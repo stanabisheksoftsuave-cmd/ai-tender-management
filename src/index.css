@@ -1,0 +1,301 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cairo:wght@400;600;700&display=swap');
+
+@tailwind base;
+
+[dir="rtl"] { font-family: 'Cairo', 'Segoe UI', sans-serif; }
+[dir="rtl"] input, [dir="rtl"] textarea, [dir="rtl"] select { text-align: right; }
+
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THEME: Bright Light (default)
+═══════════════════════════════════════════════════════════════════════ */
+[data-theme='bright'] {
+  --color-primary:       #2563EB;
+  --color-primary-dark:  #1D4ED8;
+  --color-primary-light: #3B82F6;
+  --color-accent:        #F59E0B;
+  --color-surface:       #FFFFFF;
+  --color-surface-2:     #F8FAFF;
+  --color-background:    #F1F5FF;
+  --color-sidebar:       #FFFFFF;
+  --color-sidebar-text:  #64748B;
+  --color-sidebar-active:#2563EB;
+  --color-badge-ai:      #7C3AED;
+  --color-border:        #E2E8F0;
+  --gradient: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+  --color-shadow:        0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme='bright'] body { color: #0F172A; background-color: #F1F5FF; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THEME: TenderIQ Dark Navy
+═══════════════════════════════════════════════════════════════════════ */
+[data-theme='tenderiq'] {
+  --color-primary:       #2563EB;
+  --color-primary-dark:  #1D4ED8;
+  --color-primary-light: #3B82F6;
+  --color-accent:        #F59E0B;
+  --color-surface:       #111827;
+  --color-surface-2:     #0D1530;
+  --color-background:    #0A0F1E;
+  --color-sidebar:       #070C18;
+  --color-sidebar-text:  #64748B;
+  --color-sidebar-active:#2563EB;
+  --color-badge-ai:      #818CF8;
+  --color-border:        rgba(255,255,255,0.08);
+  --gradient: linear-gradient(135deg, #070C18 0%, #1D4ED8 100%);
+  --color-shadow: 0 1px 4px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* ── Other themes (kept for backwards compat) ── */
+[data-theme='ocean'] {
+  --color-primary: #1AA8A8; --color-primary-dark: #14787A; --color-primary-light: #2BCFCF;
+  --color-accent: #F0C050; --color-surface: #FFFFFF; --color-background: #F0FAFA;
+  --color-sidebar: #082828; --color-sidebar-text: #78C8C8; --color-sidebar-active: #1AA8A8;
+  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
+  --gradient: linear-gradient(135deg, #082828 0%, #1AA8A8 100%);
+  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme='navy'] {
+  --color-primary: #1B4F8A; --color-primary-dark: #0F3468; --color-primary-light: #2563EB;
+  --color-accent: #D4AF37; --color-surface: #FFFFFF; --color-background: #F8FAFC;
+  --color-sidebar: #0A1828; --color-sidebar-text: #94A3B8; --color-sidebar-active: #1B4F8A;
+  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
+  --gradient: linear-gradient(135deg, #0A1828 0%, #1B4F8A 100%);
+  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme='sage'] {
+  --color-primary: #5A7A48; --color-primary-dark: #3D5830; --color-primary-light: #78A060;
+  --color-accent: #C8904A; --color-surface: #FFFFFF; --color-background: #F5F7F2;
+  --color-sidebar: #1E2E14; --color-sidebar-text: #90B878; --color-sidebar-active: #5A7A48;
+  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
+  --gradient: linear-gradient(135deg, #1E2E14 0%, #5A7A48 100%);
+  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme='midnight'] {
+  --color-primary: #7048C8; --color-primary-dark: #5030A8; --color-primary-light: #9068E8;
+  --color-accent: #C88040; --color-surface: #1A1230; --color-background: #120A28;
+  --color-sidebar: #0A0818; --color-sidebar-text: #8070A8; --color-sidebar-active: #4A2888;
+  --color-badge-ai: #A078E8; --color-border: rgba(255,255,255,0.08);
+  --gradient: linear-gradient(135deg, #0A0818 0%, #3A2080 100%);
+  --color-shadow: 0 1px 4px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL DARK THEME OVERRIDES
+   Remaps Tailwind's hardcoded light-mode classes to dark-friendly values
+   when TenderIQ theme is active.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Body ── */
+[data-theme='tenderiq'] body { color: #F1F5F9; background-color: #0A0F1E; }
+[data-theme='midnight'] body { color: #E2E8F0; background-color: #120A28; }
+
+/* ── Midnight: critical Tailwind overrides ── */
+[data-theme='midnight'] .bg-white         { background-color: #1A1230 !important; }
+[data-theme='midnight'] .bg-slate-50      { background-color: #150E28 !important; }
+[data-theme='midnight'] .bg-slate-100     { background-color: #261845 !important; }
+[data-theme='midnight'] .text-slate-900   { color: #F1EEF9 !important; }
+[data-theme='midnight'] .text-slate-800   { color: #E2D9F3 !important; }
+[data-theme='midnight'] .text-slate-700   { color: #C4B4E4 !important; }
+[data-theme='midnight'] .text-slate-600   { color: #A090C8 !important; }
+[data-theme='midnight'] .text-slate-500   { color: #8070A8 !important; }
+[data-theme='midnight'] .border-slate-100 { border-color: rgba(255,255,255,0.07) !important; }
+[data-theme='midnight'] .border-slate-200 { border-color: rgba(255,255,255,0.10) !important; }
+[data-theme='midnight'] .hover\:bg-slate-50:hover  { background-color: rgba(255,255,255,0.04) !important; }
+[data-theme='midnight'] .hover\:bg-slate-100:hover { background-color: rgba(255,255,255,0.07) !important; }
+
+/* ── Background overrides ── */
+[data-theme='tenderiq'] .bg-white          { background-color: #111827 !important; }
+[data-theme='tenderiq'] .bg-slate-50       { background-color: #0D1225 !important; }
+[data-theme='tenderiq'] .bg-slate-100      { background-color: #1E293B !important; }
+[data-theme='tenderiq'] .bg-slate-200      { background-color: #334155 !important; }
+
+/* semantic -50 backgrounds → transparent tinted */
+[data-theme='tenderiq'] .bg-blue-50        { background-color: rgba(59,130,246,0.12) !important; }
+[data-theme='tenderiq'] .bg-sky-50         { background-color: rgba(14,165,233,0.12) !important; }
+[data-theme='tenderiq'] .bg-green-50       { background-color: rgba(16,185,129,0.12) !important; }
+[data-theme='tenderiq'] .bg-emerald-50     { background-color: rgba(16,185,129,0.12) !important; }
+[data-theme='tenderiq'] .bg-teal-50        { background-color: rgba(20,184,166,0.12) !important; }
+[data-theme='tenderiq'] .bg-amber-50       { background-color: rgba(245,158,11,0.12) !important; }
+[data-theme='tenderiq'] .bg-orange-50      { background-color: rgba(249,115,22,0.12) !important; }
+[data-theme='tenderiq'] .bg-red-50         { background-color: rgba(239,68,68,0.12) !important; }
+[data-theme='tenderiq'] .bg-violet-50      { background-color: rgba(139,92,246,0.12) !important; }
+[data-theme='tenderiq'] .bg-purple-50      { background-color: rgba(168,85,247,0.12) !important; }
+[data-theme='tenderiq'] .bg-indigo-50      { background-color: rgba(99,102,241,0.12) !important; }
+
+/* semantic -100 backgrounds → transparent tinted (for AccessPill etc) */
+[data-theme='tenderiq'] .bg-blue-100       { background-color: rgba(59,130,246,0.18) !important; }
+[data-theme='tenderiq'] .bg-green-100      { background-color: rgba(16,185,129,0.18) !important; }
+[data-theme='tenderiq'] .bg-emerald-100    { background-color: rgba(16,185,129,0.18) !important; }
+[data-theme='tenderiq'] .bg-amber-100      { background-color: rgba(245,158,11,0.18) !important; }
+[data-theme='tenderiq'] .bg-orange-100     { background-color: rgba(249,115,22,0.18) !important; }
+[data-theme='tenderiq'] .bg-red-100        { background-color: rgba(239,68,68,0.18) !important; }
+[data-theme='tenderiq'] .bg-violet-100     { background-color: rgba(139,92,246,0.18) !important; }
+[data-theme='tenderiq'] .bg-purple-100     { background-color: rgba(168,85,247,0.18) !important; }
+[data-theme='tenderiq'] .bg-indigo-100     { background-color: rgba(99,102,241,0.18) !important; }
+[data-theme='tenderiq'] .bg-teal-100       { background-color: rgba(20,184,166,0.18) !important; }
+
+/* ── Text overrides ── */
+[data-theme='tenderiq'] .text-slate-900    { color: #F8FAFC !important; }
+[data-theme='tenderiq'] .text-slate-800    { color: #F1F5F9 !important; }
+[data-theme='tenderiq'] .text-slate-700    { color: #E2E8F0 !important; }
+[data-theme='tenderiq'] .text-slate-600    { color: #CBD5E1 !important; }
+[data-theme='tenderiq'] .text-slate-500    { color: #94A3B8 !important; }
+[data-theme='tenderiq'] .text-slate-400    { color: #64748B !important; }
+[data-theme='tenderiq'] .text-slate-300    { color: #475569 !important; }
+
+/* semantic text → lighter for dark bg */
+[data-theme='tenderiq'] .text-blue-600     { color: #60A5FA !important; }
+[data-theme='tenderiq'] .text-blue-700     { color: #60A5FA !important; }
+[data-theme='tenderiq'] .text-sky-600      { color: #38BDF8 !important; }
+[data-theme='tenderiq'] .text-sky-700      { color: #38BDF8 !important; }
+[data-theme='tenderiq'] .text-green-600    { color: #34D399 !important; }
+[data-theme='tenderiq'] .text-green-700    { color: #34D399 !important; }
+[data-theme='tenderiq'] .text-emerald-600  { color: #34D399 !important; }
+[data-theme='tenderiq'] .text-emerald-700  { color: #34D399 !important; }
+[data-theme='tenderiq'] .text-teal-600     { color: #2DD4BF !important; }
+[data-theme='tenderiq'] .text-teal-700     { color: #2DD4BF !important; }
+[data-theme='tenderiq'] .text-amber-600    { color: #FCD34D !important; }
+[data-theme='tenderiq'] .text-amber-700    { color: #FCD34D !important; }
+[data-theme='tenderiq'] .text-amber-800    { color: #FBBF24 !important; }
+[data-theme='tenderiq'] .text-orange-600   { color: #FB923C !important; }
+[data-theme='tenderiq'] .text-orange-700   { color: #FB923C !important; }
+[data-theme='tenderiq'] .text-red-600      { color: #F87171 !important; }
+[data-theme='tenderiq'] .text-red-700      { color: #F87171 !important; }
+[data-theme='tenderiq'] .text-red-500      { color: #F87171 !important; }
+[data-theme='tenderiq'] .text-red-400      { color: #FCA5A5 !important; }
+[data-theme='tenderiq'] .text-violet-600   { color: #A78BFA !important; }
+[data-theme='tenderiq'] .text-violet-700   { color: #A78BFA !important; }
+[data-theme='tenderiq'] .text-purple-600   { color: #C084FC !important; }
+[data-theme='tenderiq'] .text-purple-700   { color: #C084FC !important; }
+[data-theme='tenderiq'] .text-indigo-600   { color: #818CF8 !important; }
+[data-theme='tenderiq'] .text-indigo-700   { color: #818CF8 !important; }
+[data-theme='tenderiq'] .text-amber-500    { color: #FBBF24 !important; }
+[data-theme='tenderiq'] .text-green-500    { color: #34D399 !important; }
+[data-theme='tenderiq'] .text-amber-300    { color: #FCD34D !important; }
+[data-theme='tenderiq'] .text-amber-200    { color: #FDE68A !important; }
+
+/* ── Border overrides ── */
+[data-theme='tenderiq'] .border-slate-50   { border-color: rgba(255,255,255,0.04) !important; }
+[data-theme='tenderiq'] .border-slate-100  { border-color: rgba(255,255,255,0.07) !important; }
+[data-theme='tenderiq'] .border-slate-200  { border-color: rgba(255,255,255,0.10) !important; }
+[data-theme='tenderiq'] .border-amber-200  { border-color: rgba(245,158,11,0.3) !important; }
+[data-theme='tenderiq'] .border-red-100    { border-color: rgba(239,68,68,0.2) !important; }
+[data-theme='tenderiq'] .border-blue-100   { border-color: rgba(59,130,246,0.2) !important; }
+
+/* ── Ring overrides ── */
+[data-theme='tenderiq'] .ring-slate-200    { --tw-ring-color: rgba(255,255,255,0.12) !important; }
+[data-theme='tenderiq'] .ring-emerald-200  { --tw-ring-color: rgba(16,185,129,0.3) !important; }
+[data-theme='tenderiq'] .ring-blue-200     { --tw-ring-color: rgba(59,130,246,0.3) !important; }
+[data-theme='tenderiq'] .ring-amber-200    { --tw-ring-color: rgba(245,158,11,0.3) !important; }
+[data-theme='tenderiq'] .ring-amber-300    { --tw-ring-color: rgba(245,158,11,0.4) !important; }
+[data-theme='tenderiq'] .ring-red-100      { --tw-ring-color: rgba(239,68,68,0.2) !important; }
+[data-theme='tenderiq'] .ring-red-200      { --tw-ring-color: rgba(239,68,68,0.3) !important; }
+[data-theme='tenderiq'] .ring-violet-200   { --tw-ring-color: rgba(139,92,246,0.3) !important; }
+[data-theme='tenderiq'] .ring-purple-200   { --tw-ring-color: rgba(168,85,247,0.3) !important; }
+[data-theme='tenderiq'] .ring-indigo-200   { --tw-ring-color: rgba(99,102,241,0.3) !important; }
+[data-theme='tenderiq'] .ring-sky-200      { --tw-ring-color: rgba(14,165,233,0.3) !important; }
+[data-theme='tenderiq'] .ring-orange-200   { --tw-ring-color: rgba(249,115,22,0.3) !important; }
+[data-theme='tenderiq'] .ring-teal-200     { --tw-ring-color: rgba(20,184,166,0.3) !important; }
+
+/* ── Divider overrides ── */
+[data-theme='tenderiq'] .divide-slate-50  > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.04) !important; }
+[data-theme='tenderiq'] .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.07) !important; }
+
+/* ── Opacity-variant backgrounds (e.g. bg-slate-50/50, bg-amber-50/40) ── */
+[data-theme='tenderiq'] .bg-slate-50\/50  { background-color: rgba(255,255,255,0.03) !important; }
+[data-theme='tenderiq'] .bg-slate-50\/80  { background-color: rgba(15,23,42,0.8) !important; }
+[data-theme='tenderiq'] .bg-amber-50\/40  { background-color: rgba(245,158,11,0.08) !important; }
+[data-theme='tenderiq'] .bg-amber-50\/60  { background-color: rgba(245,158,11,0.1) !important; }
+[data-theme='tenderiq'] .bg-white\/80     { background-color: rgba(17,24,39,0.8) !important; }
+
+/* ── Hover overrides ── */
+[data-theme='tenderiq'] .hover\:bg-slate-50:hover        { background-color: rgba(255,255,255,0.04) !important; }
+[data-theme='tenderiq'] .hover\:bg-slate-50\/50:hover    { background-color: rgba(255,255,255,0.03) !important; }
+[data-theme='tenderiq'] .hover\:bg-slate-100:hover       { background-color: rgba(255,255,255,0.07) !important; }
+[data-theme='tenderiq'] .hover\:bg-white:hover           { background-color: rgba(255,255,255,0.06) !important; }
+[data-theme='tenderiq'] .hover\:bg-red-50:hover          { background-color: rgba(239,68,68,0.1) !important; }
+
+/* ── Input / Form elements (scoped to main app layout, not login) ── */
+[data-theme='tenderiq'] .app-root input:not([type='checkbox']):not([type='radio']),
+[data-theme='tenderiq'] .app-root select,
+[data-theme='tenderiq'] .app-root textarea {
+  background-color: rgba(255,255,255,0.05) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  color: #F1F5F9 !important;
+}
+[data-theme='tenderiq'] .app-root input::placeholder,
+[data-theme='tenderiq'] .app-root textarea::placeholder { color: #4B5563 !important; }
+[data-theme='tenderiq'] .app-root select option { background-color: #1E293B; color: #F1F5F9; }
+
+/* ── Shimmer dark ── */
+[data-theme='tenderiq'] .shimmer {
+  background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%) !important;
+}
+
+/* ── Scrollbar dark ── */
+[data-theme='tenderiq'] ::-webkit-scrollbar-thumb { background: #334155; }
+[data-theme='tenderiq'] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL BASE STYLES
+═══════════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-background);
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Animations ── */
+@keyframes ai-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0.35); }
+  50%       { box-shadow: 0 0 0 8px rgba(124,58,237,0); }
+}
+.ai-pulse { animation: ai-pulse 2s infinite; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fade-in 0.22s ease forwards; }
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+/* ── Sidebar nav item ── */
+.sidebar-item { transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ── Card hover ── */
+.card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+.card-hover:hover { box-shadow: 0 12px 32px -4px rgba(0,0,0,0.3); transform: translateY(-2px); }
+
+/* ── Focus ring ── */
+input:focus, select:focus, textarea:focus { outline: none; }
+
+/* ── Glow effects for TenderIQ ── */
+@keyframes subtle-glow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
