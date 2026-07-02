@@ -4,12 +4,13 @@ import { tenders as initialTenders } from '../data/mockData'
 const TenderContext = createContext()
 
 const NEXT_STATUS = {
-  draft:        { status: 'upload',        stage: 'Awaiting Ingestion' },
-  upload:       { status: 'tech_eval',     stage: 'Technical Evaluation',  evalProgress: 'not_started' },
-  tech_eval:    { status: 'comm_eval',     stage: 'Commercial Evaluation', evalProgress: 'not_started' },
-  comm_eval:    { status: 'legal_review',  stage: 'Legal Review',          evalProgress: 'not_started' },
-  legal_review: { status: 'mgmt_review',   stage: 'Management Review',     evalProgress: 'not_started' },
-  mgmt_review:  { status: 'award',         stage: 'Award Recommended' },
+  draft:            { status: 'upload',           stage: 'Awaiting Ingestion' },
+  upload:           { status: 'tech_eval',         stage: 'Technical Evaluation',   evalProgress: 'not_started' },
+  tech_eval:        { status: 'tech_eval_export',  stage: 'Awaiting Contract Engineer Upload', evalProgress: 'not_started' },
+  tech_eval_export: { status: 'comm_eval',         stage: 'Commercial Evaluation',  evalProgress: 'not_started' },
+  comm_eval:        { status: 'comm_eval_export',  stage: 'Awaiting Contract Engineer Upload', evalProgress: 'not_started' },
+  comm_eval_export: { status: 'mgmt_review',       stage: 'Management Review',      evalProgress: 'not_started' },
+  mgmt_review:      { status: 'award',             stage: 'Award Recommended' },
 }
 
 export function TenderProvider({ children }) {
@@ -39,8 +40,14 @@ export function TenderProvider({ children }) {
     setTenders(prev => prev.map(t => t.id === tenderId ? { ...t, ...changes } : t))
   }
 
+  const reassignTender = (tenderId, newStatus, newStage) => {
+    setTenders(prev => prev.map(t =>
+      t.id === tenderId ? { ...t, status: newStatus, stage: newStage, evalProgress: 'not_started' } : t
+    ))
+  }
+
   return (
-    <TenderContext.Provider value={{ tenders, advanceTender, addTender, updateTender }}>
+    <TenderContext.Provider value={{ tenders, advanceTender, addTender, updateTender, reassignTender }}>
       {children}
     </TenderContext.Provider>
   )

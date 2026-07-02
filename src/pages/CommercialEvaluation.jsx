@@ -1,6 +1,24 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { BarChart3, CheckCircle, TrendingDown, Save, Send, Pencil, Plus, Trash2, X, AlertTriangle, ArrowLeft, ShieldOff } from 'lucide-react'
+const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+    style={style} className={className}>{children}</svg>
+)
+const BarChart3     = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></Svg>
+const CheckCircle   = p => <Svg {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Svg>
+const TrendingDown  = p => <Svg {...p}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></Svg>
+const Save          = p => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Svg>
+const Send          = p => <Svg {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Svg>
+const Pencil        = p => <Svg {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></Svg>
+const Plus          = p => <Svg {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Svg>
+const Trash2        = p => <Svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Svg>
+const X             = p => <Svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>
+const AlertTriangle = p => <Svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Svg>
+const ArrowLeft     = p => <Svg {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Svg>
+const ShieldOff     = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></Svg>
+const Download      = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
+const Clock         = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -10,9 +28,9 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 
 const getCompliance = (score) => {
-  if (score >= 80) return { variant: 'compliant', label: 'Compliant' }
-  if (score >= 60) return { variant: 'partial_compliant', label: 'Partial Compliant' }
-  return { variant: 'non_compliant', label: 'Non Compliant' }
+  if (score >= 2) return { variant: 'compliant',        label: 'Compliant' }
+  if (score >= 1) return { variant: 'partial_compliant', label: 'Partially Compliant' }
+  return                  { variant: 'non_compliant',    label: 'Non-Compliant' }
 }
 
 const bidTotals = {
@@ -99,7 +117,7 @@ export default function CommercialEvaluation() {
 
   const addCriterion = () => {
     const nextId = Math.max(0, ...draft.map(c => c.id)) + 1
-    setDraft(prev => [...prev, { id: nextId, criterion: '', weight: 0, maxScore: 100 }])
+    setDraft(prev => [...prev, { id: nextId, criterion: '', weight: 0, maxScore: 3 }])
   }
 
   const removeCriterion = (idx) => {
@@ -114,7 +132,7 @@ export default function CommercialEvaluation() {
   }
 
   const setScore = (bidderId, criterionId, value) => {
-    const num = value === '' ? '' : Math.min(100, Math.max(0, Number(value)))
+    const num = value === '' ? '' : Math.min(3, Math.max(0, Number(value)))
     setScores(prev => ({ ...prev, [`${bidderId}-${criterionId}`]: num }))
   }
 
@@ -324,7 +342,8 @@ export default function CommercialEvaluation() {
                           <input
                             type="number"
                             min={0}
-                            max={100}
+                            max={3}
+                            step={1}
                             value={val ?? ''}
                             placeholder="—"
                             onChange={e => setScore(b.id, c.id, e.target.value)}
@@ -351,7 +370,7 @@ export default function CommercialEvaluation() {
                     <td key={b.id} className="px-3 py-3 text-center">
                       {scored ? (
                         <>
-                          <span className={`text-base font-bold block mb-1 ${score >= 80 ? 'text-green-600' : score >= 60 ? 'text-amber-600' : 'text-red-500'}`}>
+                          <span className={`text-base font-bold block mb-1 ${score >= 2 ? 'text-green-600' : score >= 1 ? 'text-amber-600' : 'text-red-500'}`}>
                             {score.toFixed(1)}
                           </span>
                           <Badge variant={compliance.variant}>{compliance.label}</Badge>
@@ -368,22 +387,45 @@ export default function CommercialEvaluation() {
         </div>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" size="sm"><Save size={13} /> Save Draft</Button>
-        <Button size="sm" disabled={submitted} onClick={() => {
-          if (!allScored) { setSubmitError(`${missingScoresCount} score${missingScoresCount > 1 ? 's' : ''} missing — all criteria must be scored before submitting.`); return }
-          setSubmitError(''); advanceTender(tenderId); setSubmitted(true)
-        }}><Send size={13} /> Submit Evaluation</Button>
-      </div>
-      {submitError && (
-        <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <AlertTriangle size={12} /> {submitError}
-        </div>
-      )}
-      {submitted && (
-        <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-          <CheckCircle size={12} /> Commercial evaluation submitted. Tender advanced to <strong className="ml-1">Legal Review</strong>.
-        </div>
+      {!submitted ? (
+        <>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm"><Save size={13} /> Save Draft</Button>
+            <Button size="sm" onClick={() => {
+              if (!allScored) { setSubmitError(`${missingScoresCount} score${missingScoresCount > 1 ? 's' : ''} missing — all criteria must be scored before submitting.`); return }
+              setSubmitError(''); advanceTender(tenderId); setSubmitted(true)
+            }}><Send size={13} /> Submit & Export Report</Button>
+          </div>
+          {submitError && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertTriangle size={12} /> {submitError}
+            </div>
+          )}
+        </>
+      ) : (
+        <Card className="p-5 space-y-3">
+          <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+            <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">Commercial Evaluation Submitted</p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Download the evaluation report and hand it to the <strong>Contract Engineer</strong> for upload to unlock Management Review.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+            <Clock size={13} className="shrink-0" />
+            <span>Tender is now <strong className="mx-1">Awaiting Contract Engineer Upload</strong> — the Contract Engineer must upload this report to advance to Management Review.</span>
+          </div>
+          <Button className="w-full justify-center" onClick={() => {
+            const a = document.createElement('a')
+            a.href = '#'
+            a.download = `Comm-Eval-Report-${tenderId}.pdf`
+            a.click()
+          }}>
+            <Download size={14} /> Download Commercial Evaluation Report
+          </Button>
+        </Card>
       )}
       </>)}
 

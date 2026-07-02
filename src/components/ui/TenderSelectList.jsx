@@ -4,11 +4,10 @@ import Card from './Card'
 import Badge from './Badge'
 
 const statusVariant = {
-  tech_eval: 'tech_eval',
-  comm_eval: 'comm_eval',
-  legal_review: 'legal_review',
+  tech_eval:   'tech_eval',
+  comm_eval:   'comm_eval',
   mgmt_review: 'mgmt_review',
-  upload: 'upload',
+  upload:      'upload',
 }
 
 export default function TenderSelectList({ tenders, status, basePath, title, description, emptyText }) {

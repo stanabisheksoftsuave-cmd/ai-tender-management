@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Bot, Sparkles, CheckCircle, RefreshCw, Highlighter, Send, ChevronRight,
-  FileText, AlertCircle, Clock, RotateCcw, Circle, UserCheck, Download, ShieldCheck
+  FileText, AlertCircle, Clock, RotateCcw, Circle, UserCheck, Download, ShieldCheck,
+  UploadCloud, X, Paperclip
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -653,10 +654,10 @@ const generationTasks = [
 
 const draftStatusMap = [
   { label: 'ITT Draft', sub: 'Filling in project details', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { label: 'ITT Draft', sub: 'Selecting document template', cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   { label: 'ITT Draft', sub: 'AI generating document...', cls: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { label: 'ITT Draft', sub: 'Selecting document template', cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   { label: 'ITT Draft', sub: 'Under review', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { label: 'Pending Approval', sub: 'Awaiting approver decision', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { label: 'Ready to Export', sub: 'Export for external review', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
 ]
 
 export default function ITTCreation() {
@@ -665,10 +666,10 @@ export default function ITTCreation() {
   const { tenders, addTender, advanceTender } = useTenders()
   const { lang, t } = useLanguage()
   const { user } = useAuth()
-  const approverName = user?.name || 'Procurement Officer'
-  const approverRole = user?.role?.label || 'Procurement Officer'
+  const approverName = user?.name || 'Contract Engineer'
+  const approverRole = user?.role?.label || 'Contract Engineer'
   const approverInitials = approverName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const steps = [t('itt.step1'), 'Template', t('itt.step2'), t('itt.step3'), t('itt.step4')]
+  const steps = [t('itt.step1'), t('itt.step2'), 'Template', t('itt.step3'), t('itt.step4')]
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
   const initialForm = existingTender
@@ -689,7 +690,32 @@ export default function ITTCreation() {
   const [ittApproved, setIttApproved] = useState(false)
   const [form, setForm] = useState(initialForm)
   const [showErrors, setShowErrors] = useState(false)
-  const draftSavedRef = useRef(false)
+  const draftSavedRef  = useRef(false)
+  const fileInputRef   = useRef(null)
+
+  const [descMode,     setDescMode]     = useState('type') // 'type' | 'upload'
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [isDragging,   setIsDragging]   = useState(false)
+
+  const handleFileUpload = (file) => {
+    if (!file) return
+    setUploadedFile(file)
+    if (file.type === 'text/plain') {
+      const reader = new FileReader()
+      reader.onload = e => setField('description', e.target.result)
+      reader.readAsText(file)
+    } else {
+      setField('description', `[Extracted from: ${file.name} — AI will parse this document during generation]`)
+    }
+    setDescMode('upload')
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFileUpload(file)
+  }
 
   const requiredFields = ['title', 'department', 'budget', 'deadline', 'description']
   const isFormValid = requiredFields.every(f => form[f].trim() !== '')
@@ -706,12 +732,12 @@ export default function ITTCreation() {
 
   // Auto-tick generation tasks, then add draft tender + advance to Review
   useEffect(() => {
-    if (step !== 2) return
+    if (step !== 1) return
     if (genStep >= generationTasks.length) {
       const t = setTimeout(() => {
         if (!draftSavedRef.current) {
           draftSavedRef.current = true
-          setSections(generateSections(form, selectedTemplate))
+          setSections(generateSections(form, null))
           const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(t.id.split('-')[2]) || 0), 0)
           const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
           addTender({
@@ -723,7 +749,7 @@ export default function ITTCreation() {
             description: form.description,
             duration: form.duration,
             status: 'draft',
-            stage: 'Pending Approval',
+            stage: 'Draft — Pending Export',
             created: new Date().toISOString().split('T')[0],
             bidders: 0,
             bidderList: [],
@@ -731,7 +757,7 @@ export default function ITTCreation() {
           })
           setDraftTenderId(newId)
         }
-        setStep(3)
+        setStep(2)
       }, 400)
       return () => clearTimeout(t)
     }
@@ -742,12 +768,8 @@ export default function ITTCreation() {
 
   const handleGenerate = () => {
     if (!isFormValid) { setShowErrors(true); return }
-    setStep(1)
-  }
-
-  const handleStartGeneration = () => {
     setGenStep(0)
-    setStep(2)
+    setStep(1)
   }
 
   const handleTextSelect = () => {
@@ -768,7 +790,7 @@ export default function ITTCreation() {
   }
 
   const currentDraftStatus = ittApproved
-    ? { label: 'ITT Created', sub: 'Approved & ready to export', cls: 'bg-green-100 text-green-700 border-green-200' }
+    ? { label: 'ITT Exported', sub: 'Exported — awaiting bid upload', cls: 'bg-green-100 text-green-700 border-green-200' }
     : draftStatusMap[step] || draftStatusMap[0]
 
   const reviewableSections = sections.filter(s => !s.autoApproved)
@@ -807,8 +829,8 @@ export default function ITTCreation() {
 
       {/* ── Step 0: Project Details ── */}
       {step === 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <Card className="lg:col-span-2 p-5">
+        <div className="space-y-4">
+          <Card className="p-5">
             <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <FileText size={16} className="text-[var(--color-primary)]" />
               Project Information
@@ -819,7 +841,6 @@ export default function ITTCreation() {
                 { key: 'department', label: t('itt.fieldDept'),     placeholder: 'e.g. IT Department', required: true },
                 { key: 'budget',     label: t('itt.fieldBudget'),   placeholder: 'e.g. 500000', required: true, onChangeFn: setBudget },
                 { key: 'deadline',   label: t('itt.fieldDeadline'), type: 'date', required: true },
-                { key: 'duration',   label: t('itt.fieldDuration'), placeholder: 'e.g. 24 months', required: false },
               ].map(f => (
                 <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">
@@ -841,21 +862,140 @@ export default function ITTCreation() {
                   )}
                 </div>
               ))}
+
+              {/* Contract Duration — years + months duration picker */}
+              {(() => {
+                const yearOpts  = Array.from({ length: 11 }, (_, i) => i)   // 0–10 years
+                const monthOpts = Array.from({ length: 12 }, (_, i) => i)   // 0–11 months
+                const match     = (form.duration || '').match(/^(\d+)\s+year[s]?\s+(\d+)\s+month[s]?$/)
+                const selYears  = match ? match[1] : ''
+                const selMonths = match ? match[2] : ''
+                const setDuration = (y, m) => {
+                  if (y === '' && m === '') { setField('duration', ''); return }
+                  const yv = y !== '' ? y : '0'
+                  const mv = m !== '' ? m : '0'
+                  setField('duration', `${yv} year${yv === '1' ? '' : 's'} ${mv} month${mv === '1' ? '' : 's'}`)
+                }
+                return (
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      {t('itt.fieldDuration')}
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={selYears}
+                        onChange={e => setDuration(e.target.value, selMonths)}
+                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
+                        <option value="">Years</option>
+                        {yearOpts.map(y => <option key={y} value={y}>{y} year{y === 1 ? '' : 's'}</option>)}
+                      </select>
+                      <select
+                        value={selMonths}
+                        onChange={e => setDuration(selYears, e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
+                        <option value="">Months</option>
+                        {monthOpts.map(m => <option key={m} value={m}>{m} month{m === 1 ? '' : 's'}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )
+              })()}
               <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                  Project Description / Key Requirements
-                  <span className="text-red-500 ml-0.5">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Describe the project scope, objectives, and key requirements..."
-                  value={form.description}
-                  onChange={e => setField('description', e.target.value)}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 resize-none transition-colors
-                    ${fieldError('description')
-                      ? 'border-red-400 focus:ring-red-300 bg-red-50'
-                      : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    Project Description / Key Requirements
+                    <span className="text-red-500 ml-0.5">*</span>
+                  </label>
+                  {/* Mode toggle */}
+                  <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                    {[{ id: 'type', icon: FileText, label: 'Type' }, { id: 'upload', icon: UploadCloud, label: 'Upload File' }].map(m => (
+                      <button key={m.id} type="button" onClick={() => setDescMode(m.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all
+                          ${descMode === m.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                        <m.icon size={11} /> {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Type mode: plain textarea ── */}
+                {descMode === 'type' && (
+                  <textarea
+                    rows={4}
+                    placeholder="Describe the project scope, objectives, and key requirements..."
+                    value={form.description}
+                    onChange={e => setField('description', e.target.value)}
+                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 resize-none transition-colors
+                      ${fieldError('description')
+                        ? 'border-red-400 focus:ring-red-300 bg-red-50'
+                        : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
+                  />
+                )}
+
+                {/* ── Upload mode ── */}
+                {descMode === 'upload' && (
+                  <div className="space-y-2">
+                    {/* Drop zone (hidden once file attached) */}
+                    {!uploadedFile && (
+                      <div
+                        onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`w-full rounded-xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center gap-2 py-7 transition-all
+                          ${isDragging
+                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                            : fieldError('description')
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-slate-200 hover:border-[var(--color-primary)]/50 hover:bg-slate-50'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
+                          ${isDragging ? 'bg-[var(--color-primary)]/10' : 'bg-slate-100'}`}>
+                          <UploadCloud size={20} className={isDragging ? 'text-[var(--color-primary)]' : 'text-slate-400'} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-slate-600">
+                            Drag & drop or <span className="text-[var(--color-primary)] underline underline-offset-2">browse</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">.pdf · .docx · .txt · .doc</p>
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,.docx,.txt,.doc,.rtf"
+                          className="hidden"
+                          onChange={e => handleFileUpload(e.target.files?.[0])}
+                        />
+                      </div>
+                    )}
+
+                    {/* File attached chip + extracted textarea */}
+                    {uploadedFile && (
+                      <>
+                        <div className="flex items-center gap-2 bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 rounded-lg px-3 py-2">
+                          <Paperclip size={13} className="text-[var(--color-primary)] shrink-0" />
+                          <span className="text-xs font-medium text-slate-700 flex-1 truncate">{uploadedFile.name}</span>
+                          <span className="text-[10px] text-slate-400">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
+                          <button type="button"
+                            onClick={() => { setUploadedFile(null); setField('description', '') }}
+                            className="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          placeholder="Extracted content will appear here — you can edit before generating…"
+                          value={form.description}
+                          onChange={e => setField('description', e.target.value)}
+                          className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 resize-none transition-colors
+                            ${fieldError('description')
+                              ? 'border-red-400 focus:ring-red-300 bg-red-50'
+                              : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {fieldError('description') && (
                   <p className="text-[11px] text-red-500 mt-1">Project description is required</p>
                 )}
@@ -863,69 +1003,31 @@ export default function ITTCreation() {
             </div>
           </Card>
 
-          <div className="space-y-4">
-            <Card className="p-4">
-              <h3 className="font-semibold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                <Bot size={14} className="text-violet-600" />
-                AI Configuration
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Evaluation Model</label>
-                  <select className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none">
-                    <option>60% Quality / 40% Price</option>
-                    <option>70% Quality / 30% Price</option>
-                    <option>50% Quality / 50% Price</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Contract Type</label>
-                  <select className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none">
-                    <option>Fixed-Price</option>
-                    <option>Time & Materials</option>
-                    <option>Framework Agreement</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Compliance Standards</label>
-                  <div className="space-y-1.5">
-                    {['ISO 27001', 'GDPR', 'Local Content', 'Financial Vetting'].map(c => (
-                      <label key={c} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                        <input type="checkbox" defaultChecked className="accent-[var(--color-primary)]" />
-                        {c}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
+          <Button
+            onClick={handleGenerate}
+            className="w-full justify-center py-3"
+            disabled={showErrors && !isFormValid}
+          >
+            <Sparkles size={15} />
+            Generate with AI
+          </Button>
 
-            <Button
-              onClick={handleGenerate}
-              className="w-full justify-center"
-              disabled={showErrors && !isFormValid}
-            >
-              <ChevronRight size={15} />
-              Next: Select Template
-            </Button>
+          {showErrors && !isFormValid && (
+            <p className="text-[11px] text-red-500 text-center flex items-center justify-center gap-1">
+              <AlertCircle size={11} /> Please fill in all required fields marked with *
+            </p>
+          )}
 
-            {showErrors && !isFormValid && (
-              <p className="text-[11px] text-red-500 text-center flex items-center justify-center gap-1">
-                <AlertCircle size={11} /> Please fill in all required fields marked with *
-              </p>
-            )}
-
-            {!showErrors && (
-              <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-                Choose a document template on the next step before AI generation.
-              </p>
-            )}
-          </div>
+          {!showErrors && (
+            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+              AI will generate the ITT from your project details. Choose a template after generation.
+            </p>
+          )}
         </div>
       )}
 
-      {/* ── Step 1: Template Selection ── */}
-      {step === 1 && (
+      {/* ── Step 2: Template Selection ── */}
+      {step === 2 && (
         <div className="space-y-5">
           <Card className="p-5">
             <div className="flex items-center justify-between mb-5">
@@ -981,17 +1083,17 @@ export default function ITTCreation() {
               <p className="text-[11px] text-slate-400">
                 {selectedTemplate ? `Selected: ${selectedTemplate.name}` : 'No template selected — AI will use standard structure'}
               </p>
-              <Button onClick={handleStartGeneration} className="flex items-center gap-2">
-                <Sparkles size={15} />
-                {t('itt.generate')}
+              <Button onClick={() => { setSections(generateSections(form, selectedTemplate)); setStep(3) }} className="flex items-center gap-2">
+                <ChevronRight size={15} />
+                {selectedTemplate ? 'Apply Template & Review' : 'Skip & Review'}
               </Button>
             </div>
           </Card>
         </div>
       )}
 
-      {/* ── Step 2: AI Generation ── */}
-      {step === 2 && (
+      {/* ── Step 1: AI Generation ── */}
+      {step === 1 && (
         <Card className="p-12">
           <div className="text-center mb-10">
             <div className="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
@@ -1041,16 +1143,16 @@ export default function ITTCreation() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="ai"><Bot size={10} /> AI Generated</Badge>
-                <span className="text-xs text-slate-500">Approve or redesign each section</span>
+                <span className="text-xs text-slate-500">Accept or redesign each section</span>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => { setGenStep(0); setApprovedSections([]); setRedesignSection(null); setStep(2) }}>
+              <Button variant="secondary" size="sm" onClick={() => { setGenStep(0); draftSavedRef.current = false; setApprovedSections([]); setRedesignSection(null); setStep(1) }}>
                 <RefreshCw size={13} /> Regenerate All
               </Button>
             </div>
 
             <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg px-4 py-3 text-xs text-violet-700">
               <Highlighter size={14} className="mt-0.5 shrink-0" />
-              <span>Highlight text for targeted AI edits, approve sections you're satisfied with, or request a full redesign per section.</span>
+              <span>Highlight text for targeted AI edits, accept sections you're satisfied with, or request a full redesign per section.</span>
             </div>
 
             {sections.map(s => {
@@ -1105,7 +1207,7 @@ export default function ITTCreation() {
                             size="sm"
                             onClick={() => toggleApprove(s.id)}
                           >
-                            {isApproved ? 'Unapprove' : 'Approve'}
+                            {isApproved ? 'Undo Accept' : 'Accept'}
                           </Button>
                         </>
                       )}
@@ -1119,7 +1221,7 @@ export default function ITTCreation() {
                   {isAutoApproved && (
                     <div className="px-4 py-2.5 bg-teal-50/60 border-t border-teal-100 flex items-center gap-2">
                       <ShieldCheck size={12} className="text-teal-500 shrink-0" />
-                      <p className="text-[11px] text-teal-700">Mandatory regulatory clause — automatically included. No Procurement Officer review required.</p>
+                      <p className="text-[11px] text-teal-700">Mandatory regulatory clause — automatically included. No Contract Engineer review required.</p>
                     </div>
                   )}
 
@@ -1157,12 +1259,12 @@ export default function ITTCreation() {
             {allApproved ? (
               <div className="flex justify-end gap-3 pt-2">
                 <Button onClick={() => setStep(4)}>
-                  <UserCheck size={15} /> Submit for Approval
+                  <Download size={15} /> Proceed to Export
                 </Button>
               </div>
             ) : (
               <p className="text-xs text-slate-400 text-right pt-1">
-                {reviewableSections.length - approvedSections.length} section(s) remaining to approve before submission
+                {reviewableSections.length - approvedSections.length} section(s) remaining to accept before export
               </p>
             )}
           </div>
@@ -1224,26 +1326,26 @@ export default function ITTCreation() {
         </div>
       )}
 
-      {/* ── Step 4: Pending Approval ── */}
+      {/* ── Step 4: Export ITT ── */}
       {step === 4 && !ittApproved && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Submission status */}
+          {/* Export status */}
           <Card className="p-5">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <Clock size={20} className="text-blue-600" />
+                <Download size={20} className="text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-800">Pending Approval</h3>
-                <p className="text-xs text-slate-400">{draftTenderId} submitted for human review</p>
+                <h3 className="font-semibold text-slate-800">Ready to Export</h3>
+                <p className="text-xs text-slate-400">{draftTenderId} ready for external review</p>
               </div>
             </div>
 
             <div className="space-y-2.5">
               {[
-                { label: 'Submitted By', value: approverName, sub: approverRole },
-                { label: 'Submitted On', value: new Date().toISOString().split('T')[0], sub: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' local time' },
-                { label: 'Sections Reviewed', value: `${sections.length} of ${sections.length}`, sub: 'All sections approved' },
+                { label: 'Prepared By', value: approverName, sub: approverRole },
+                { label: 'Prepared On', value: new Date().toISOString().split('T')[0], sub: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' local time' },
+                { label: 'Sections Reviewed', value: `${sections.length} of ${sections.length}`, sub: 'All sections reviewed' },
               ].map(item => (
                 <div key={item.label} className="bg-slate-50 rounded-lg px-3 py-2.5">
                   <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">{item.label}</p>
@@ -1255,11 +1357,11 @@ export default function ITTCreation() {
 
             <div className="mt-4 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-700">
               <AlertCircle size={13} className="mt-0.5 shrink-0" />
-              Review the ITT summary and approve to publish it to the tender list.
+              Export the ITT document for external review, then upload the finalised version to proceed.
             </div>
           </Card>
 
-          {/* Approver panel */}
+          {/* Export panel */}
           <Card className="p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] font-bold text-sm shrink-0">
@@ -1269,7 +1371,7 @@ export default function ITTCreation() {
                 <p className="text-sm font-semibold text-slate-800">{approverName}</p>
                 <p className="text-xs text-slate-400">{approverRole}</p>
               </div>
-              <Badge variant="info">Approver</Badge>
+              <Badge variant="info">Exporter</Badge>
             </div>
 
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">ITT Summary</p>
@@ -1289,41 +1391,41 @@ export default function ITTCreation() {
             </div>
 
             <div className="mb-4">
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">Approval Notes (Optional)</label>
+              <label className="text-xs font-medium text-slate-600 mb-1.5 block">Export Notes (Optional)</label>
               <textarea
                 value={approvalNote}
                 onChange={e => setApprovalNote(e.target.value)}
                 rows={3}
-                placeholder="Add comments or conditions before approving..."
+                placeholder="Add notes for the external reviewer..."
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 resize-none"
               />
             </div>
 
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1 justify-center" onClick={() => setStep(3)}>
-                Request Changes
+                Back to Review
               </Button>
               <Button className="flex-1 justify-center" onClick={() => {
                 if (draftTenderId) advanceTender(draftTenderId)
                 setIttApproved(true)
               }}>
-                <CheckCircle size={15} /> {t('itt.approveBtn')}
+                <Download size={15} /> Export ITT
               </Button>
             </div>
           </Card>
         </div>
       )}
 
-      {/* ── ITT Created (post-approval) ── */}
+      {/* ── ITT Exported & Created ── */}
       {step === 4 && ittApproved && (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-500" />
           </div>
-          <Badge variant="success" className="mb-3">ITT Created</Badge>
-          <h2 className="text-xl font-bold text-slate-800 mb-1">ITT Approved & Created</h2>
-          <p className="text-slate-500 text-sm mb-1">Approved by {approverName} · {approverRole}</p>
-          <p className="text-slate-400 text-xs mb-6">{draftTenderId} — {form.title} is ready to be exported and sent to bidders</p>
+          <Badge variant="success" className="mb-3">ITT Exported</Badge>
+          <h2 className="text-xl font-bold text-slate-800 mb-1">ITT Exported & Created</h2>
+          <p className="text-slate-500 text-sm mb-1">Exported by {approverName} · {approverRole}</p>
+          <p className="text-slate-400 text-xs mb-6">{draftTenderId} — {form.title} is exported for external review. Upload the finalised version when ready.</p>
           <div className="flex items-center justify-center gap-3">
             <Button variant="secondary" onClick={() => {
               const tender = tenders.find(t => t.id === draftTenderId) || {

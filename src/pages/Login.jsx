@@ -112,16 +112,20 @@ export default function Login() {
     : `w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${disabled ? 'bg-slate-100 border-slate-200 cursor-default text-slate-400' : 'bg-white border-slate-200 hover:border-slate-300'}`
 
   return (
-    <div className="min-h-screen flex" style={{ background: isDark ? '#0A0F1E' : '#F1F5FF', direction: isRtl ? 'rtl' : 'ltr' }}
+    <div className="min-h-screen flex" style={{ background: isDark ? '#0A0F1E' : theme === 'olng' ? '#ecf4fc' : '#F1F5FF', direction: isRtl ? 'rtl' : 'ltr' }}
       onClick={() => showThemes && setShowThemes(false)}>
 
       {/* ── LEFT PANEL ──────────────────────────────────────────────────────── */}
       <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #0A0F1E 0%, #0D1530 60%, #0A1628 100%)' }}>
+        style={{ background: theme === 'olng'
+          ? 'linear-gradient(145deg, #1b4c6f 0%, #0d3352 50%, #0089cf 100%)'
+          : 'linear-gradient(135deg, #0A0F1E 0%, #0D1530 60%, #0A1628 100%)' }}>
 
-        {/* Gold grid overlay */}
+        {/* Grid overlay */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: 'linear-gradient(rgba(245,158,11,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.04) 1px, transparent 1px)',
+          backgroundImage: theme === 'olng'
+            ? 'linear-gradient(rgba(175,217,244,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(175,217,244,0.06) 1px, transparent 1px)'
+            : 'linear-gradient(rgba(245,158,11,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.04) 1px, transparent 1px)',
           backgroundSize: '60px 60px'
         }} />
 
@@ -130,38 +134,55 @@ export default function Login() {
           <div key={i} className="absolute rounded-full" style={{
             top: d.top, left: d.left,
             width: d.size * 4, height: d.size * 4,
-            background: `rgba(245,158,11,${d.opacity})`,
-            boxShadow: `0 0 ${d.size * 6}px rgba(245,158,11,${d.opacity * 0.6})`,
+            background: theme === 'olng'
+              ? `rgba(175,217,244,${d.opacity})`
+              : `rgba(245,158,11,${d.opacity})`,
+            boxShadow: theme === 'olng'
+              ? `0 0 ${d.size * 6}px rgba(175,217,244,${d.opacity * 0.5})`
+              : `0 0 ${d.size * 6}px rgba(245,158,11,${d.opacity * 0.6})`,
           }} />
         ))}
 
-        {/* Khanjar/star watermark */}
+        {/* Watermark — OLNG flame shape / star */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none"
-          style={{ opacity: 0.06 }}>
-          <svg width="360" height="360" viewBox="0 0 100 100" fill="currentColor" style={{ color: '#F59E0B' }}>
-            <polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" />
-          </svg>
+          style={{ opacity: theme === 'olng' ? 0.08 : 0.06 }}>
+          {theme === 'olng' ? (
+            <svg width="340" height="340" viewBox="0 0 100 100" fill="currentColor" style={{ color: '#afd9f4' }}>
+              {/* Flame shape — simplified OLNG blue flame element */}
+              <path d="M50 10 C50 10 30 30 30 55 C30 70 38 80 50 85 C62 80 70 70 70 55 C70 30 50 10 50 10Z" opacity="0.6"/>
+              <path d="M50 30 C50 30 40 45 40 58 C40 66 44 72 50 75 C56 72 60 66 60 58 C60 45 50 30 50 30Z" opacity="0.9"/>
+              <circle cx="50" cy="20" r="6" opacity="0.4"/>
+            </svg>
+          ) : (
+            <svg width="360" height="360" viewBox="0 0 100 100" fill="currentColor" style={{ color: '#F59E0B' }}>
+              <polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" />
+            </svg>
+          )}
         </div>
 
         {/* Glow blobs */}
         <div className="absolute top-16 -left-16 w-80 h-80 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)' }} />
+          style={{ background: theme === 'olng'
+            ? 'radial-gradient(circle, rgba(0,137,207,0.20) 0%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)' }} />
         <div className="absolute bottom-10 right-0 w-72 h-72 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)' }} />
+          style={{ background: theme === 'olng'
+            ? 'radial-gradient(circle, rgba(175,217,244,0.12) 0%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)' }} />
 
         {/* ── Top: Logo ── */}
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-lg"
-              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>AI</div>
-            <div>
-              <div className="font-bold text-white text-base leading-tight">{t('login.appName')}</div>
-              <div className="text-xs text-slate-400 leading-tight">{t('login.miniSub')}</div>
-            </div>
+            <img
+              src="/olng-logo.png"
+              alt="Oman LNG"
+              className="h-24 w-auto object-contain"
+            />
           </div>
 
           {/* Label */}
-          <p className="text-[10px] font-bold tracking-[0.25em] mb-5" style={{ color: '#F59E0B' }}>
+          <p className="text-[10px] font-bold tracking-[0.25em] mb-5"
+            style={{ color: theme === 'olng' ? '#afd9f4' : '#F59E0B' }}>
             {t('login.procurementDir')}
           </p>
 
@@ -169,8 +190,8 @@ export default function Login() {
           <h2 className="text-4xl font-extrabold leading-tight mb-6">
             <span className="text-white block">{t('login.heroLine1')}</span>
             <span className="text-white block">{t('login.heroLine2')}</span>
-            <span className="block" style={{ color: '#2563EB' }}>{t('login.heroLine3')}</span>
-            <span className="block text-slate-400">{t('login.heroLine4')}</span>
+            <span className="block" style={{ color: theme === 'olng' ? '#afd9f4' : '#2563EB' }}>{t('login.heroLine3')}</span>
+            <span className="block" style={{ color: theme === 'olng' ? 'rgba(204,230,248,0.75)' : '#94A3B8' }}>{t('login.heroLine4')}</span>
           </h2>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
@@ -202,7 +223,7 @@ export default function Login() {
 
       {/* ── RIGHT PANEL ─────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 relative"
-        style={{ background: isDark ? '#0D1225' : '#F1F5FF' }}>
+        style={{ background: isDark ? '#0D1225' : theme === 'olng' ? '#ecf4fc' : '#F1F5FF' }}>
 
         {/* Top-right controls */}
         <div className={`absolute top-5 ${isRtl ? 'left-5' : 'right-5'} flex items-center gap-2`}>
@@ -265,7 +286,7 @@ export default function Login() {
               <button key={l} onClick={() => setLang(l)}
                 className="text-[10px] px-2.5 py-1 rounded-md transition-all font-semibold"
                 style={lang === l
-                  ? { background: '#2563EB', color: '#fff' }
+                  ? { background: theme === 'olng' ? '#0089cf' : '#2563EB', color: '#fff' }
                   : { color: isDark ? 'rgba(255,255,255,0.4)' : '#64748B' }}>
                 {l === 'en' ? 'EN' : 'عربي'}
               </button>
@@ -284,9 +305,10 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-[10px]"
-              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>AI</div>
-            <div className="font-bold text-sm" style={{ color: isDark ? '#fff' : '#0F172A' }}>{t('login.appName')}</div>
+            <img src="/olng-logo.png" alt="Oman LNG" className="h-9 w-9 object-contain rounded-lg" />
+            <div className="font-bold text-sm" style={{ color: isDark ? '#fff' : '#0F172A' }}>
+              Oman LNG
+            </div>
           </div>
 
           {/* Heading */}
@@ -411,25 +433,33 @@ export default function Login() {
             )}
 
             {/* CTA button */}
-            {needsSetPassword ? (
-              <div className="space-y-2 pt-1">
-                <button onClick={handleSetPassword}
-                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 24px rgba(37,99,235,0.35)' }}>
-                  {t('login.setPasswordSignIn')} <ArrowRightSvg />
+            {(() => {
+              const btnGrad = theme === 'olng'
+                ? 'linear-gradient(135deg, #0089cf, #1b4c6f)'
+                : 'linear-gradient(135deg, #2563EB, #1D4ED8)'
+              const btnShadow = theme === 'olng'
+                ? '0 4px 24px rgba(0,137,207,0.35)'
+                : '0 4px 24px rgba(37,99,235,0.35)'
+              return needsSetPassword ? (
+                <div className="space-y-2 pt-1">
+                  <button onClick={handleSetPassword}
+                    className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{ background: btnGrad, boxShadow: btnShadow }}>
+                    {t('login.setPasswordSignIn')} <ArrowRightSvg />
+                  </button>
+                  <button onClick={() => { setNeedsSetPassword(false); setNewPassword(''); setConfirmPassword(''); setError('') }}
+                    className="w-full py-2 text-xs transition-colors" style={{ color: isDark ? '#64748B' : '#94A3B8' }}>
+                    {t('login.backToSignIn')}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={handleLogin}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98] mt-1"
+                  style={{ background: btnGrad, boxShadow: btnShadow }}>
+                  {t('login.signInSecurely')} <ArrowRightSvg />
                 </button>
-                <button onClick={() => { setNeedsSetPassword(false); setNewPassword(''); setConfirmPassword(''); setError('') }}
-                  className="w-full py-2 text-xs transition-colors" style={{ color: isDark ? '#64748B' : '#94A3B8' }}>
-                  {t('login.backToSignIn')}
-                </button>
-              </div>
-            ) : (
-              <button onClick={handleLogin}
-                className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98] mt-1"
-                style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 24px rgba(37,99,235,0.35)' }}>
-                {t('login.signInSecurely')} <ArrowRightSvg />
-              </button>
-            )}
+              )
+            })()}
           </div>
 
           {/* Demo accounts */}

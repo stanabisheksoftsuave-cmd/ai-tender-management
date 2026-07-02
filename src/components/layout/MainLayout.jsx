@@ -10,11 +10,9 @@ const pageMeta = {
   '/upload':         { titleKey: 'page.ingestion',   subKey: 'page.ingestion.sub' },
   '/technical-eval': { titleKey: 'page.techEval',    subKey: 'page.techEval.sub' },
   '/commercial-eval':{ titleKey: 'page.commEval',    subKey: 'page.commEval.sub' },
-  '/legal-review':   { titleKey: 'page.legalReview', subKey: 'page.legalReview.sub' },
   '/mgmt-review':    { titleKey: 'page.mgmtReview',  subKey: 'page.mgmtReview.sub' },
   '/contract':       { titleKey: 'page.contract',    subKey: 'page.contract.sub' },
   '/audit-log':      { titleKey: 'page.auditLog',    subKey: 'page.auditLog.sub' },
-  '/system':         { titleKey: 'page.system',      subKey: 'page.system.sub' },
   '/users':          { titleKey: 'page.users',       subKey: 'page.users.sub' },
 }
 
@@ -28,9 +26,9 @@ export default function MainLayout({ children }) {
 
   return (
     <div className="app-root flex min-h-screen">
+      <Header title={t(meta.titleKey)} subtitle={meta.subKey ? t(meta.subKey) : ''} />
       <Sidebar />
-      <div className={`flex-1 ${isRtl ? 'mr-[232px]' : 'ml-[232px]'} flex flex-col min-h-screen`}>
-        <Header title={t(meta.titleKey)} subtitle={meta.subKey ? t(meta.subKey) : ''} />
+      <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}>
         <main className="flex-1 p-6 overflow-auto fade-in">
           {children}
         </main>

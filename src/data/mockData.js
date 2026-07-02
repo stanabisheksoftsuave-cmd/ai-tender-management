@@ -93,47 +93,6 @@ export const tenders = [
     assignedCommEval: { id: 4, name: 'Mark Davis' },
   },
 
-  // ── Legal Review ───────────────────────────────────────────────────────────
-  {
-    id: 'ITT-2025-002',
-    title: 'National Cybersecurity Operations Centre Establishment',
-    department: 'National Information Technology Authority (NITA)',
-    budget: 'OMR 692,000',
-    status: 'legal_review',
-    stage: 'Legal Review',
-    evalProgress: 'in_progress',
-    created: '2025-02-28',
-    deadline: '2025-04-01',
-    bidders: 3,
-    aiScore: 91,
-  },
-  {
-    id: 'ITT-2025-011',
-    title: 'Muscat International Airport Perimeter Security Upgrade',
-    department: 'Oman Airports Company (OAC)',
-    budget: 'OMR 1,924,000',
-    status: 'legal_review',
-    stage: 'Legal Review',
-    evalProgress: 'not_started',
-    created: '2025-01-20',
-    deadline: '2025-03-30',
-    bidders: 3,
-    aiScore: 88,
-  },
-  {
-    id: 'ITT-2025-012',
-    title: 'Sohar Port Cargo Management & Automation System',
-    department: 'Asyad Group — Port Operations',
-    budget: 'OMR 1,077,000',
-    status: 'legal_review',
-    stage: 'Legal Review',
-    evalProgress: 'not_started',
-    created: '2025-02-05',
-    deadline: '2025-04-10',
-    bidders: 4,
-    aiScore: 90,
-  },
-
   // ── Management Review ─────────────────────────────────────────────────────
   {
     id: 'ITT-2025-013',
@@ -224,33 +183,38 @@ export const bidders = [
 ]
 
 export const auditLogs = [
-  { id: 1,  user: 'John Smith',   role: 'Procurement Officer', action: 'Created ITT',                              tender: 'ITT-2025-001', timestamp: '2025-03-10 09:14:32', ip: '10.1.0.10',  status: 'success' },
-  { id: 2,  user: 'AI System',    role: 'System',              action: 'Generated ITT Document',                   tender: 'ITT-2025-001', timestamp: '2025-03-10 09:15:45', ip: '10.0.0.1',   status: 'success' },
-  { id: 3,  user: 'John Smith',   role: 'Procurement Officer', action: 'Approved ITT',                             tender: 'ITT-2025-001', timestamp: '2025-03-10 10:32:11', ip: '10.1.0.10',  status: 'success' },
-  { id: 4,  user: 'John Smith',   role: 'Procurement Officer', action: 'Exported Tender Package',                  tender: 'ITT-2025-001', timestamp: '2025-03-11 08:55:00', ip: '10.1.0.10',  status: 'success' },
-  { id: 5,  user: 'John Smith',   role: 'Procurement Officer', action: 'Uploaded Bidder Proposals',               tender: 'ITT-2025-001', timestamp: '2025-03-25 14:10:22', ip: '10.1.0.10',  status: 'success' },
-  { id: 6,  user: 'AI System',    role: 'System',              action: 'Extracted Proposal Data',                  tender: 'ITT-2025-001', timestamp: '2025-03-25 14:12:05', ip: '10.0.0.1',   status: 'success' },
-  { id: 7,  user: 'Sarah Chen',   role: 'Technical Evaluator', action: 'Submitted Technical Evaluation',          tender: 'ITT-2025-001', timestamp: '2025-04-02 16:45:33', ip: '10.1.0.22',  status: 'success' },
-  { id: 8,  user: 'Mark Davis',   role: 'Commercial Evaluator',action: 'Submitted Commercial Evaluation',         tender: 'ITT-2025-001', timestamp: '2025-04-03 11:20:14', ip: '10.1.0.31',  status: 'success' },
-  { id: 9,  user: 'Emma Wilson',  role: 'Legal Reviewer',      action: 'Submitted Final Legal Approval',          tender: 'ITT-2025-001', timestamp: '2025-04-05 09:55:47', ip: '10.1.0.45',  status: 'success' },
-  { id: 10, user: 'Robert Lee',   role: 'Management Reviewer', action: 'Approved Award — Initiated Contract Draft',tender: 'ITT-2025-001', timestamp: '2025-04-06 14:30:20', ip: '10.1.0.52',  status: 'success' },
+  { id: 1,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Created ITT',                                    tender: 'ITT-2025-001', timestamp: '2025-03-10 09:14:32', ip: '10.1.0.10', status: 'success' },
+  { id: 2,  user: 'AI System',   role: 'System',               action: 'Generated ITT Document',                          tender: 'ITT-2025-001', timestamp: '2025-03-10 09:15:45', ip: '10.0.0.1',  status: 'success' },
+  { id: 3,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Exported ITT Document for External Review',       tender: 'ITT-2025-001', timestamp: '2025-03-10 10:32:11', ip: '10.1.0.10', status: 'success' },
+  { id: 4,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Uploaded Finalized ITT Document',                 tender: 'ITT-2025-001', timestamp: '2025-03-11 08:55:00', ip: '10.1.0.10', status: 'success' },
+  { id: 5,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Uploaded Bidder Proposals',                       tender: 'ITT-2025-001', timestamp: '2025-03-25 14:10:22', ip: '10.1.0.10', status: 'success' },
+  { id: 6,  user: 'AI System',   role: 'System',               action: 'Extracted Proposal Data',                         tender: 'ITT-2025-001', timestamp: '2025-03-25 14:12:05', ip: '10.0.0.1',  status: 'success' },
+  { id: 7,  user: 'Admin User',  role: 'Administrator',        action: 'Assigned Technical Evaluation — Sarah Chen',      tender: 'ITT-2025-001', timestamp: '2025-03-26 09:00:00', ip: '10.1.0.1',  status: 'success' },
+  { id: 8,  user: 'Sarah Chen',  role: 'Technical Evaluator',  action: 'Submitted Technical Evaluation',                  tender: 'ITT-2025-001', timestamp: '2025-04-02 16:45:33', ip: '10.1.0.22', status: 'success' },
+  { id: 9,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Exported Technical Evaluation Report',            tender: 'ITT-2025-001', timestamp: '2025-04-02 17:10:00', ip: '10.1.0.10', status: 'success' },
+  { id: 10, user: 'John Smith',  role: 'Contract Engineer',  action: 'Uploaded Finalized Technical Evaluation Report',  tender: 'ITT-2025-001', timestamp: '2025-04-03 08:30:00', ip: '10.1.0.10', status: 'success' },
+  { id: 11, user: 'Mark Davis',  role: 'Commercial Evaluator', action: 'Submitted Commercial Evaluation',                 tender: 'ITT-2025-001', timestamp: '2025-04-04 11:20:14', ip: '10.1.0.31', status: 'success' },
+  { id: 12, user: 'John Smith',  role: 'Contract Engineer',  action: 'Exported Commercial Evaluation Report',           tender: 'ITT-2025-001', timestamp: '2025-04-04 12:00:00', ip: '10.1.0.10', status: 'success' },
+  { id: 13, user: 'John Smith',  role: 'Contract Engineer',  action: 'Uploaded Finalized Commercial Evaluation Report', tender: 'ITT-2025-001', timestamp: '2025-04-05 09:00:00', ip: '10.1.0.10', status: 'success' },
+  { id: 14, user: 'Robert Lee',  role: 'Management Reviewer',  action: 'Submitted Award Recommendation — TechSolutions Ltd', tender: 'ITT-2025-001', timestamp: '2025-04-06 14:30:20', ip: '10.1.0.52', status: 'success' },
+  { id: 15, user: 'John Smith',  role: 'Contract Engineer',  action: 'Created Contract for Awarded Bidder',             tender: 'ITT-2025-001', timestamp: '2025-04-07 09:15:00', ip: '10.1.0.10', status: 'success' },
 ]
 
 export const technicalCriteria = [
-  { id: 1, criterion: 'Technical Approach & Methodology',   weight: 25, maxScore: 100 },
-  { id: 2, criterion: 'Team Qualifications & Experience',   weight: 20, maxScore: 100 },
-  { id: 3, criterion: 'Implementation Timeline',            weight: 15, maxScore: 100 },
-  { id: 4, criterion: 'Technology Stack & Innovation',      weight: 20, maxScore: 100 },
-  { id: 5, criterion: 'Risk Management Plan',               weight: 10, maxScore: 100 },
-  { id: 6, criterion: 'After-Sales Support & SLA',          weight: 10, maxScore: 100 },
+  { id: 1, criterion: 'Technical Approach & Methodology',   weight: 25, maxScore: 3 },
+  { id: 2, criterion: 'Team Qualifications & Experience',   weight: 20, maxScore: 3 },
+  { id: 3, criterion: 'Implementation Timeline',            weight: 15, maxScore: 3 },
+  { id: 4, criterion: 'Technology Stack & Innovation',      weight: 20, maxScore: 3 },
+  { id: 5, criterion: 'Risk Management Plan',               weight: 10, maxScore: 3 },
+  { id: 6, criterion: 'After-Sales Support & SLA',          weight: 10, maxScore: 3 },
 ]
 
 export const commercialCriteria = [
-  { id: 1, criterion: 'Total Bid Price',               weight: 40, maxScore: 100 },
-  { id: 2, criterion: 'Payment Terms',                 weight: 15, maxScore: 100 },
-  { id: 3, criterion: 'Warranty & Maintenance Cost',   weight: 20, maxScore: 100 },
-  { id: 4, criterion: 'In-country Value (ICV)',        weight: 15, maxScore: 100 },
-  { id: 5, criterion: 'Financial Stability',           weight: 10, maxScore: 100 },
+  { id: 1, criterion: 'Total Bid Price',               weight: 40, maxScore: 3 },
+  { id: 2, criterion: 'Payment Terms',                 weight: 15, maxScore: 3 },
+  { id: 3, criterion: 'Warranty & Maintenance Cost',   weight: 20, maxScore: 3 },
+  { id: 4, criterion: 'In-country Value (ICV)',        weight: 15, maxScore: 3 },
+  { id: 5, criterion: 'Financial Stability',           weight: 10, maxScore: 3 },
 ]
 
 export const contractTemplates = [

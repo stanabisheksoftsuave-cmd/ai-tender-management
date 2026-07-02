@@ -1,18 +1,43 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import {
-  CheckCircle, XCircle, ChevronDown, ChevronUp, FileText,
-  Bell, X, ArrowLeft, ShieldOff, Eye, Send,
-  AlertTriangle, Bot, ClipboardCheck, Hash, Calendar, RotateCcw,
-  Zap, Users, Shield, ScanSearch
-} from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
-import { bidders as seedBidders } from '../data/mockData'
+import { bidders as seedBidders, technicalCriteria as defaultTechCriteria } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+
+const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+    style={style} className={className}>{children}</svg>
+)
+const CheckCircle    = p => <Svg {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Svg>
+const XCircle        = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></Svg>
+const ChevronDown    = p => <Svg {...p}><polyline points="6 9 12 15 18 9"/></Svg>
+const ChevronUp      = p => <Svg {...p}><polyline points="18 15 12 9 6 15"/></Svg>
+const FileText       = p => <Svg {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></Svg>
+const Bell           = p => <Svg {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></Svg>
+const X              = p => <Svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>
+const ArrowLeft      = p => <Svg {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Svg>
+const ShieldOff      = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></Svg>
+const Eye            = p => <Svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Svg>
+const Send           = p => <Svg {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Svg>
+const AlertTriangle  = p => <Svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Svg>
+const Bot            = p => <Svg {...p}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></Svg>
+const ClipboardCheck = p => <Svg {...p}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></Svg>
+const Hash           = p => <Svg {...p}><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></Svg>
+const Calendar       = p => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Svg>
+const RotateCcw      = p => <Svg {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.1"/></Svg>
+const Zap            = p => <Svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Svg>
+const Users          = p => <Svg {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>
+const Shield         = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Svg>
+const ScanSearch     = p => <Svg {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M18.5 18.5l2.5 2.5"/></Svg>
+const BarChart3      = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></Svg>
+const Download       = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
+const Clock          = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
+const Upload         = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
 
 // ── Evaluation Metric Definitions ────────────────────────────────────────────
 
@@ -237,6 +262,14 @@ export default function TechnicalEvaluation() {
   const [reExtracting,     setReExtracting]     = useState(false)
   const [reExtractStep,    setReExtractStep]    = useState(0)
   const [reEvalState,      setReEvalState]      = useState({}) // { [bidderId]: { step, done } }
+  const [activeTab,        setActiveTab]        = useState('compliance') // 'compliance' | 'scoring'
+  const [techScores,       setTechScores]       = useState({})
+  const [techCriteria]                          = useState(defaultTechCriteria)
+  const [aiScored,    setAiScored]    = useState(false)
+  const [aiScoring,   setAiScoring]   = useState(false)
+  const [aiScoreStep, setAiScoreStep] = useState(0)
+  const [aiModified,  setAiModified]  = useState({})
+  const eligibleBiddersRef            = useRef([])
 
   const AI_STEPS = [
     'Parsing bidder submission bundles…',
@@ -249,7 +282,7 @@ export default function TechnicalEvaluation() {
   ]
 
   const RE_EXTRACT_STEPS = [
-    'Receiving re-uploaded documents from Procurement Officer…',
+    'Receiving re-uploaded documents from Contract Engineer…',
     'Parsing corrected compliance documents…',
     'Re-validating against ITT requirements…',
     'Re-evaluating compliance status for updated bidders…',
@@ -327,11 +360,11 @@ export default function TechnicalEvaluation() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingReExtract.length])
 
-  // Auto-navigate to submit page once all bidders are finalized
+  // When compliance is fully finalized, move straight to scoring — skip the submit overlay
   useEffect(() => {
     if (!allFinalized) { setShowSubmit(false); return }
-    const t = setTimeout(() => setShowSubmit(true), 900)
-    return () => clearTimeout(t)
+    setActiveTab('scoring')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFinalized])
 
   // Re-extraction progress — on complete: re-evaluate compliance for re-submitted bidders,
@@ -366,8 +399,7 @@ export default function TechnicalEvaluation() {
         })
         setReExtracting(false)
         setStarted(true)
-        // Do NOT auto-jump to submit — let evaluator review updated compliance first.
-        // The allFinalized useEffect will navigate to submit once all statuses are determined.
+        setActiveTab('scoring') // re-upload done → go straight to scoring, skip submit screen
         const merged = [...new Set([...(tender?.extractedBidderIds || []), ...pendingReExtract.map(b => b.id)])]
         updateTender(tenderId, { extractedBidderIds: merged })
       }, 800)
@@ -377,6 +409,37 @@ export default function TechnicalEvaluation() {
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reExtracting, reExtractStep])
+
+  // Auto-start AI scoring when scoring tab opens
+  useEffect(() => {
+    if (activeTab !== 'scoring' || aiScored || aiScoring) return
+    const t = setTimeout(() => { setAiScoreStep(0); setAiScoring(true) }, 300)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Step through animation; on completion apply scores from ref (avoids stale closure on eligibleBidders)
+  useEffect(() => {
+    if (!aiScoring) return
+    if (aiScoreStep >= techCriteria.length + 2) {
+      const result = {}
+      eligibleBiddersRef.current.forEach(bidder => {
+        techCriteria.forEach(c => {
+          const base = ((bidder.techScore ?? 75) / 100) * 3
+          const seed = (Number(bidder.id) * 17 + Number(c.id) * 7) % 10
+          const variation = (seed - 5) * 0.12
+          result[`${bidder.id}-${c.id}`] = Math.min(3, Math.max(0, Math.round(base + variation)))
+        })
+      })
+      setTechScores(result)
+      setAiScoring(false)
+      setAiScored(true)
+      return
+    }
+    const t = setTimeout(() => setAiScoreStep(s => s + 1), 380)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiScoring, aiScoreStep])
 
   // ── Role gate ──
   if (user?.role?.id !== 'tech_eval') {
@@ -588,6 +651,29 @@ export default function TechnicalEvaluation() {
     return acc
   }, {})
 
+  const setTechScore = (bidderId, criterionId, value) => {
+    const num = value === '' ? '' : Math.min(3, Math.max(0, Number(value)))
+    setTechScores(prev => ({ ...prev, [`${bidderId}-${criterionId}`]: num }))
+  }
+  const techTotalFor = bidderId =>
+    techCriteria.reduce((sum, c) => {
+      const s = techScores[`${bidderId}-${c.id}`]
+      return sum + ((s === '' || s === undefined ? 0 : Number(s)) * c.weight / 100)
+    }, 0)
+  const hasTechScores = bidderId => techCriteria.some(c => techScores[`${bidderId}-${c.id}`] !== undefined)
+  const eligibleBidders = displayBidders.filter(b =>
+    getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT) !== 'non_compliant'
+  )
+  eligibleBiddersRef.current = eligibleBidders // keep ref fresh for the AI scoring effect
+  const allTechScored = eligibleBidders.length > 0 && eligibleBidders.every(b =>
+    techCriteria.every(c => { const v = techScores[`${b.id}-${c.id}`]; return v !== undefined && v !== '' })
+  )
+  const getScoreCompliance = score => {
+    if (score >= 2) return { variant: 'compliant',         label: 'Compliant' }
+    if (score >= 1) return { variant: 'partial_compliant', label: 'Partial' }
+    return             { variant: 'non_compliant',     label: 'Non-Compliant' }
+  }
+
   const handleNotifyPOF = (bidder) => {
     if (notifications.some(n => n.bidder.id === bidder.id)) return
     const now = new Date()
@@ -602,7 +688,7 @@ export default function TechnicalEvaluation() {
       ...mo.map(o => ({ ...o, kind: 'optional' })),
     ]
     setNotifications(prev => [...prev, { bidder, comp, notifiedAt }])
-    // Persist to TenderContext so Procurement Officer can see it in BidderUpload
+    // Persist to TenderContext so Contract Engineer can see it in BidderUpload
     const existing = tender.correctionRequests || []
     updateTender(tenderId, {
       correctionRequests: [
@@ -807,7 +893,7 @@ export default function TechnicalEvaluation() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-800">{b.name}</p>
-                      <p className="text-[11px] text-amber-600">Awaiting Procurement Officer re-upload</p>
+                      <p className="text-[11px] text-amber-600">Awaiting Contract Engineer re-upload</p>
                     </div>
                   </div>
                   <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
@@ -881,13 +967,28 @@ export default function TechnicalEvaluation() {
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl shrink-0">
               <Bell size={13} className="text-amber-500" />
               <span className="text-xs font-semibold text-amber-700">
-                {notifications.length} Procurement Officer notification{notifications.length !== 1 ? 's' : ''} sent
+                {notifications.length} Contract Engineer notification{notifications.length !== 1 ? 's' : ''} sent
               </span>
             </div>
           )}
         </div>
       </Card>
 
+      {/* ── Tab Navigation ── */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        {[
+          { id: 'compliance', label: 'Compliance Review' },
+          { id: 'scoring',    label: 'Technical Scoring' },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+              ${activeTab === tab.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'compliance' && (<>
       {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
@@ -1155,7 +1256,7 @@ export default function TechnicalEvaluation() {
                             ${isNotified ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-200'}`}>
                             <div className="flex items-center gap-2 text-xs">
                               {isNotified
-                                ? <><CheckCircle size={12} className="text-emerald-500" /><span className="text-slate-500">Correction request sent to Procurement Officer. Awaiting re-upload.</span></>
+                                ? <><CheckCircle size={12} className="text-emerald-500" /><span className="text-slate-500">Correction request sent to Contract Engineer. Awaiting re-upload.</span></>
                                 : <><AlertTriangle size={12} className="text-amber-500" /><span className="text-amber-700">{mm.length + mo.length} document{mm.length + mo.length !== 1 ? 's' : ''} require vendor attention.</span></>}
                             </div>
                             <button
@@ -1167,7 +1268,7 @@ export default function TechnicalEvaluation() {
                                   : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
                               {isNotified
                                 ? <><RotateCcw size={11} /> Notified</>
-                                : <><Bell size={11} /> Notify Procurement Officer to Re-upload</>}
+                                : <><Bell size={11} /> Notify Contract Engineer to Re-upload</>}
                             </button>
                           </div>
                         </div>
@@ -1225,34 +1326,296 @@ export default function TechnicalEvaluation() {
             })}
           </div>
 
-          {/* Submit panel */}
+          {/* Compliance complete — proceed to scoring */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Compliance Review</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {allFinalized
+                    ? 'All compliance statuses finalised. Proceed to Technical Scoring.'
+                    : 'Resolve all Partial Compliant statuses before proceeding.'}
+                </p>
+              </div>
+              <button
+                disabled={!allFinalized}
+                onClick={() => setActiveTab('scoring')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
+                  ${allFinalized
+                    ? 'bg-[var(--color-primary)] text-white hover:opacity-90 shadow-md'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+                Technical Scoring →
+              </button>
+            </div>
+            {!allFinalized && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertTriangle size={12} />
+                All bidders must be <strong className="mx-1">Compliant</strong> or <strong className="mx-1">Non-Compliant</strong> before proceeding to scoring.
+              </div>
+            )}
+          </Card>
+      </>)}
+
+      {activeTab === 'scoring' && (<>
+        {!aiScored && !aiScoring && (
+          <div className="flex items-center gap-2.5 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl animate-pulse">
+            <Bot size={14} className="text-blue-500" />
+            <span className="text-xs text-blue-700 font-medium">AI is initialising technical scoring…</span>
+          </div>
+        )}
+        {aiScoring && (() => {
+          const steps = ['Preparing analysis of bidder submissions…', ...techCriteria.map(c => `Evaluating: ${c.criterion}…`), 'Compiling weighted scores…']
+          return (
+            <Card className="overflow-hidden border border-blue-100">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center gap-2">
+                <Bot size={14} className="text-white" />
+                <p className="text-xs font-semibold text-white">AI Technical Scoring in Progress…</p>
+                <div className="ml-auto w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              </div>
+              <div className="p-4 space-y-2">
+                {steps.map((step, i) => (
+                  <div key={i} className={`flex items-center gap-2.5 py-0.5 transition-all ${i > aiScoreStep ? 'opacity-20' : 'opacity-100'}`}>
+                    {i < aiScoreStep
+                      ? <CheckCircle size={13} className="text-emerald-500 shrink-0" />
+                      : i === aiScoreStep
+                        ? <div className="w-3.5 h-3.5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
+                        : <div className="w-3.5 h-3.5 rounded-full border border-slate-200 shrink-0" />
+                    }
+                    <span className={`text-xs ${i < aiScoreStep ? 'text-slate-400 line-through' : i === aiScoreStep ? 'text-slate-800 font-semibold' : 'text-slate-300'}`}>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )
+        })()}
+        {aiScored && (
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+            <Bot size={14} className="text-blue-600 shrink-0" />
+            <span className="text-xs text-blue-800"><strong>AI-generated scores applied.</strong> Review and adjust individual scores below if needed before submitting.</span>
+            <button onClick={() => { setAiScored(false); setAiModified({}); setTechScores({}) }}
+              className="ml-auto shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline whitespace-nowrap">
+              Re-analyse
+            </button>
+          </div>
+        )}
+        {/* Technical Scoring Table */}
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Technical Evaluation Criteria</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Score 0–3 per criterion · 0 Unacceptable · 1 Marginal · 2 Acceptable · 3 Excellent</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <BarChart3 size={12} /> Weighted scoring
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 min-w-52">Criterion</th>
+                  <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 w-16">Weight</th>
+                  {displayBidders.map(b => {
+                    const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                    return (
+                      <th key={b.id} className="text-center px-3 py-3 text-xs font-semibold text-slate-500 min-w-32">
+                        <div>{b.name.split(' ')[0]}</div>
+                        {bStatus === 'non_compliant' && (
+                          <span className="block text-[9px] font-medium text-red-400 mt-0.5">Eliminated</span>
+                        )}
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {techCriteria.map(c => (
+                  <tr key={c.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 text-sm font-medium text-slate-700">{c.criterion}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{c.weight}%</span>
+                    </td>
+                    {displayBidders.map(b => {
+                      const scoreKey = `${b.id}-${c.id}`
+                      const val = techScores[scoreKey]
+                      const hasVal = val !== undefined && val !== ''
+                      const scoreComp = hasVal ? getScoreCompliance(Number(val)) : null
+                      const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                      return (
+                        <td key={b.id} className="px-3 py-3 text-center">
+                          {bStatus === 'non_compliant' ? (
+                            <span className="text-xs text-slate-200">—</span>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <div className="relative">
+                                <input
+                                  type="number" min={0} max={3} step={1}
+                                  value={val ?? ''}
+                                  placeholder="—"
+                                  onChange={e => {
+                                    setTechScore(b.id, c.id, e.target.value)
+                                    if (aiScored) setAiModified(prev => ({ ...prev, [scoreKey]: true }))
+                                  }}
+                                  className={`w-16 text-center text-sm font-semibold rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300 ${
+                                    aiScored && !aiModified[scoreKey] && hasVal
+                                      ? 'border-2 border-blue-300 bg-blue-50/40'
+                                      : 'border border-slate-200'
+                                  }`}
+                                />
+                                {aiScored && !aiModified[scoreKey] && hasVal && (
+                                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                                    <Bot size={8} />
+                                  </div>
+                                )}
+                              </div>
+                              {aiScored && aiModified[scoreKey] && (
+                                <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">Modified</span>
+                              )}
+                              {hasVal && scoreComp && (
+                                <Badge variant={scoreComp.variant} className="text-[9px] px-1.5 py-0">{scoreComp.label}</Badge>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-50 border-t-2 border-slate-200">
+                  <td colSpan={2} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Weighted Total</td>
+                  {displayBidders.map(b => {
+                    const scored = hasTechScores(b.id)
+                    const score = techTotalFor(b.id)
+                    const scoreComp = getScoreCompliance(score)
+                    const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                    return (
+                      <td key={b.id} className="px-3 py-3 text-center">
+                        {bStatus === 'non_compliant' ? (
+                          <span className="text-xs text-slate-400 italic">Eliminated</span>
+                        ) : scored ? (
+                          <>
+                            <span className={`text-base font-bold block mb-1 ${score >= 2 ? 'text-green-600' : score >= 1 ? 'text-amber-600' : 'text-red-500'}`}>
+                              {score.toFixed(2)}
+                            </span>
+                            <Badge variant={scoreComp.variant}>{scoreComp.label}</Badge>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-300">—</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+
+        {/* Submit / Export */}
+        {!submitted ? (
           <Card className="p-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Finalise Technical Evaluation</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {allFinalized
-                    ? 'All bidders evaluated. Submit to advance to Commercial Evaluation.'
-                    : 'Resolve all Partial Compliant statuses before submitting.'}
+                  {allTechScored
+                    ? 'All criteria scored. Submit to generate the evaluation report.'
+                    : `Score all ${eligibleBidders.length} eligible bidder${eligibleBidders.length !== 1 ? 's' : ''} across all ${techCriteria.length} criteria.`}
                 </p>
               </div>
-              <Button size="sm" disabled={submitted || !allFinalized} onClick={() => { advanceTender(tenderId); setSubmitted(true) }}>
-                <Send size={13} /> {submitted ? 'Evaluation Submitted' : 'Submit Evaluation'}
+              <Button size="sm" disabled={!allTechScored}
+                onClick={() => { advanceTender(tenderId); setSubmitted(true) }}>
+                <Send size={13} /> Submit & Export Report
               </Button>
             </div>
-            {!allFinalized && !submitted && (
+            {!allTechScored && (
               <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <AlertTriangle size={12} />
-                Submit is disabled — all bidders must be <strong className="mx-1">Compliant</strong> or <strong className="mx-1">Non-Compliant</strong>. Partial Compliant statuses must be resolved first.
-              </div>
-            )}
-            {submitted && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                <CheckCircle size={12} />
-                Technical evaluation submitted. Tender advanced to <strong className="ml-1">Commercial Evaluation</strong>.
+                Score all {eligibleBidders.length} eligible bidder{eligibleBidders.length !== 1 ? 's' : ''} across all {techCriteria.length} criteria before submitting.
               </div>
             )}
           </Card>
+        ) : (
+          <Card className="p-5 space-y-3">
+            <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">Technical Evaluation Submitted</p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Download the evaluation report and hand it to the <strong>Contract Engineer</strong> for upload to unlock Commercial Evaluation.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+              <Clock size={13} className="shrink-0" />
+              <span>Tender is now <strong className="mx-1">Awaiting Contract Engineer Upload</strong> — the Contract Engineer must upload this report to advance to Commercial Evaluation.</span>
+            </div>
+            <Button className="w-full justify-center" onClick={() => {
+              const win = window.open('', '_blank')
+              if (!win) return
+              const rows = eligibleBidders.map(b => {
+                const total = techTotalFor(b)
+                const sc = getScoreCompliance(total)
+                const cols = techCriteria.map(c => {
+                  const v = techScores[`${b.id}-${c.id}`]
+                  return `<td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9">${v ?? '—'}</td>`
+                }).join('')
+                return `<tr>
+                  <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-weight:600">${b.name}</td>
+                  <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:11px">${b.country}</td>
+                  ${cols}
+                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;color:${total>=2?'#059669':total>=1?'#d97706':'#dc2626'}">${total.toFixed(2)}</td>
+                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;font-size:11px;color:${sc.variant==='compliant'?'#059669':sc.variant==='partial_compliant'?'#d97706':'#dc2626'}">${sc.label}</td>
+                </tr>`
+              }).join('')
+              const criterionHeaders = techCriteria.map(c =>
+                `<th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">${c.criterion}<br><span style="font-size:9px;color:#94a3b8">${c.weight}%</span></th>`
+              ).join('')
+              win.document.write(`<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <title>Tech-Eval-Report-${tenderId}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;padding:32px;color:#1e293b}table{width:100%;border-collapse:collapse;font-size:12px}@media print{.no-print{display:none}body{background:white;padding:0}.page{box-shadow:none;border-radius:0}}</style>
+</head><body>
+  <div class="page" style="max-width:960px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.10)">
+    <div style="background:linear-gradient(135deg,#1b4c6f,#0089cf);color:white;padding:40px 48px">
+      <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Technical Evaluation Report</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">${tender.title}</div>
+      <div style="font-size:13px;opacity:.8">${tender.id} · ${tender.department} · Generated ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+      <div style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap">
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Total Bidders</div><div style="font-size:16px;font-weight:700">${displayBidders.length}</div></div>
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Eligible</div><div style="font-size:16px;font-weight:700">${eligibleBidders.length}</div></div>
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Criteria</div><div style="font-size:16px;font-weight:700">${techCriteria.length}</div></div>
+        <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Evaluator</div><div style="font-size:16px;font-weight:700">${user?.name || 'Technical Evaluator'}</div></div>
+      </div>
+    </div>
+    <div style="padding:40px 48px">
+      <div style="font-size:12px;font-weight:700;color:#1b4c6f;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0">Technical Scoring Matrix</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th style="text-align:left;padding:8px 12px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Bidder</th>
+            <th style="text-align:left;padding:8px 12px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Country</th>
+            ${criterionHeaders}
+            <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Weighted Total</th>
+            <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Result</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <button class="no-print" onclick="window.print()" style="position:fixed;bottom:24px;right:24px;background:#0089cf;color:white;border:none;padding:12px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,137,207,.4)">⬇ Print / Save as PDF</button>
+</body></html>`)
+              win.document.close()
+            }}>
+              <Download size={14} /> Download Technical Evaluation Report
+            </Button>
+          </Card>
+        )}
+      </>)}
     </div>
   )
 }

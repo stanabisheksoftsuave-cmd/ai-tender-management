@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
 const roleColors = {
-  'Procurement Officer': 'bg-blue-100 text-blue-700',
+  'Contract Engineer': 'bg-blue-100 text-blue-700',
   'Technical Evaluator': 'bg-green-100 text-green-700',
   'Commercial Evaluator': 'bg-amber-100 text-amber-700',
   'Legal Reviewer': 'bg-purple-100 text-purple-700',

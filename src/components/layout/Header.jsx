@@ -1,152 +1,112 @@
 import { Bell, Palette, Search, ChevronDown } from 'lucide-react'
 import { useTheme, themes } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
+
+const roleColors = {
+  it_admin:    '#7C3AED',
+  biz_admin:   '#0F766E',
+  pof:         '#1B4F8A',
+  tech_eval:   '#059669',
+  comm_eval:   '#D97706',
+  mgmt_review: '#0F766E',
+}
 
 export default function Header({ title, subtitle }) {
   const { theme, setTheme, isDark } = useTheme()
   const { lang, t } = useLanguage()
+  const { user } = useAuth()
   const [showTheme, setShowTheme] = useState(false)
   const isRtl = lang === 'ar'
 
-  // Light header for all non-dark themes (bright, ocean, navy, sage)
-  const h = isDark ? {
-    bg:             'rgba(10,15,30,0.85)',
-    border:         '1px solid rgba(255,255,255,0.07)',
-    shadow:         'none',
-    titleColor:     '#F1F5F9',
-    subtitleColor:  '#475569',
-    searchBg:       'rgba(255,255,255,0.05)',
-    searchBorder:   '1px solid rgba(255,255,255,0.08)',
-    searchColor:    '#F1F5F9',
-    searchPlaceholder: '#475569',
-    searchFocusBg:  'rgba(255,255,255,0.08)',
-    searchFocusBorder: 'rgba(37,99,235,0.5)',
-    iconBg:         'rgba(255,255,255,0.04)',
-    iconHoverBg:    'rgba(255,255,255,0.08)',
-    iconColor:      '#94A3B8',
-    btnBg:          'rgba(255,255,255,0.04)',
-    btnBorder:      '1px solid rgba(255,255,255,0.08)',
-    btnColor:       '#94A3B8',
-    btnHoverBg:     'rgba(255,255,255,0.08)',
-    paletteColor:   '#64748B',
-    dropdownBg:     '#111827',
-    dropdownBorder: '1px solid rgba(255,255,255,0.1)',
-    dropdownShadow: '0 8px 32px rgba(0,0,0,0.5)',
-    dropdownLabel:  '#475569',
-    itemActive:     { background: 'rgba(37,99,235,0.15)', color: '#F1F5F9' },
-    itemInactive:   { background: 'transparent',           color: '#94A3B8' },
-    itemHoverBg:    'rgba(255,255,255,0.05)',
-  } : {
-    bg:             'rgba(255,255,255,0.92)',
-    border:         '1px solid #E2E8F0',
-    shadow:         '0 1px 8px rgba(0,0,0,0.06)',
-    titleColor:     '#0F172A',
-    subtitleColor:  '#64748B',
-    searchBg:       '#F8FAFC',
-    searchBorder:   '1px solid #E2E8F0',
-    searchColor:    '#0F172A',
-    searchPlaceholder: '#94A3B8',
-    searchFocusBg:  '#FFFFFF',
-    searchFocusBorder: '#2563EB',
-    iconBg:         '#F8FAFC',
-    iconHoverBg:    '#EEF2FF',
-    iconColor:      '#64748B',
-    btnBg:          '#F8FAFC',
-    btnBorder:      '1px solid #E2E8F0',
-    btnColor:       '#64748B',
-    btnHoverBg:     '#EEF2FF',
-    paletteColor:   '#94A3B8',
-    dropdownBg:     '#FFFFFF',
-    dropdownBorder: '1px solid #E2E8F0',
-    dropdownShadow: '0 8px 24px rgba(0,0,0,0.10)',
-    dropdownLabel:  '#94A3B8',
-    itemActive:     { background: '#EEF2FF', color: '#1D4ED8' },
-    itemInactive:   { background: 'transparent', color: '#64748B' },
-    itemHoverBg:    '#F8FAFC',
+  const isOlng = theme === 'olng'
+
+  const bg     = isDark ? 'rgba(10,15,30,0.92)' : '#ffffff'
+  const border = isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid #E8EDF5'
+  const title_ = isDark ? '#F1F5F9' : '#0F172A'
+  const sub_   = isDark ? '#64748B'  : '#64748B'
+  const search = {
+    bg:     isDark ? 'rgba(255,255,255,0.05)' : '#F4F6FA',
+    border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+    color:  isDark ? '#F1F5F9' : '#0F172A',
+    ph:     isDark ? '#4B5563' : '#94A3B8',
   }
+  const iconBg      = isDark ? 'rgba(255,255,255,0.05)' : '#F4F6FA'
+  const iconBorder  = isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'
+  const iconColor   = isDark ? '#94A3B8' : '#64748B'
+  const dropBg      = isDark ? '#111827' : '#ffffff'
+  const dropBorder  = isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'
+  const dropShadow  = isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.10)'
+  const dropLabel   = isDark ? '#475569' : '#94A3B8'
+  const itemActive  = isDark ? { background: 'rgba(37,99,235,0.15)', color: '#F1F5F9' } : { background: '#EEF2FF', color: '#1D4ED8' }
+  const itemInact   = isDark ? { background: 'transparent', color: '#94A3B8' } : { background: 'transparent', color: '#64748B' }
+  const itemHover   = isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC'
+
+  const avatarBg = roleColors[user?.role?.id] || '#2563EB'
+  const initials = (user?.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-30"
+    <header className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-50"
       style={{
-        background: h.bg,
+        background: bg,
         backdropFilter: 'blur(16px)',
-        borderBottom: h.border,
-        boxShadow: h.shadow,
+        borderBottom: border,
+        boxShadow: isDark ? 'none' : '0 1px 6px rgba(0,0,0,0.05)',
       }}>
 
-      {/* Title */}
+      {/* Page title */}
       <div>
-        <h1 className="font-bold text-[15px] leading-tight tracking-tight" style={{ color: h.titleColor }}>{title}</h1>
-        {subtitle && <p className="text-[11px] mt-0.5" style={{ color: h.subtitleColor }}>{subtitle}</p>}
+        <h1 className="font-bold text-[15px] leading-tight tracking-tight" style={{ color: title_ }}>{title}</h1>
+        {subtitle && <p className="text-[11px] mt-0.5" style={{ color: sub_ }}>{subtitle}</p>}
       </div>
 
       <div className="flex items-center gap-2">
+
         {/* Search */}
         <div className="relative hidden md:flex items-center">
           <Search size={13} className={`absolute ${isRtl ? 'right-3' : 'left-3'} pointer-events-none`}
-            style={{ color: h.subtitleColor }} />
+            style={{ color: sub_ }} />
           <input
             type="text"
             placeholder={t('common.searchTenders')}
-            className={`${isRtl ? 'pr-8 pl-4' : 'pl-8 pr-4'} py-2 text-xs rounded-xl w-48 outline-none transition-all`}
-            style={{
-              background: h.searchBg,
-              border: h.searchBorder,
-              color: h.searchColor,
-            }}
-            onFocus={e => {
-              e.target.style.background = h.searchFocusBg
-              e.target.style.borderColor = h.searchFocusBorder
-            }}
-            onBlur={e => {
-              e.target.style.background = h.searchBg
-              e.target.style.border = h.searchBorder
-            }}
+            className={`${isRtl ? 'pr-8 pl-4' : 'pl-8 pr-4'} py-2 text-xs rounded-xl w-52 outline-none transition-all focus:w-64`}
+            style={{ background: search.bg, border: search.border, color: search.color }}
           />
         </div>
 
         {/* Notifications */}
-        <button className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-          style={{ background: h.iconBg, border: h.btnBorder }}
-          onMouseOver={e => e.currentTarget.style.background = h.iconHoverBg}
-          onMouseOut={e => e.currentTarget.style.background = h.iconBg}>
-          <Bell size={15} style={{ color: h.iconColor }} />
+        <button
+          className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+          style={{ background: iconBg, border: iconBorder }}
+          onMouseOver={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#EEF2FF'}
+          onMouseOut={e => e.currentTarget.style.background = iconBg}
+        >
+          <Bell size={15} style={{ color: iconColor }} />
           <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500"
             style={{ boxShadow: '0 0 6px rgba(239,68,68,0.8)' }} />
         </button>
 
-        {/* Theme Switcher */}
+        {/* Theme switcher */}
         <div className="relative">
           <button
             onClick={() => setShowTheme(!showTheme)}
             className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium transition-colors"
-            style={{
-              background: h.btnBg,
-              border: h.btnBorder,
-              color: h.btnColor,
-            }}
-            onMouseOver={e => e.currentTarget.style.background = h.btnHoverBg}
-            onMouseOut={e => e.currentTarget.style.background = h.btnBg}>
-            <Palette size={13} style={{ color: h.paletteColor }} />
-            {t('common.theme')}
-            <ChevronDown size={11} style={{
-              color: h.paletteColor,
-              transform: showTheme ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.2s',
-            }} />
+            style={{ background: iconBg, border: iconBorder, color: iconColor }}
+            onMouseOver={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#EEF2FF'}
+            onMouseOut={e => e.currentTarget.style.background = iconBg}
+          >
+            <Palette size={13} style={{ color: iconColor }} />
+            <span className="hidden sm:inline">{t('common.theme')}</span>
+            <ChevronDown size={11} style={{ color: iconColor, transform: showTheme ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
 
           {showTheme && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowTheme(false)} />
               <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} top-11 w-56 rounded-2xl p-2 z-50 fade-in`}
-                style={{
-                  background: h.dropdownBg,
-                  border: h.dropdownBorder,
-                  boxShadow: h.dropdownShadow,
-                }}>
-                <p className="text-[9px] uppercase tracking-[0.1em] font-bold px-2 py-1.5" style={{ color: h.dropdownLabel }}>
+                style={{ background: dropBg, border: dropBorder, boxShadow: dropShadow }}>
+                <p className="text-[9px] uppercase tracking-[0.1em] font-bold px-2 py-1.5" style={{ color: dropLabel }}>
                   {t('audit.colourTheme')}
                 </p>
                 {themes.map(th => (
@@ -154,15 +114,13 @@ export default function Header({ title, subtitle }) {
                     key={th.id}
                     onClick={() => { setTheme(th.id); setShowTheme(false) }}
                     className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs transition-colors"
-                    style={{
-                      ...(theme === th.id ? h.itemActive : h.itemInactive),
-                      fontWeight: theme === th.id ? 600 : 400,
-                    }}
-                    onMouseOver={e => { if (theme !== th.id) e.currentTarget.style.background = h.itemHoverBg }}
-                    onMouseOut={e => { if (theme !== th.id) e.currentTarget.style.background = 'transparent' }}>
+                    style={{ ...(theme === th.id ? itemActive : itemInact), fontWeight: theme === th.id ? 600 : 400 }}
+                    onMouseOver={e => { if (theme !== th.id) e.currentTarget.style.background = itemHover }}
+                    onMouseOut={e => { if (theme !== th.id) e.currentTarget.style.background = 'transparent' }}
+                  >
                     <div className="flex gap-1 shrink-0">
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.primary, border: `2px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}` }} />
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.accent,  border: `2px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}` }} />
+                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.primary }} />
+                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.accent  }} />
                     </div>
                     <span className="flex-1">{th.label}</span>
                     {theme === th.id && (
@@ -178,6 +136,18 @@ export default function Header({ title, subtitle }) {
               </div>
             </>
           )}
+        </div>
+
+        {/* User avatar */}
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 cursor-pointer"
+          style={{
+            background: `linear-gradient(135deg, ${avatarBg}, ${avatarBg}cc)`,
+            boxShadow: `0 2px 8px ${avatarBg}40`,
+          }}
+          title={user?.name}
+        >
+          {initials}
         </div>
       </div>
     </header>

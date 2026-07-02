@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft, ChevronRight, Users, Calendar, Building2, Lock, Activity, UserPlus, Save, Phone, Bell, FileText, AlertTriangle, Send } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft, ChevronRight, Users, Calendar, Building2, Lock, Activity, UserPlus, Save, Phone, Bell, FileText, AlertTriangle, Send, UploadCloud, Download } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -236,6 +236,11 @@ export default function BidderUpload() {
   const allExtracted = uploadedBidders.length > 0 && uploadedBidders.every(b => b.status === 'completed')
   const hasQueued = bidders.some(b => b.status === 'queued')
 
+  // Tenders awaiting POF upload of evaluation reports
+  const evalExportTenders = tenders.filter(t => t.status === 'tech_eval_export' || t.status === 'comm_eval_export')
+  const [evalUploaded, setEvalUploaded] = useState({}) // { tenderId: true }
+  const [evalDragging, setEvalDragging] = useState({}) // { tenderId: true }
+
   // Tenders in tech_eval with pending correction requests for the POF
   const correctionTenders = tenders.filter(
     t => t.correctionRequests?.some(r => !r.resolved)
@@ -287,7 +292,7 @@ export default function BidderUpload() {
   }
 
   const proceedToEvaluation = () => {
-    setAssignments({ techEval: '', commEval: '', legalReview: '' })
+    setAssignments({ techEval: '', commEval: '' })
     setAssignModalErrors({})
     setShowAssignModal(true)
   }
@@ -646,6 +651,103 @@ export default function BidderUpload() {
           </div>
         </div>
       )}
+        {/* ── Evaluation Report Uploads (Tech & Comm) ── */}
+        {evalExportTenders.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <UploadCloud size={14} className="text-orange-500" />
+              <h3 className="text-sm font-semibold text-slate-700">Evaluation Report Uploads</h3>
+              <span className="text-[10px] font-semibold text-orange-700 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full animate-pulse">
+                {evalExportTenders.length} pending
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 -mt-1">
+              Upload the signed evaluation report from the evaluator to advance each tender to its next stage.
+            </p>
+            {evalExportTenders.map(tender => {
+              const isTech  = tender.status === 'tech_eval_export'
+              const uploaded = evalUploaded[tender.id]
+              const dragging = evalDragging[tender.id]
+              const nextStage = isTech ? 'Commercial Evaluation' : 'Management Review'
+              const reportLabel = isTech ? 'Technical' : 'Commercial'
+
+              return (
+                <Card key={tender.id} className={`overflow-hidden border-2 transition-all ${uploaded ? 'border-emerald-300' : 'border-orange-200'}`}>
+                  {/* Tender header */}
+                  <div className={`px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${uploaded ? 'bg-emerald-50' : 'bg-orange-50'}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-mono text-slate-400 bg-white/70 px-2 py-0.5 rounded shrink-0">{tender.id}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isTech ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                        {reportLabel} Eval Report
+                      </span>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{tender.title}</p>
+                    </div>
+                    {uploaded ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                        <CheckCircle size={10} /> Uploaded · Advancing to {nextStage}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-white border border-orange-200 px-2.5 py-1 rounded-full shrink-0">
+                        <Clock size={10} /> Awaiting Upload
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="px-4 py-4">
+                    {uploaded ? (
+                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-emerald-800">Report uploaded successfully</p>
+                          <p className="text-[11px] text-emerald-600 mt-0.5">Tender advanced to <strong>{nextStage}</strong>.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={e => { e.preventDefault(); setEvalDragging(prev => ({ ...prev, [tender.id]: true })) }}
+                        onDragLeave={() => setEvalDragging(prev => ({ ...prev, [tender.id]: false }))}
+                        onDrop={e => {
+                          e.preventDefault()
+                          setEvalDragging(prev => ({ ...prev, [tender.id]: false }))
+                          if (e.dataTransfer.files?.length) {
+                            advanceTender(tender.id)
+                            setEvalUploaded(prev => ({ ...prev, [tender.id]: true }))
+                          }
+                        }}
+                        className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2.5 py-8 transition-all cursor-pointer
+                          ${dragging ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/40'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${dragging ? 'bg-[var(--color-primary)]/10' : 'bg-slate-100'}`}>
+                          <UploadCloud size={20} className={dragging ? 'text-[var(--color-primary)]' : 'text-slate-400'} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs font-semibold text-slate-700">
+                            Upload <span className={isTech ? 'text-blue-600' : 'text-violet-600'}>{reportLabel} Evaluation Report</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Drag & drop or</p>
+                        </div>
+                        <label className="cursor-pointer">
+                          <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity">
+                            Browse File
+                          </span>
+                          <input type="file" accept=".pdf,.docx,.xlsx" className="hidden" onChange={e => {
+                            if (e.target.files?.length) {
+                              advanceTender(tender.id)
+                              setEvalUploaded(prev => ({ ...prev, [tender.id]: true }))
+                              e.target.value = ''
+                            }
+                          }} />
+                        </label>
+                        <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
+            <div className="border-t border-slate-100 pt-1" />
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-slate-700">{t('ing.selectTitle')}</h2>

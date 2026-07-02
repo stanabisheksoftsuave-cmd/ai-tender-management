@@ -30,6 +30,39 @@
 [data-theme='bright'] body { color: #0F172A; background-color: #F1F5FF; }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   THEME: Oman LNG Brand  (OLNG01 Brand Manual)
+   Primary: #0089cf  |  Ocean Blue: #1b4c6f  |  Bg: #ecf4fc
+═══════════════════════════════════════════════════════════════════════ */
+[data-theme='olng'] {
+  --color-primary:       #0089cf;
+  --color-primary-dark:  #1b4c6f;
+  --color-primary-light: #afd9f4;
+  --color-accent:        #1b4c6f;
+  --color-surface:       #ffffff;
+  --color-surface-2:     #ecf4fc;
+  --color-background:    #ecf4fc;
+  --color-sidebar:       #1b4c6f;
+  --color-sidebar-text:  rgba(255,255,255,0.6);
+  --color-sidebar-active:#0089cf;
+  --color-badge-ai:      #0089cf;
+  --color-border:        #cce6f8;
+  --gradient: linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%);
+  --color-shadow: 0 1px 4px rgba(27,76,111,0.08), 0 4px 16px rgba(27,76,111,0.12);
+}
+[data-theme='olng'] body { color: #1b4c6f; background-color: #ecf4fc; }
+
+/* ── OLNG: force primary blue for Tailwind utility classes ── */
+[data-theme='olng'] .text-blue-600  { color: #0089cf !important; }
+[data-theme='olng'] .text-blue-700  { color: #1b4c6f !important; }
+[data-theme='olng'] .text-blue-500  { color: #0089cf !important; }
+[data-theme='olng'] .bg-blue-600    { background-color: #0089cf !important; }
+[data-theme='olng'] .bg-blue-500    { background-color: #0089cf !important; }
+[data-theme='olng'] .border-blue-600 { border-color: #0089cf !important; }
+[data-theme='olng'] .ring-blue-500   { --tw-ring-color: rgba(0,137,207,0.5) !important; }
+[data-theme='olng'] .focus\:ring-blue-500:focus { --tw-ring-color: rgba(0,137,207,0.4) !important; }
+[data-theme='olng'] .focus\:border-blue-500:focus { border-color: #0089cf !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
    THEME: TenderIQ Dark Navy
 ═══════════════════════════════════════════════════════════════════════ */
 [data-theme='tenderiq'] {

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+
+  <!-- Outer encompassing circle (Corporate Green) — transparent background -->
+  <circle cx="100" cy="100" r="92" stroke="#00a651" stroke-width="6"/>
+  <circle cx="100" cy="100" r="85" stroke="#00a651" stroke-width="1.5"/>
+
+  <!-- Rising Sun (Corporate Red) — upper section -->
+  <line x1="100" y1="22" x2="100" y2="12" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="122" y1="30" x2="130" y2="22" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="135" y1="52" x2="145" y2="48" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="129" y1="76" x2="138" y2="83" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="78" y1="30" x2="70" y2="22" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="65" y1="52" x2="55" y2="48" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="71" y1="76" x2="62" y2="83" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <line x1="100" y1="90" x2="100" y2="100" stroke="#ed1c24" stroke-width="4" stroke-linecap="round"/>
+  <!-- Sun disc -->
+  <circle cx="100" cy="52" r="24" fill="#ed1c24"/>
+
+  <!-- Fortress wall (Corporate Green) — middle section -->
+  <rect x="54" y="90" width="15" height="18" rx="1.5" fill="#00a651"/>
+  <rect x="74" y="90" width="15" height="18" rx="1.5" fill="#00a651"/>
+  <rect x="94" y="90" width="15" height="18" rx="1.5" fill="#00a651"/>
+  <rect x="114" y="90" width="15" height="18" rx="1.5" fill="#00a651"/>
+  <!-- Wall body -->
+  <rect x="54" y="108" width="92" height="14" fill="#00a651"/>
+
+  <!-- Blue Flame (#0089cf) — lower section -->
+  <path d="M100 126 C90 117 80 119 80 134 C80 150 90 162 100 166 C110 162 120 150 120 134 C120 119 110 117 100 126Z" fill="#0089cf"/>
+  <path d="M100 137 C94 131 90 133 90 141 C90 150 95 158 100 161 C105 158 110 150 110 141 C110 133 106 131 100 137Z" fill="#afd9f4"/>
+  <path d="M100 147 C97 144 95 146 95 150 C95 155 97 159 100 160 C103 159 105 155 105 150 C105 146 103 144 100 147Z" fill="white" opacity="0.85"/>
+</svg>
