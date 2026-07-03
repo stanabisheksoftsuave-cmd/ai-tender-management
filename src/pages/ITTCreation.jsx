@@ -176,6 +176,14 @@ export default function ITTCreation() {
     setGenStep(0)
     setStep(1)
   }
+  const prefillMap = useMemo(() => {
+    const map = {}
+    if (form.title) map['contract title'] = form.title
+    if (draftTenderId) map['contract no'] = draftTenderId
+    if (draftTenderId && form.title) map['contract number & title'] = `${draftTenderId} — ${form.title}`
+    else if (form.title) map['contract number & title'] = form.title
+    return map
+  }, [form.title, draftTenderId])
 
   const effectiveFlow = useMemo(() => resolveFlow(b1Category), [b1Category])
   const currentFlowItem = effectiveFlow[currentSectionIndex]
@@ -496,6 +504,7 @@ export default function ITTCreation() {
             <SectionFillStep
               section={currentFlowItem}
               answers={sectionAnswers[currentFlowItem.id]}
+              prefill={prefillMap}
               onAnswersChange={handleAnswersChange}
               onNext={goToNextSection}
               onBack={goToPrevSection}

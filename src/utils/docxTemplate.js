@@ -36,26 +36,34 @@ function attrValue(token, name) {
 }
 
 // Walks word/document.xml as a flat token stream (tag or text run) and builds:
-//  - paragraphs: renderable segments (plain text + field references) in reading order
+//  - blocks: renderable content in reading order — either a paragraph
+//    ({ type:'p', segments }) or a table ({ type:'table', rows:[{ cells:[{ blocks }] }] }),
+//    so tables render as real tables instead of a flattened line-per-cell stream.
+//  - paragraphs: flat list of every paragraph block (back-compat / convenience).
 //  - fields: merged runs of highlighted text, with byte offsets into the ORIGINAL xml
 //    string so export can splice in answers without a lossy DOM round-trip.
 // w:delText (tracked-change deletions) is a distinct tag name from w:t, so deleted
 // placeholder text is naturally excluded without any extra bookkeeping.
 export function buildFieldModel(xml) {
   const tokenRe = /<[^>]+>|[^<]+/g
+  const rootBlocks = []
   const paragraphs = []
   const fields = []
+  const containerStack = [rootBlocks]
+  const tableStack = []
+  const container = () => containerStack[containerStack.length - 1]
+
   let currentParagraph = null
   let insideRun = false
   let runHighlightSpan = null
   let lastWasField = false
 
-  const startParagraph = () => {
-    currentParagraph = { id: paragraphs.length, segments: [] }
+  const openParagraph = () => {
+    currentParagraph = { type: 'p', id: paragraphs.length, segments: [] }
+    container().push(currentParagraph)
     paragraphs.push(currentParagraph)
     lastWasField = false
   }
-  startParagraph()
 
   let match
   while ((match = tokenRe.exec(xml)) !== null) {
@@ -67,8 +75,40 @@ export function buildFieldModel(xml) {
     const closing = token.startsWith('</')
     const name = tagName(token)
 
+    if (name === 'w:tbl') {
+      if (!closing) {
+        const table = { type: 'table', rows: [] }
+        container().push(table)
+        tableStack.push(table)
+      } else {
+        tableStack.pop()
+      }
+      currentParagraph = null
+      lastWasField = false
+      continue
+    }
+    if (name === 'w:tr') {
+      if (!closing && tableStack.length) tableStack[tableStack.length - 1].rows.push({ cells: [] })
+      currentParagraph = null
+      lastWasField = false
+      continue
+    }
+    if (name === 'w:tc') {
+      if (!closing) {
+        const table = tableStack[tableStack.length - 1]
+        const row = table && table.rows[table.rows.length - 1]
+        const cell = { blocks: [] }
+        if (row) row.cells.push(cell)
+        containerStack.push(cell.blocks)
+      } else if (containerStack.length > 1) {
+        containerStack.pop()
+      }
+      currentParagraph = null
+      lastWasField = false
+      continue
+    }
     if (name === 'w:p') {
-      if (!closing) startParagraph()
+      if (!closing) openParagraph()
       continue
     }
     if (name === 'w:r') {
@@ -97,6 +137,7 @@ export function buildFieldModel(xml) {
           }
         }
       }
+      if (!currentParagraph) openParagraph()
       const decoded = decodeXmlEntities(xml.slice(textStart, textEnd))
       const isField = insideRun && !!runHighlightSpan
       if (isField && lastWasField) {
@@ -119,7 +160,7 @@ export function buildFieldModel(xml) {
     }
   }
 
-  return { xml, paragraphs, fields }
+  return { xml, blocks: rootBlocks, paragraphs, fields }
 }
 
 export async function parseDocxTemplate(url) {
