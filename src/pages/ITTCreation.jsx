@@ -12,22 +12,22 @@ import Badge from '../components/ui/Badge'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
-import { exportTenderPDF } from '../utils/exportPDF'
 import { buildFilledDocxBlob } from '../utils/docxTemplate'
 import SectionFillStep from '../components/itt/SectionFillStep'
 import B1CategoryChooser from '../components/itt/B1CategoryChooser'
 import { B1_CATEGORY_MAP } from '../components/itt/b1Categories'
 
-// Fixed section order for the real ITT template fill-in wizard: 1 → D → B1 → C → E → F → H → J → K → L → G
-// (Section A is excluded — handled separately by the future Contract Draft feature.)
+// Fixed section order for the real ITT template fill-in wizard: 1 → A → D → B1 → B2 → C → E → F → H → J → K → L → G
 const SECTION_FLOW = [
   { id: 'section1', title: 'Section 1 — Instructions to Tenderers', docxUrl: '/itt-templates/section-1-instructions.docx', exportFilename: 'Section 1 - Instructions.docx' },
+  { id: 'sectionA', title: 'Section A — Form of Agreement', docxUrl: '/itt-templates/section-a-form-of-agreement.docx', exportFilename: 'Section A - Form of Agreement.docx' },
   { id: 'sectionD', title: 'Section D — Scope of Work', docxUrl: '/itt-templates/section-d-scope-of-work.docx', exportFilename: 'Section D - Scope of Work.docx' },
   { id: 'sectionB1', title: 'Section B1 — General Conditions of Contract', kind: 'b1-chooser' },
+  { id: 'sectionB2', title: 'Section B2 — Special Conditions of Contract', docxUrl: '/itt-templates/section-b2-special-conditions.docx', exportFilename: 'Section B2 - Special Conditions.docx' },
   { id: 'sectionC', title: 'Section C — QHSSE Requirements', docxUrl: '/itt-templates/section-c-qhsse.docx', exportFilename: 'Section C - QHSSE Requirements.docx' },
   { id: 'sectionE', title: 'Section E — Schedule of Prices', docxUrl: '/itt-templates/section-e-schedule-of-prices.docx', exportFilename: 'Section E - Schedule of Prices.docx' },
   { id: 'sectionF', title: 'Section F — Execution Methodology', docxUrl: '/itt-templates/section-f-execution-methodology.docx', exportFilename: 'Section F - Execution Methodology.docx' },
-  { id: 'sectionH', title: 'Section H — ICV Requirements', docxUrl: '/itt-templates/section-h-icv-requirements.docx', exportFilename: 'Section H - ICV Requirements.docx' },
+  { id: 'sectionH', title: 'Section H — ICV Requirements', docxUrl: '/itt-templates/section-h-icv-requirements.docx', exportFilename: 'Section H - ICV Requirements.docx', attachmentUrl: '/itt-templates/section-h-appendix-tenderplan.xlsx', attachmentLabel: 'Appendix A — Tender Plan (reference)' },
   { id: 'sectionJ', title: 'Section J — JSRS Requirements', docxUrl: '/itt-templates/section-j-jsrs-requirements.docx', exportFilename: 'Section J - JSRS Requirements.docx' },
   { id: 'sectionK', title: 'Section K — OPAL Requirements', docxUrl: '/itt-templates/section-k-opal-requirements.docx', exportFilename: 'Section K - OPAL Requirements.docx' },
   { id: 'sectionL', title: 'Section L — Minimum Salaries', docxUrl: '/itt-templates/section-l-minimum-salaries.docx', exportFilename: 'Section L - Minimum Salaries.docx' },
@@ -48,8 +48,9 @@ function resolveFlow(b1Category) {
 const generationTasks = [
   'Analysing project requirements',
   'Loading Section 1 — Instructions to Tenderers',
+  'Loading Section A — Form of Agreement',
   'Loading Section D — Scope of Work',
-  'Loading Section B1 — General Conditions of Contract',
+  'Loading Sections B1 & B2 — General & Special Conditions of Contract',
   'Loading Section C — QHSSE Requirements',
   'Loading Sections E & F — Pricing & Methodology',
   'Loading Sections H, J, K, L — ICV, JSRS, OPAL & Salaries',
@@ -77,10 +78,14 @@ export default function ITTCreation() {
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
   const initialForm = existingTender
-    ? { title: existingTender.title, department: existingTender.department, budget: existingTender.budget, deadline: existingTender.deadline, duration: existingTender.duration || '', description: existingTender.description || '' }
+    ? { title: existingTender.title || '', department: existingTender.department || '', budget: existingTender.budget || '', deadline: existingTender.deadline || '', duration: existingTender.duration || '', description: existingTender.description || '' }
     : { title: '', department: '', budget: '', deadline: '', duration: '', description: '' }
 
-  const [step, setStep] = useState(existingTender ? 2 : 0)
+  // A tender handed off from Pre-Qualification has an id but has never been
+  // through this wizard's generation step (no sectionAnswers yet) — it should
+  // start at the same detail-entry step as a brand-new ITT, not jump to review.
+  const alreadyGenerated = existingTender?.sectionAnswers != null
+  const [step, setStep] = useState(alreadyGenerated ? 2 : 0)
   const [genStep, setGenStep] = useState(0)
   const [draftTenderId, setDraftTenderId] = useState(existingTender?.id || null)
   const [sectionAnswers, setSectionAnswers] = useState(existingTender?.sectionAnswers || {})
@@ -141,26 +146,44 @@ export default function ITTCreation() {
       const t = setTimeout(() => {
         if (!draftSavedRef.current) {
           draftSavedRef.current = true
-          const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(t.id.split('-')[2]) || 0), 0)
-          const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
-          addTender({
-            id: newId,
-            title: form.title,
-            department: form.department,
-            budget: form.budget,
-            deadline: form.deadline,
-            description: form.description,
-            duration: form.duration,
-            status: 'draft',
-            stage: 'Draft — Pending Export',
-            created: new Date().toISOString().split('T')[0],
-            bidders: 0,
-            bidderList: [],
-            aiScore: null,
-            sectionAnswers: {},
-            b1Category: null,
-          })
-          setDraftTenderId(newId)
+          if (draftTenderId) {
+            // Tender already exists (e.g. handed off from Pre-Qualification) —
+            // fill in the details CE just entered without touching bidderList/
+            // bidders/aiScore that an earlier stage may have already set.
+            updateTender(draftTenderId, {
+              title: form.title,
+              department: form.department,
+              budget: form.budget,
+              deadline: form.deadline,
+              description: form.description,
+              duration: form.duration,
+              status: 'draft',
+              stage: 'Draft — Pending Export',
+              sectionAnswers: existingTender?.sectionAnswers || {},
+              b1Category: existingTender?.b1Category ?? null,
+            })
+          } else {
+            const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(t.id.split('-')[2]) || 0), 0)
+            const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
+            addTender({
+              id: newId,
+              title: form.title,
+              department: form.department,
+              budget: form.budget,
+              deadline: form.deadline,
+              description: form.description,
+              duration: form.duration,
+              status: 'draft',
+              stage: 'Draft — Pending Export',
+              created: new Date().toISOString().split('T')[0],
+              bidders: 0,
+              bidderList: [],
+              aiScore: null,
+              sectionAnswers: {},
+              b1Category: null,
+            })
+            setDraftTenderId(newId)
+          }
         }
         setStep(2)
       }, 400)
@@ -182,6 +205,11 @@ export default function ITTCreation() {
     if (draftTenderId) map['contract no'] = draftTenderId
     if (draftTenderId && form.title) map['contract number & title'] = `${draftTenderId} — ${form.title}`
     else if (form.title) map['contract number & title'] = form.title
+    // Section B2's only fillable field is the template's own authoring note —
+    // default it to "NOT USED" (per Section A's own instruction for an
+    // inapplicable section), editable if the CE wants to specify real deviations.
+    map['(ai to identify and draft clauses where deviate from b 1 clauses)'] =
+      'NOT USED — Section B1 General Conditions of Contract apply without modification.'
     return map
   }, [form.title, draftTenderId])
 
@@ -464,6 +492,31 @@ export default function ITTCreation() {
             </div>
           </Card>
 
+          {existingTender?.bidderList?.some(b => b.handoffDocs) && (
+            <Card branded className="p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                  <PackageCheck size={16} style={{ color: '#0089cf' }} />
+                </div>
+                Bidder Documents from Pre-Qualification
+              </h3>
+              <div className="space-y-3">
+                {existingTender.bidderList.filter(b => b.handoffDocs).map(b => (
+                  <div key={b.id} className="rounded-lg px-3.5 py-3" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: '#1b4c6f' }}>{b.name}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(b.handoffDocs).map(([key, fileName]) => (
+                        <span key={key} className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-white" style={{ border: '1px solid rgba(0,137,207,0.15)', color: '#1b4c6f' }}>
+                          <CheckCircle size={10} style={{ color: '#0089cf' }} /> {fileName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           <Button
             variant="brand"
             onClick={handleGenerate}
@@ -731,23 +784,6 @@ export default function ITTCreation() {
             <Button variant="secondary" disabled={downloadingZip} onClick={handleDownloadIttPackage}>
               {downloadingZip ? <RefreshCw size={15} className="animate-spin" /> : <PackageCheck size={15} />}
               {downloadingZip ? 'Building Package…' : 'Download ITT Package (.zip)'}
-            </Button>
-            <Button variant="secondary" onClick={() => {
-              const tender = tenders.find(t => t.id === draftTenderId) || {
-                id: draftTenderId,
-                title: form.title,
-                department: form.department,
-                budget: form.budget,
-                deadline: form.deadline,
-                description: form.description,
-                duration: form.duration,
-                stage: 'ITT Created',
-                created: new Date().toISOString().split('T')[0],
-                bidders: 0,
-              }
-              exportTenderPDF(tender)
-            }}>
-              <Download size={15} /> {t('itt.export')}
             </Button>
             <Button variant="brand" onClick={() => navigate('/tenders')}>
               <FileText size={15} /> View in Tender List

@@ -6,12 +6,18 @@ import { useLanguage } from '../../context/LanguageContext'
 const pageMeta = {
   '/dashboard':      { titleKey: 'page.dashboard',  subKey: 'page.dashboard.sub' },
   '/tenders':        { titleKey: 'page.tenders',     subKey: 'page.tenders.sub' },
+  '/contract-strategy':  { titleKey: 'page.contractStrategy',  subKey: 'page.contractStrategy.sub' },
+  '/pre-qualification':  { titleKey: 'page.preQualification',  subKey: 'page.preQualification.sub' },
   '/create-itt':     { titleKey: 'page.createItt',   subKey: 'page.createItt.sub' },
   '/upload':         { titleKey: 'page.ingestion',   subKey: 'page.ingestion.sub' },
   '/technical-eval': { titleKey: 'page.techEval',    subKey: 'page.techEval.sub' },
   '/commercial-eval':{ titleKey: 'page.commEval',    subKey: 'page.commEval.sub' },
   '/mgmt-review':    { titleKey: 'page.mgmtReview',  subKey: 'page.mgmtReview.sub' },
   '/contract':       { titleKey: 'page.contract',    subKey: 'page.contract.sub' },
+  '/legal-review':   { titleKey: 'page.legalReview',      subKey: 'page.legalReview.sub' },
+  '/contract-execution': { titleKey: 'page.contractExecution', subKey: 'page.contractExecution.sub' },
+  '/contract-management':{ titleKey: 'page.contractManagement', subKey: 'page.contractManagement.sub' },
+  '/contract-closure':   { titleKey: 'page.contractClosure',    subKey: 'page.contractClosure.sub' },
   '/audit-log':      { titleKey: 'page.auditLog',    subKey: 'page.auditLog.sub' },
   '/users':          { titleKey: 'page.users',       subKey: 'page.users.sub' },
 }

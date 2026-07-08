@@ -6,9 +6,11 @@ export const roles = [
   { id: 'it_admin',    label: 'IT Admin',            color: '#7C3AED' },
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#1B4F8A' },
+  { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
   { id: 'tech_eval',   label: 'Technical Evaluator',  color: '#059669' },
   { id: 'comm_eval',   label: 'Commercial Evaluator', color: '#D97706' },
   { id: 'mgmt_review', label: 'Management Reviewer',  color: '#0F766E' },
+  { id: 'legal_review',label: 'Legal Reviewer',       color: '#B45309' },
 ]
 
 // Single source of truth — credentials + profile + status
@@ -19,6 +21,8 @@ export const INITIAL_USERS = [
   { id: 3, username: 'sarah.chen@corp.com',  password: 'Sarah@123',  name: 'Sarah Chen',    roleId: 'tech_eval',   status: 'active', avatar: 'SC', lastLogin: '2025-04-05 16:30' },
   { id: 4, username: 'mark.davis@corp.com',  password: 'Mark@123',   name: 'Mark Davis',    roleId: 'comm_eval',   status: 'active', avatar: 'MD', lastLogin: '2025-04-04 11:22' },
   { id: 5, username: 'robert.lee@corp.com',  password: 'Robert@123', name: 'Robert Lee',    roleId: 'mgmt_review', status: 'active', avatar: 'RL', lastLogin: '2025-04-06 14:30' },
+  { id: 7, username: 'amina.saleh@corp.com', password: 'Amina@123',  name: 'Amina Saleh',   roleId: 'legal_review',status: 'active', avatar: 'AS', lastLogin: '2025-04-06 13:10' },
+  { id: 8, username: 'fatima.ali@corp.com',  password: 'Fatima@123', name: 'Fatima Al-Ali', roleId: 'contract_holder', status: 'active', avatar: 'FA', lastLogin: '2025-04-06 08:45' },
 ]
 
 // Keep for backward compat with Login demo panel
@@ -27,7 +31,7 @@ export const DEMO_USERS = INITIAL_USERS
 const STORAGE_KEY = 'atm_user'
 const USERS_STORAGE_KEY = 'atm_users'
 const USERS_VERSION_KEY = 'atm_users_v'
-const CURRENT_VERSION = '3' // bump whenever INITIAL_USERS structure changes
+const CURRENT_VERSION = '5' // bump whenever INITIAL_USERS structure changes
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {

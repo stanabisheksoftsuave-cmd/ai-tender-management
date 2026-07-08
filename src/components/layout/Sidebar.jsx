@@ -31,11 +31,18 @@ const navByRole = {
     { to: '/tenders',   icon: '/src/assets/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
   ],
   pof: [
-    { to: '/dashboard',  icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard'   },
-    { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',    labelKey: 'nav.tenderTrack' },
-    { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg', labelKey: 'nav.createItt'   },
-    { to: '/upload',     icon: '/src/assets/icons/ingestion.svg',  labelKey: 'nav.ingestion'   },
-    { to: '/contract',   icon: '/src/assets/icons/contract.svg',   labelKey: 'nav.contract'    },
+    { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
+    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.createItt'   },
+    { to: '/upload',             icon: '/src/assets/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
+    { to: '/contract',           icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.contract'    },
+    { to: '/contract-management',icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
+  ],
+  contract_holder: [
+    { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
+    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/contract-strategy',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.contractStrategy' },
+    { to: '/pre-qualification',  icon: '/src/assets/icons/users.svg',       labelKey: 'nav.preQualification' },
   ],
   tech_eval: [
     { to: '/dashboard',      icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
@@ -49,6 +56,10 @@ const navByRole = {
     { to: '/dashboard',   icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
     { to: '/tenders',     icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
     { to: '/mgmt-review', icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.mgmtReview'},
+  ],
+  legal_review: [
+    { to: '/dashboard',    icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
+    { to: '/legal-review', icon: '/src/assets/icons/audit-log.svg',  labelKey: 'nav.legalReview' },
   ],
 }
 

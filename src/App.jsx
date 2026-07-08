@@ -34,6 +34,12 @@ import AwardRecommendation from './pages/AwardRecommendation'
 import ContractTemplate from './pages/ContractTemplate'
 import AuditLog from './pages/AuditLog'
 import UserManagement from './pages/UserManagement'
+import ContractStrategy from './pages/ContractStrategy'
+import PreQualification from './pages/PreQualification'
+import LegalReview from './pages/LegalReview'
+import ContractExecution from './pages/ContractExecution'
+import ContractManagement from './pages/ContractManagement'
+import ContractClosure from './pages/ContractClosure'
 
 function AdminRoute({ children }) {
   const { user } = useAuth()
@@ -65,6 +71,18 @@ function PofRoute({ children }) {
   return children
 }
 
+function LegalReviewRoute({ children }) {
+  const { user } = useAuth()
+  if (user?.role?.id !== 'legal_review') return <Navigate to="/dashboard" replace />
+  return children
+}
+
+function ContractHolderRoute({ children }) {
+  const { user } = useAuth()
+  if (user?.role?.id !== 'contract_holder') return <Navigate to="/dashboard" replace />
+  return children
+}
+
 function ProtectedRoutes() {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
@@ -74,6 +92,10 @@ function ProtectedRoutes() {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tenders" element={<TenderList />} />
+          <Route path="/contract-strategy" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
+          <Route path="/contract-strategy/:tenderId" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
+          <Route path="/pre-qualification" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
+          <Route path="/pre-qualification/:tenderId" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
           <Route path="/create-itt" element={<PofRoute><ITTCreation /></PofRoute>} />
           <Route path="/create-itt/:tenderId" element={<PofRoute><ITTCreation /></PofRoute>} />
           <Route path="/upload" element={<PofRoute><BidderUpload /></PofRoute>} />
@@ -86,6 +108,14 @@ function ProtectedRoutes() {
           <Route path="/mgmt-review/:tenderId" element={<MgmtReviewRoute><AwardRecommendation /></MgmtReviewRoute>} />
           <Route path="/contract" element={<PofRoute><ContractTemplate /></PofRoute>} />
           <Route path="/contract/:tenderId" element={<PofRoute><ContractTemplate /></PofRoute>} />
+          <Route path="/legal-review" element={<LegalReviewRoute><LegalReview /></LegalReviewRoute>} />
+          <Route path="/legal-review/:tenderId" element={<LegalReviewRoute><LegalReview /></LegalReviewRoute>} />
+          <Route path="/contract-execution" element={<PofRoute><ContractExecution /></PofRoute>} />
+          <Route path="/contract-execution/:tenderId" element={<PofRoute><ContractExecution /></PofRoute>} />
+          <Route path="/contract-management" element={<PofRoute><ContractManagement /></PofRoute>} />
+          <Route path="/contract-management/:tenderId" element={<PofRoute><ContractManagement /></PofRoute>} />
+          <Route path="/contract-closure" element={<PofRoute><ContractClosure /></PofRoute>} />
+          <Route path="/contract-closure/:tenderId" element={<PofRoute><ContractClosure /></PofRoute>} />
           <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
           <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

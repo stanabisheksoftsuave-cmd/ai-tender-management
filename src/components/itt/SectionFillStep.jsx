@@ -196,6 +196,16 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
         </button>
       </div>
 
+      {section.attachmentUrl && (
+        <a
+          href={section.attachmentUrl}
+          download
+          className="mb-4 flex items-center gap-1.5 w-fit text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors hover:bg-slate-50"
+          style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', background: 'rgba(0,137,207,0.04)' }}>
+          <Download size={11} /> Download {section.attachmentLabel || 'attachment'}
+        </a>
+      )}
+
       {!loading && !error && model && total > 0 && (
         <div className="mb-5">
           <div className="flex items-center justify-between gap-3 mb-2">
@@ -245,12 +255,12 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       {error && <div className="text-center py-16 text-sm text-red-500">{error}</div>}
 
       {!loading && !error && model && model.fields.length === 0 && (
-        <div className="text-center py-16 text-sm text-slate-400">
-          No fillable fields detected in this template — review manually before export.
+        <div className="mb-3 text-center text-xs text-slate-400">
+          No fillable fields detected in this template — review the content below before export.
         </div>
       )}
 
-      {!loading && !error && model && model.fields.length > 0 && (
+      {!loading && !error && model && (
         <div className="max-h-[62vh] overflow-y-auto rounded-xl bg-white" style={{ border: '1px solid #cce6f8' }}>
           <div className="px-6 py-6 sm:px-8 text-[13px] leading-6 text-slate-700">
             {renderBlocks(model.blocks)}

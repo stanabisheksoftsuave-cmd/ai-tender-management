@@ -1,6 +1,7 @@
 import { CheckCircle, Circle, Clock } from 'lucide-react'
 
 const stages = [
+  { id: 'prequal',    label: 'Pre-Qualification' },
   { id: 'draft',      label: 'ITT Creation' },
   { id: 'approval',   label: 'ITT Approval' },
   { id: 'export',     label: 'Tender Export' },
@@ -8,10 +9,13 @@ const stages = [
   { id: 'extraction', label: 'AI Extraction' },
   { id: 'tech_eval',  label: 'Technical Eval.' },
   { id: 'comm_eval',  label: 'Commercial Eval.' },
-  { id: 'legal',      label: 'Legal Review' },
   { id: 'mgmt',       label: 'Mgmt Review' },
   { id: 'award',      label: 'Award' },
   { id: 'contract',   label: 'Contract' },
+  { id: 'legal',      label: 'Legal Review' },
+  { id: 'execution',  label: 'Execution' },
+  { id: 'management', label: 'Management' },
+  { id: 'closure',    label: 'Closure' },
 ]
 
 export default function StageTimeline({ currentStage }) {

@@ -18,50 +18,90 @@ const REASSIGN_OPTIONS = [
 ]
 
 const getTenderRoute = (t) => {
+  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_rejected'].includes(t.status)) return `/pre-qualification/${t.id}`
   if (t.status === 'draft')        return `/create-itt/${t.id}`
   if (t.status === 'upload')       return `/upload/${t.id}`
   if (t.status === 'tech_eval')    return `/technical-eval/${t.id}`
   if (t.status === 'comm_eval')    return `/commercial-eval/${t.id}`
   if (t.status === 'mgmt_review')  return `/mgmt-review/${t.id}`
   if (t.status === 'award')        return `/contract/${t.id}`
+  if (t.status === 'legal_review')       return `/legal-review/${t.id}`
+  if (t.status === 'contract_execution') return `/contract-execution/${t.id}`
+  if (t.status === 'active')             return `/contract-management/${t.id}`
+  if (t.status === 'contract_closure')   return `/contract-closure/${t.id}`
   return '/tenders'
 }
 
 const getTimelineStage = (t) => {
+  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_rejected'].includes(t.status)) return 'prequal'
   if (t.status === 'draft')        return 'approval'
   if (t.status === 'upload')       return 'upload'
   if (t.status === 'tech_eval')    return 'tech_eval'
   if (t.status === 'comm_eval')    return 'comm_eval'
   if (t.status === 'mgmt_review')  return 'mgmt'
   if (t.status === 'award')        return 'award'
+  if (t.status === 'legal_review')       return 'legal'
+  if (t.status === 'contract_execution') return 'execution'
+  if (t.status === 'active')             return 'management'
+  if (t.status === 'contract_closure')   return 'closure'
   return 'draft'
 }
 
 const statusVariant = {
+  prequal_stage1:   'prequal_stage1',
+  prequal_stage2:   'prequal_stage2',
+  prequal_stage3:   'prequal_stage3',
+  prequal_stage4:   'prequal_stage4',
+  prequal_rejected: 'prequal_rejected',
   draft:        'draft',
   upload:       'upload',
   tech_eval:    'tech_eval',
   comm_eval:    'comm_eval',
   mgmt_review:  'mgmt_review',
   award:        'award',
+  legal_review:       'legal_review',
+  contract_execution: 'contract_execution',
+  active:             'active',
+  contract_closure:   'contract_closure',
+  closed:             'closed',
 }
 
 const statusLabelsEn = {
+  prequal_stage1:   'Pre-Qual — Bidder Matching',
+  prequal_stage2:   'Pre-Qual — Questionnaire',
+  prequal_stage3:   'Pre-Qual — Response Review',
+  prequal_stage4:   'Pre-Qual — Financial Assessment',
+  prequal_rejected: 'Pre-Qualification Rejected',
   draft:        'Draft — Pending Export',
   upload:       'Awaiting Ingestion',
   tech_eval:    'Technical Evaluation',
   comm_eval:    'Commercial Evaluation',
   mgmt_review:  'Management Review',
   award:        'Award Recommended',
+  legal_review:       'Legal Review',
+  contract_execution: 'Contract Execution',
+  active:             'Contract Active',
+  contract_closure:   'Closure In Progress',
+  closed:             'Closed & Archived',
 }
 
 const statusLabelsAr = {
+  prequal_stage1:   'التأهيل المسبق - مطابقة المتقدمين',
+  prequal_stage2:   'التأهيل المسبق - الاستبيان',
+  prequal_stage3:   'التأهيل المسبق - مراجعة الردود',
+  prequal_stage4:   'التأهيل المسبق - التقييم المالي',
+  prequal_rejected: 'تم رفض التأهيل المسبق',
   draft:        'في انتظار الموافقة',
   upload:       'في انتظار الاستيعاب',
   tech_eval:    'التقييم الفني',
   comm_eval:    'التقييم التجاري',
   mgmt_review:  'مراجعة الإدارة',
   award:        'موصى بالترسية',
+  legal_review:       'المراجعة القانونية',
+  contract_execution: 'تنفيذ العقد',
+  active:             'العقد نشط',
+  contract_closure:   'الإغلاق قيد التنفيذ',
+  closed:             'مغلق ومؤرشف',
 }
 
 export default function TenderList() {
@@ -79,6 +119,7 @@ export default function TenderList() {
   const roleId = user?.role?.id
   const isBizAdmin = roleId === 'biz_admin'
   const isPof = roleId === 'pof'
+  const isContractHolder = roleId === 'contract_holder'
 
   // Map tender status → the role that evaluates it
   const stageRoleMap = { tech_eval: 'tech_eval', comm_eval: 'comm_eval', mgmt_review: 'mgmt_review' }
@@ -104,11 +145,14 @@ export default function TenderList() {
 
   const tabs = [
     { key: 'all',      label: lang === 'ar' ? 'جميع المناقصات' : 'All Tenders', fn: () => true },
+    { key: 'prequal',  label: lang === 'ar' ? 'التأهيل المسبق' : 'Pre-Qual',    fn: td => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(td.status) },
     { key: 'progress', label: lang === 'ar' ? 'قيد التقدم'     : 'In Progress',  fn: td => ['draft', 'upload'].includes(td.status) },
     { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' },
     { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' },
     { key: 'review',   label: lang === 'ar' ? 'المراجعة'       : 'Review',       fn: td => td.status === 'mgmt_review' },
     { key: 'award',    label: lang === 'ar' ? 'الترسية'        : 'Awarded',      fn: td => td.status === 'award' },
+    { key: 'contract', label: lang === 'ar' ? 'العقد'          : 'Contract',     fn: td => ['legal_review','contract_execution','active','contract_closure'].includes(td.status) },
+    { key: 'closed',   label: lang === 'ar' ? 'مغلقة'          : 'Closed',       fn: td => ['closed','prequal_rejected'].includes(td.status) },
   ]
 
   const filtered = tenders.filter(t => {
@@ -243,8 +287,13 @@ export default function TenderList() {
           <Button variant="secondary" size="sm">
             <Filter size={13} /> {t('common.filter')}
           </Button>
+          {isContractHolder && (
+            <Button onClick={() => navigate('/contract-strategy')} size="sm">
+              <Plus size={13} /> New Tender
+            </Button>
+          )}
           {isPof && (
-            <Button onClick={() => navigate('/create-itt')} size="sm">
+            <Button variant="secondary" onClick={() => navigate('/create-itt')} size="sm">
               <Plus size={13} /> New ITT
             </Button>
           )}
@@ -324,7 +373,32 @@ export default function TenderList() {
                             <Button variant="secondary" size="sm" onClick={() => navigate(getTenderRoute(td))}>
                               <Eye size={13} /> View Detail
                             </Button>
-                            {/* Contract Engineer actions */}
+                            {/* Contract Holder actions */}
+                            {isContractHolder && ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(td.status) && (
+                              <Button size="sm" onClick={() => navigate(`/pre-qualification/${td.id}`)}>
+                                Continue Pre-Qualification
+                              </Button>
+                            )}
+                            {isPof && td.status === 'legal_review' && (
+                              <Button size="sm" onClick={() => navigate(`/legal-review/${td.id}`)}>
+                                View Legal Review
+                              </Button>
+                            )}
+                            {isPof && td.status === 'contract_execution' && (
+                              <Button size="sm" onClick={() => navigate(`/contract-execution/${td.id}`)}>
+                                Sign Contract
+                              </Button>
+                            )}
+                            {isPof && td.status === 'active' && (
+                              <Button size="sm" onClick={() => navigate(`/contract-management/${td.id}`)}>
+                                Manage Contract
+                              </Button>
+                            )}
+                            {isPof && td.status === 'contract_closure' && (
+                              <Button size="sm" onClick={() => navigate(`/contract-closure/${td.id}`)}>
+                                Close Contract
+                              </Button>
+                            )}
                             {isPof && td.status === 'draft' && (
                               <Button size="sm" onClick={() => navigate(`/create-itt/${td.id}`)}>
                                 <FileText size={13} /> Continue Review

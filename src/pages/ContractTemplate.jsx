@@ -47,7 +47,7 @@ export default function ContractTemplate() {
   const { tenderId } = useParams()
   const navigate     = useNavigate()
   const { user }     = useAuth()
-  const { tenders }  = useTenders()
+  const { tenders, advanceTender }  = useTenders()
   const tender       = tenders.find(t => t.id === tenderId)
 
   const [selected, setSelected] = useState(null)
@@ -317,9 +317,14 @@ export default function ContractTemplate() {
                   <Send size={14} /> Draft Contract with AI <ChevronRight size={14} />
                 </Button>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">
-                  <CheckCircle size={15} />
-                  Contract drafting in progress for {awardedBidder.name} — estimated 3 minutes.
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">
+                    <CheckCircle size={15} />
+                    Contract drafted for {awardedBidder.name}.
+                  </div>
+                  <Button onClick={() => { advanceTender(tender.id); navigate('/tenders') }}>
+                    <Send size={14} /> Submit for Legal Review <ChevronRight size={14} />
+                  </Button>
                 </div>
               )}
             </div>

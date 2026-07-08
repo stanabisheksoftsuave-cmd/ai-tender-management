@@ -121,7 +121,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Section B1 — General Conditions of Contract</h3>
-          <p className="text-xs text-slate-400 mt-1">Choose the value / risk category that applies to this CONTRACT.</p>
+          <p className="text-xs text-slate-400 mt-1">Choose the value/risk tier, or Purchase of Materials for goods procurement, that applies to this CONTRACT.</p>
         </div>
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-50" style={{ color: '#0089cf' }}>
           <ChevronLeft size={13} /> Back
