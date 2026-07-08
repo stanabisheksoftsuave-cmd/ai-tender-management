@@ -121,7 +121,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
     const isHeading = !hasField && paraText.length > 0 && paraText.length <= 60 &&
       paraText === paraText.toUpperCase() && /[A-Z]{3,}/.test(paraText)
     if (isHeading) {
-      return <p key={block.id} className="font-semibold text-slate-900 tracking-wide mt-4 mb-1.5 first:mt-0">{paraText}</p>
+      return <p key={block.id} className="font-semibold tracking-wide mt-4 mb-1.5 first:mt-0" style={{ color: '#1b4c6f' }}>{paraText}</p>
     }
     return <p key={block.id} className="whitespace-pre-wrap mb-1.5">{block.segments.map(renderSegment)}</p>
   }
@@ -142,13 +142,16 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       )
     }
     return (
-      <div key={`tbl-${bi}`} className="my-3 overflow-x-auto rounded-lg border border-slate-200">
+      <div key={`tbl-${bi}`} className="my-3 overflow-x-auto rounded-lg" style={{ border: '1px solid #cce6f8' }}>
         <table className="w-full border-collapse text-[12.5px]">
           <tbody>
             {block.rows.map((row, ri) => (
-              <tr key={ri} className={ri === 0 ? 'bg-slate-50' : (ri % 2 ? 'bg-slate-50/40' : '')}>
+              <tr key={ri} className={ri === 0 ? '' : ''} style={ri === 0 ? { background: 'rgba(0,137,207,0.04)' } : ri % 2 ? { background: 'rgba(236,244,252,0.4)' } : {}}>
                 {row.cells.map((cell, ci) => (
-                  <td key={ci} className={`border border-slate-200 px-3 py-2 align-top ${ri === 0 ? 'font-semibold text-slate-700' : ''}`}>
+                  <td key={ci} className={`px-3 py-2 align-top ${ri === 0 ? 'font-semibold' : ''}`} style={{
+                    border: '1px solid #cce6f8',
+                    color: ri === 0 ? '#1b4c6f' : undefined
+                  }}>
                     {renderBlocks(cell.blocks)}
                   </td>
                 ))}
@@ -176,42 +179,56 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
   }
 
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <FileText size={16} className="text-[var(--color-primary)]" />
-          <h3 className="font-semibold text-slate-800">{section.title}</h3>
+    <Card branded accent className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+            <FileText size={16} style={{ color: '#0089cf' }} />
+          </div>
+          <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>{section.title}</h3>
         </div>
         <button
           onClick={onBack}
           disabled={isFirst}
-          className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-          <ChevronLeft size={12} /> Back
+          className="flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg hover:bg-slate-50"
+          style={{ color: '#0089cf' }}>
+          <ChevronLeft size={13} /> Back
         </button>
       </div>
 
       {!loading && !error && model && total > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between gap-3 mb-1.5">
-            <div className="flex items-center gap-2 text-xs">
+        <div className="mb-5">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2.5 text-xs">
               {allFilled
-                ? <span className="flex items-center gap-1.5 font-semibold text-emerald-600"><CheckCircle2 size={13} /> All fields filled</span>
-                : <span className="font-semibold text-slate-700">{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">fields filled</span></span>}
+                ? <span className="flex items-center gap-1.5 font-bold" style={{ color: '#0089cf' }}><CheckCircle2 size={14} /> All fields filled</span>
+                : <span className="font-semibold" style={{ color: '#1b4c6f' }}>{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">fields filled</span></span>}
               {!allFilled && (
-                <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{remaining} to go</span>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{
+                  color: '#e69c00',
+                  background: 'rgba(230,156,0,0.08)',
+                  border: '1px solid rgba(230,156,0,0.2)'
+                }}>{remaining} to go</span>
               )}
             </div>
             <button
               onClick={jumpToNextEmpty}
               disabled={allFilled}
-              className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] hover:underline underline-offset-2 disabled:text-slate-300 disabled:no-underline disabled:cursor-not-allowed transition-colors">
+              className="flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+              style={{ color: '#0089cf' }}>
               <ArrowDownToLine size={12} /> Jump to next empty
             </button>
           </div>
-          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="olng-progress-bar h-2">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${allFilled ? 'bg-emerald-500' : 'bg-[var(--color-primary)]'}`}
-              style={{ width: `${Math.max(pct, 2)}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${allFilled ? '' : ''}`}
+              style={{
+                width: `${Math.max(pct, 2)}%`,
+                background: allFilled
+                  ? 'linear-gradient(90deg, #0089cf, #10b981)'
+                  : 'linear-gradient(90deg, #1b4c6f, #0089cf)',
+                position: 'relative', overflow: 'hidden'
+              }}
             />
           </div>
         </div>
@@ -220,7 +237,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       {standInNotice}
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-slate-400 text-sm">
+        <div className="flex items-center justify-center gap-2 py-16 text-sm" style={{ color: '#0089cf' }}>
           <Loader2 size={16} className="animate-spin" /> Loading template…
         </div>
       )}
@@ -234,22 +251,22 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       )}
 
       {!loading && !error && model && model.fields.length > 0 && (
-        <div className="max-h-[62vh] overflow-y-auto rounded-xl border border-slate-200 bg-white">
+        <div className="max-h-[62vh] overflow-y-auto rounded-xl bg-white" style={{ border: '1px solid #cce6f8' }}>
           <div className="px-6 py-6 sm:px-8 text-[13px] leading-6 text-slate-700">
             {renderBlocks(model.blocks)}
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
-        <p className="text-[11px] text-slate-400">
+      <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid rgba(0,137,207,0.1)' }}>
+        <p className="text-[11px]" style={{ color: '#94a3b8' }}>
           {model
             ? (allFilled
                 ? `All ${total} field${total === 1 ? '' : 's'} completed`
                 : `${filledCount} of ${total} field${total === 1 ? '' : 's'} filled`)
             : ''}
         </p>
-        <Button onClick={handleNext} disabled={loading} className="flex items-center gap-2">
+        <Button variant="brand" onClick={handleNext} disabled={loading} className="flex items-center gap-2">
           {isLast ? <>Proceed to Export <Download size={15} /></> : <>Save & Continue <ChevronRight size={15} /></>}
         </Button>
       </div>

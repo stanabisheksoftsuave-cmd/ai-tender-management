@@ -3,7 +3,7 @@ import JSZip from 'jszip'
 import {
   Bot, Sparkles, CheckCircle, RefreshCw, ChevronRight,
   FileText, AlertCircle, Circle, Download,
-  UploadCloud, X, Paperclip, PackageCheck
+  UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -250,41 +250,54 @@ export default function ITTCreation() {
 
   return (
     <div className="space-y-5">
-      {/* Draft status banner */}
-      <div className="flex items-center justify-between">
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${currentDraftStatus.cls}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50 shrink-0" />
-          <span>{currentDraftStatus.label}</span>
-          <span className="opacity-40">·</span>
-          <span className="opacity-70">{currentDraftStatus.sub}</span>
+      {/* ── Branded Status Banner ── */}
+      <div className="flex items-center justify-between olng-slide-up">
+        <div className="olng-status-banner">
+          <span className="status-dot" />
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{currentDraftStatus.label}</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-xs text-slate-500">{currentDraftStatus.sub}</span>
+          </div>
         </div>
-        <span className="text-xs text-slate-400 font-mono bg-slate-100 px-2 py-0.5 rounded">{draftTenderId || 'New Draft'}</span>
+        <span className="text-xs font-mono px-3 py-1 rounded-lg font-medium" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.15)' }}>
+          {draftTenderId || 'New Draft'}
+        </span>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-0 flex-wrap gap-y-2">
+      {/* ── Premium Step Indicator ── */}
+      <div className="flex items-center gap-0 olng-slide-up" style={{ animationDelay: '60ms' }}>
         {steps.map((s, i) => (
-          <div key={i} className="flex items-center">
-            <div className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
-                ${i < step ? 'bg-green-500 border-green-500 text-white' :
-                  i === step ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' :
-                  'bg-white border-slate-200 text-slate-400'}`}>
-                {i < step ? <CheckCircle size={14} /> : i + 1}
+          <div key={i} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className={`olng-step-circle ${
+                i < step ? 'olng-step-circle--done' :
+                i === step ? 'olng-step-circle--active' :
+                'olng-step-circle--pending'
+              }`}>
+                {i < step ? <CheckCircle size={15} /> : i + 1}
               </div>
-              <span className={`text-sm ${i === step ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{s}</span>
+              <span className={`text-sm whitespace-nowrap ${
+                i === step ? 'font-semibold' : i < step ? 'font-medium' : ''
+              }`} style={{
+                color: i === step ? '#1b4c6f' : i < step ? '#0089cf' : '#94a3b8'
+              }}>{s}</span>
             </div>
-            {i < steps.length - 1 && <ChevronRight size={16} className="mx-3 text-slate-300" />}
+            {i < steps.length - 1 && (
+              <div className={`olng-step-connector mx-3 ${i < step ? 'olng-step-connector--done' : ''}`} />
+            )}
           </div>
         ))}
       </div>
 
       {/* ── Step 0: Project Details ── */}
       {step === 0 && (
-        <div className="space-y-4">
-          <Card className="p-5">
-            <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-              <FileText size={16} className="text-[var(--color-primary)]" />
+        <div className="space-y-4 olng-slide-up" style={{ animationDelay: '120ms' }}>
+          <Card branded className="p-6">
+            <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                <FileText size={16} style={{ color: '#0089cf' }} />
+              </div>
               Project Information
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -295,22 +308,19 @@ export default function ITTCreation() {
                 { key: 'deadline',   label: t('itt.fieldDeadline'), type: 'date', required: true },
               ].map(f => (
                 <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
                     {f.label}
-                    {f.required && <span className="text-red-500 ml-0.5">*</span>}
+                    {f.required && <span style={{ color: '#0089cf' }}>*</span>}
                   </label>
                   <input
                     type={f.type || 'text'}
                     placeholder={f.placeholder}
                     value={form[f.key]}
                     onChange={e => f.onChangeFn ? f.onChangeFn(e.target.value) : setField(f.key, e.target.value)}
-                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 transition-colors
-                      ${fieldError(f.key)
-                        ? 'border-red-400 focus:ring-red-300 bg-red-50'
-                        : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
+                    className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError(f.key) ? 'olng-input--error' : ''}`}
                   />
                   {fieldError(f.key) && (
-                    <p className="text-[11px] text-red-500 mt-1">{f.label} is required</p>
+                    <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />{f.label} is required</p>
                   )}
                 </div>
               ))}
@@ -330,21 +340,22 @@ export default function ITTCreation() {
                 }
                 return (
                   <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                      <Clock size={12} style={{ color: '#0089cf' }} />
                       {t('itt.fieldDuration')}
                     </label>
                     <div className="flex gap-2">
                       <select
                         value={selYears}
                         onChange={e => setDuration(e.target.value, selMonths)}
-                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
+                        className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input">
                         <option value="">Years</option>
                         {yearOpts.map(y => <option key={y} value={y}>{y} year{y === 1 ? '' : 's'}</option>)}
                       </select>
                       <select
                         value={selMonths}
                         onChange={e => setDuration(selYears, e.target.value)}
-                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
+                        className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input">
                         <option value="">Months</option>
                         {monthOpts.map(m => <option key={m} value={m}>{m} month{m === 1 ? '' : 's'}</option>)}
                       </select>
@@ -353,17 +364,20 @@ export default function ITTCreation() {
                 )
               })()}
               <div className="col-span-2">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-medium text-slate-600">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1b4c6f' }}>
                     Project Description / Key Requirements
-                    <span className="text-red-500 ml-0.5">*</span>
+                    <span style={{ color: '#0089cf' }}>*</span>
                   </label>
                   {/* Mode toggle */}
-                  <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                  <div className="flex gap-0.5 rounded-lg p-0.5" style={{ background: 'rgba(0,137,207,0.06)', border: '1px solid rgba(0,137,207,0.1)' }}>
                     {[{ id: 'type', icon: FileText, label: 'Type' }, { id: 'upload', icon: UploadCloud, label: 'Upload File' }].map(m => (
                       <button key={m.id} type="button" onClick={() => setDescMode(m.id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all
-                          ${descMode === m.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                        style={descMode === m.id
+                          ? { background: '#fff', color: '#1b4c6f', boxShadow: '0 1px 3px rgba(27,76,111,0.1)' }
+                          : { color: '#94a3b8' }
+                        }>
                         <m.icon size={11} /> {m.label}
                       </button>
                     ))}
@@ -377,10 +391,7 @@ export default function ITTCreation() {
                     placeholder="Describe the project scope, objectives, and key requirements..."
                     value={form.description}
                     onChange={e => setField('description', e.target.value)}
-                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 resize-none transition-colors
-                      ${fieldError('description')
-                        ? 'border-red-400 focus:ring-red-300 bg-red-50'
-                        : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
+                    className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError('description') ? 'olng-input--error' : ''}`}
                   />
                 )}
 
@@ -394,21 +405,18 @@ export default function ITTCreation() {
                         onDragLeave={() => setIsDragging(false)}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`w-full rounded-xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center gap-2 py-7 transition-all
-                          ${isDragging
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                            : fieldError('description')
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-slate-200 hover:border-[var(--color-primary)]/50 hover:bg-slate-50'}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-                          ${isDragging ? 'bg-[var(--color-primary)]/10' : 'bg-slate-100'}`}>
-                          <UploadCloud size={20} className={isDragging ? 'text-[var(--color-primary)]' : 'text-slate-400'} />
+                        className={`olng-dropzone w-full cursor-pointer flex flex-col items-center justify-center gap-3 py-8 transition-all
+                          ${isDragging ? 'olng-dropzone--active' : ''}
+                          ${fieldError('description') ? 'olng-input--error' : ''}`}>
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
+                          style={{ background: isDragging ? 'rgba(0,137,207,0.1)' : 'rgba(0,137,207,0.06)' }}>
+                          <UploadCloud size={22} style={{ color: isDragging ? '#0089cf' : '#94a3b8' }} />
                         </div>
                         <div className="text-center">
-                          <p className="text-xs font-medium text-slate-600">
-                            Drag & drop or <span className="text-[var(--color-primary)] underline underline-offset-2">browse</span>
+                          <p className="text-xs font-medium" style={{ color: '#1b4c6f' }}>
+                            Drag & drop or <span style={{ color: '#0089cf' }} className="underline underline-offset-2 cursor-pointer">browse</span>
                           </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">.pdf · .docx · .txt · .doc</p>
+                          <p className="text-[10px] text-slate-400 mt-1">.pdf · .docx · .txt · .doc</p>
                         </div>
                         <input
                           ref={fileInputRef}
@@ -423,9 +431,13 @@ export default function ITTCreation() {
                     {/* File attached chip + extracted textarea */}
                     {uploadedFile && (
                       <>
-                        <div className="flex items-center gap-2 bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 rounded-lg px-3 py-2">
-                          <Paperclip size={13} className="text-[var(--color-primary)] shrink-0" />
-                          <span className="text-xs font-medium text-slate-700 flex-1 truncate">{uploadedFile.name}</span>
+                        <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{
+                          background: 'rgba(0,137,207,0.05)',
+                          border: '1px solid rgba(0,137,207,0.15)',
+                          borderLeft: '3px solid #0089cf'
+                        }}>
+                          <Paperclip size={13} style={{ color: '#0089cf' }} className="shrink-0" />
+                          <span className="text-xs font-medium flex-1 truncate" style={{ color: '#1b4c6f' }}>{uploadedFile.name}</span>
                           <span className="text-[10px] text-slate-400">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
                           <button type="button"
                             onClick={() => { setUploadedFile(null); setField('description', '') }}
@@ -438,10 +450,7 @@ export default function ITTCreation() {
                           placeholder="Extracted content will appear here — you can edit before generating…"
                           value={form.description}
                           onChange={e => setField('description', e.target.value)}
-                          className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 resize-none transition-colors
-                            ${fieldError('description')
-                              ? 'border-red-400 focus:ring-red-300 bg-red-50'
-                              : 'border-slate-200 focus:ring-[var(--color-primary)]/30'}`}
+                          className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError('description') ? 'olng-input--error' : ''}`}
                         />
                       </>
                     )}
@@ -449,18 +458,19 @@ export default function ITTCreation() {
                 )}
 
                 {fieldError('description') && (
-                  <p className="text-[11px] text-red-500 mt-1">Project description is required</p>
+                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Project description is required</p>
                 )}
               </div>
             </div>
           </Card>
 
           <Button
+            variant="brand"
             onClick={handleGenerate}
-            className="w-full justify-center py-3"
+            className="w-full justify-center py-3.5 text-[15px]"
             disabled={showErrors && !isFormValid}
           >
-            <Sparkles size={15} />
+            <Sparkles size={16} />
             Generate with AI
           </Button>
 
@@ -480,15 +490,22 @@ export default function ITTCreation() {
 
       {/* ── Step 2: Fill In ITT Sections ── */}
       {step === 2 && (
-        <div className="space-y-4">
+        <div className="space-y-4 olng-slide-up">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="ai"><FileText size={10} /> {currentFlowItem.title}</Badge>
-              <span className="text-xs text-slate-500">Section {currentSectionIndex + 1} of {effectiveFlow.length}</span>
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{
+                background: 'linear-gradient(135deg, rgba(0,137,207,0.1), rgba(27,76,111,0.06))',
+                color: '#1b4c6f',
+                border: '1px solid rgba(0,137,207,0.15)'
+              }}>
+                <Layers size={12} style={{ color: '#0089cf' }} />
+                {currentFlowItem.title}
+              </div>
+              <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Section {currentSectionIndex + 1} of {effectiveFlow.length}</span>
             </div>
-            <div className="w-40 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className="olng-progress-bar w-40 h-2">
               <div
-                className="h-full rounded-full bg-[var(--color-primary)] transition-all duration-500"
+                className="olng-progress-fill"
                 style={{ width: `${Math.round(((currentSectionIndex + 1) / effectiveFlow.length) * 100)}%` }}
               />
             </div>
@@ -511,9 +528,9 @@ export default function ITTCreation() {
               isFirst={isFirstSection}
               isLast={isLastSection}
               standInNotice={currentFlowItem.isStandIn && (
-                <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
-                  <AlertCircle size={13} className="mt-0.5 shrink-0" />
-                  Dedicated template not yet available for this category — showing the nearest {currentFlowItem.nearestTier} template as a stand-in.
+                <div className="mb-4 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs olng-info-alert" style={{ borderLeft: '3px solid #e69c00' }}>
+                  <AlertCircle size={13} className="mt-0.5 shrink-0" style={{ color: '#e69c00' }} />
+                  <span>Dedicated template not yet available for this category — showing the nearest {currentFlowItem.nearestTier} template as a stand-in.</span>
                 </div>
               )}
             />
@@ -523,97 +540,117 @@ export default function ITTCreation() {
 
       {/* ── Step 1: AI Generation ── */}
       {step === 1 && (
-        <Card className="p-12">
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
-              <Bot size={36} className="text-violet-600" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">AI is Generating Your ITT</h3>
-            <p className="text-sm text-slate-400">Building your document based on project requirements and compliance standards</p>
-          </div>
-
-          <div className="max-w-xs mx-auto space-y-3 mb-10">
-            {generationTasks.map((task, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all
-                  ${i < genStep ? 'bg-green-500' : i === genStep ? 'bg-violet-600' : 'bg-slate-200'}`}>
-                  {i < genStep
-                    ? <CheckCircle size={13} className="text-white" />
-                    : i === genStep
-                    ? <RefreshCw size={12} className="text-white animate-spin" />
-                    : <Circle size={12} className="text-slate-400" />}
-                </div>
-                <span className={`text-sm transition-colors ${
-                  i < genStep ? 'text-slate-400 line-through' :
-                  i === genStep ? 'text-slate-800 font-medium' : 'text-slate-300'
-                }`}>{task}</span>
+        <Card branded className="p-12 olng-scale-in">
+          <div className="olng-dot-pattern absolute inset-0 opacity-40 pointer-events-none rounded-2xl" style={{ position: 'absolute' }} />
+          <div className="relative z-10">
+            <div className="text-center mb-10">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 olng-float" style={{
+                background: 'linear-gradient(135deg, rgba(0,137,207,0.15), rgba(27,76,111,0.1))',
+                boxShadow: '0 8px 32px rgba(0,137,207,0.15)'
+              }}>
+                <Bot size={36} style={{ color: '#0089cf' }} />
               </div>
-            ))}
-          </div>
-
-          <div className="max-w-xs mx-auto">
-            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-violet-500 transition-all duration-500"
-                style={{ width: `${Math.round((genStep / generationTasks.length) * 100)}%` }}
-              />
+              <h3 className="text-lg font-bold mb-1" style={{ color: '#1b4c6f' }}>AI is Generating Your ITT</h3>
+              <p className="text-sm text-slate-400">Building your document based on project requirements and compliance standards</p>
             </div>
-            <p className="text-center text-xs text-slate-400 mt-2">
-              {Math.round((genStep / generationTasks.length) * 100)}% complete
-            </p>
+
+            <div className="max-w-sm mx-auto space-y-3 mb-10">
+              {generationTasks.map((task, i) => (
+                <div key={i} className="flex items-center gap-3 olng-slide-up olng-stagger" style={{ '--i': i }}>
+                  <div className={`olng-gen-dot shrink-0 ${
+                    i < genStep ? 'olng-gen-dot--done' :
+                    i === genStep ? 'olng-gen-dot--active' :
+                    'olng-gen-dot--pending'
+                  }`}>
+                    {i < genStep
+                      ? <CheckCircle size={14} className="text-white" />
+                      : i === genStep
+                      ? <RefreshCw size={13} className="text-white animate-spin" />
+                      : <Circle size={12} style={{ color: '#cce6f8' }} />}
+                  </div>
+                  <span className={`text-sm transition-colors ${
+                    i < genStep ? 'text-slate-400 line-through' :
+                    i === genStep ? 'font-semibold' : 'text-slate-300'
+                  }`} style={i === genStep ? { color: '#1b4c6f' } : {}}>{task}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="max-w-sm mx-auto">
+              <div className="olng-progress-bar h-2">
+                <div
+                  className="olng-progress-fill"
+                  style={{ width: `${Math.round((genStep / generationTasks.length) * 100)}%` }}
+                />
+              </div>
+              <p className="text-center text-xs mt-2.5 font-medium" style={{ color: '#0089cf' }}>
+                {Math.round((genStep / generationTasks.length) * 100)}% complete
+              </p>
+            </div>
           </div>
         </Card>
       )}
 
       {/* ── Step 3: Export ITT ── */}
       {step === 3 && !ittApproved && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 olng-slide-up">
           {/* Export status */}
-          <Card className="p-5">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <Download size={20} className="text-blue-600" />
+          <Card branded className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="olng-export-icon">
+                <Download size={20} />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-800">Ready to Export</h3>
-                <p className="text-xs text-slate-400">{draftTenderId} ready for external review</p>
+                <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Ready to Export</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{draftTenderId} ready for external review</p>
               </div>
             </div>
 
             <div className="space-y-2.5">
               {[
-                { label: 'Prepared By', value: approverName, sub: approverRole },
-                { label: 'Prepared On', value: new Date().toISOString().split('T')[0], sub: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' local time' },
-                { label: 'Sections Completed', value: `${effectiveFlow.length} of ${effectiveFlow.length}`, sub: 'All sections filled in' },
+                { label: 'Prepared By', value: approverName, sub: approverRole, icon: User },
+                { label: 'Prepared On', value: new Date().toISOString().split('T')[0], sub: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' local time', icon: Clock },
+                { label: 'Sections Completed', value: `${effectiveFlow.length} of ${effectiveFlow.length}`, sub: 'All sections filled in', icon: Layers },
               ].map(item => (
-                <div key={item.label} className="bg-slate-50 rounded-lg px-3 py-2.5">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">{item.label}</p>
-                  <p className="text-sm font-medium text-slate-800">{item.value}</p>
-                  {item.sub && <p className="text-xs text-slate-400">{item.sub}</p>}
+                <div key={item.label} className="rounded-xl px-4 py-3 flex items-start gap-3" style={{
+                  background: 'linear-gradient(135deg, rgba(236,244,252,0.6), rgba(0,137,207,0.04))',
+                  border: '1px solid rgba(0,137,207,0.08)'
+                }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'rgba(0,137,207,0.08)' }}>
+                    <item.icon size={14} style={{ color: '#0089cf' }} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider mb-0.5 font-semibold" style={{ color: '#94a3b8' }}>{item.label}</p>
+                    <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{item.value}</p>
+                    {item.sub && <p className="text-xs text-slate-400">{item.sub}</p>}
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-700">
-              <AlertCircle size={13} className="mt-0.5 shrink-0" />
-              Export the ITT document for external review, then upload the finalised version to proceed.
+            <div className="mt-4 flex items-start gap-2.5 olng-info-alert px-3.5 py-3 text-xs">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: '#0089cf' }} />
+              <span>Export the ITT document for external review, then upload the finalised version to proceed.</span>
             </div>
           </Card>
 
           {/* Export panel */}
-          <Card className="p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] font-bold text-sm shrink-0">
+          <Card branded className="p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0" style={{
+                background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))',
+                color: '#0089cf'
+              }}>
                 {approverInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800">{approverName}</p>
+                <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{approverName}</p>
                 <p className="text-xs text-slate-400">{approverRole}</p>
               </div>
               <Badge variant="info">Exporter</Badge>
             </div>
 
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">ITT Summary</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#0089cf' }}>ITT Summary</p>
             <div className="mb-4 space-y-0">
               {[
                 { label: 'Tender ID', value: draftTenderId || '—' },
@@ -622,21 +659,21 @@ export default function ITTCreation() {
                 { label: 'Department', value: form.department },
                 { label: 'Sections', value: `${effectiveFlow.length} sections · all completed` },
               ].map(item => (
-                <div key={item.label} className="flex justify-between py-1.5 border-b border-slate-100 text-xs">
+                <div key={item.label} className="flex justify-between py-2 text-xs" style={{ borderBottom: '1px solid rgba(0,137,207,0.08)' }}>
                   <span className="text-slate-400">{item.label}</span>
-                  <span className="font-medium text-slate-700">{item.value}</span>
+                  <span className="font-semibold" style={{ color: '#1b4c6f' }}>{item.value}</span>
                 </div>
               ))}
             </div>
 
             <div className="mb-4">
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">Export Notes (Optional)</label>
+              <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Export Notes (Optional)</label>
               <textarea
                 value={approvalNote}
                 onChange={e => setApprovalNote(e.target.value)}
                 rows={3}
                 placeholder="Add notes for the external reviewer..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 resize-none"
+                className="w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input"
               />
             </div>
 
@@ -663,7 +700,7 @@ export default function ITTCreation() {
               <Button variant="secondary" className="flex-1 justify-center" onClick={() => { setCurrentSectionIndex(effectiveFlow.length - 1); setStep(2) }}>
                 Back to Sections
               </Button>
-              <Button className="flex-1 justify-center" onClick={() => {
+              <Button variant="brand" className="flex-1 justify-center" onClick={() => {
                 if (draftTenderId) advanceTender(draftTenderId)
                 setIttApproved(true)
               }}>
@@ -676,14 +713,14 @@ export default function ITTCreation() {
 
       {/* ── ITT Exported & Created ── */}
       {step === 3 && ittApproved && (
-        <Card className="p-12 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-500" />
+        <Card branded className="p-12 text-center olng-scale-in">
+          <div className="olng-success-ring mx-auto mb-5">
+            <CheckCircle size={32} style={{ color: '#0089cf' }} />
           </div>
           <Badge variant="success" className="mb-3">ITT Exported</Badge>
-          <h2 className="text-xl font-bold text-slate-800 mb-1">ITT Exported & Created</h2>
-          <p className="text-slate-500 text-sm mb-1">Exported by {approverName} · {approverRole}</p>
-          <p className="text-slate-400 text-xs mb-6">{draftTenderId} — {form.title} is exported for external review. Upload the finalised version when ready.</p>
+          <h2 className="text-xl font-bold mb-1" style={{ color: '#1b4c6f' }}>ITT Exported & Created</h2>
+          <p className="text-sm mb-1" style={{ color: '#64748b' }}>Exported by {approverName} · {approverRole}</p>
+          <p className="text-xs mb-6" style={{ color: '#94a3b8' }}>{draftTenderId} — {form.title} is exported for external review. Upload the finalised version when ready.</p>
           {zipError && (
             <div className="max-w-md mx-auto mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-600 text-left">
               <AlertCircle size={13} className="mt-0.5 shrink-0" />
@@ -712,7 +749,7 @@ export default function ITTCreation() {
             }}>
               <Download size={15} /> {t('itt.export')}
             </Button>
-            <Button onClick={() => navigate('/tenders')}>
+            <Button variant="brand" onClick={() => navigate('/tenders')}>
               <FileText size={15} /> View in Tender List
             </Button>
           </div>

@@ -45,7 +45,10 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
     if (seg.type === 'text') return <span key={i}>{seg.text}</span>
     const field = previewState.model?.fields[seg.fieldIndex]
     return (
-      <span key={i} className="inline-block px-1 mx-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700">
+      <span key={i} className="inline-block px-1 mx-0.5 rounded text-amber-700" style={{
+        background: 'rgba(230,156,0,0.08)',
+        border: '1px solid rgba(230,156,0,0.2)'
+      }}>
         {field?.defaultText || '…'}
       </span>
     )
@@ -61,7 +64,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
     const isHeading = !hasField && paraText.length > 0 && paraText.length <= 60 &&
       paraText === paraText.toUpperCase() && /[A-Z]{3,}/.test(paraText)
     if (isHeading) {
-      return <p key={block.id} className="font-semibold text-slate-900 tracking-wide mt-3 mb-1 first:mt-0">{paraText}</p>
+      return <p key={block.id} className="font-semibold tracking-wide mt-3 mb-1 first:mt-0" style={{ color: '#1b4c6f' }}>{paraText}</p>
     }
     return <p key={block.id} className="whitespace-pre-wrap mb-1">{block.segments.map(renderSegment)}</p>
   }
@@ -77,13 +80,16 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
       )
     }
     return (
-      <div key={`tbl-${bi}`} className="my-2 overflow-x-auto rounded-lg border border-slate-200">
+      <div key={`tbl-${bi}`} className="my-2 overflow-x-auto rounded-lg" style={{ border: '1px solid #cce6f8' }}>
         <table className="w-full border-collapse text-[11.5px]">
           <tbody>
             {block.rows.map((row, ri) => (
-              <tr key={ri} className={ri === 0 ? 'bg-slate-50' : (ri % 2 ? 'bg-slate-50/40' : '')}>
+              <tr key={ri} style={ri === 0 ? { background: 'rgba(0,137,207,0.04)' } : ri % 2 ? { background: 'rgba(236,244,252,0.3)' } : {}}>
                 {row.cells.map((cell, ci) => (
-                  <td key={ci} className={`border border-slate-200 px-2.5 py-1.5 align-top ${ri === 0 ? 'font-semibold text-slate-700' : ''}`}>
+                  <td key={ci} className={`px-2.5 py-1.5 align-top ${ri === 0 ? 'font-semibold' : ''}`} style={{
+                    border: '1px solid #cce6f8',
+                    color: ri === 0 ? '#1b4c6f' : undefined
+                  }}>
                     {renderBlocks(cell.blocks)}
                   </td>
                 ))}
@@ -111,14 +117,14 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
   }
 
   return (
-    <Card className="p-5">
+    <Card branded className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="font-semibold text-slate-800">Section B1 — General Conditions of Contract</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Choose the value / risk category that applies to this CONTRACT.</p>
+          <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Section B1 — General Conditions of Contract</h3>
+          <p className="text-xs text-slate-400 mt-1">Choose the value / risk category that applies to this CONTRACT.</p>
         </div>
-        <button onClick={onBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-          <ChevronLeft size={12} /> Back
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-50" style={{ color: '#0089cf' }}>
+          <ChevronLeft size={13} /> Back
         </button>
       </div>
 
@@ -126,21 +132,36 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
         <button
           onClick={goPrev}
           aria-label="Previous category"
-          className="shrink-0 self-center w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors">
+          className="shrink-0 self-center w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105"
+          style={{
+            background: 'rgba(0,137,207,0.06)',
+            border: '1px solid rgba(0,137,207,0.15)',
+            color: '#0089cf'
+          }}>
           <ChevronLeft size={16} />
         </button>
 
-        <div className="flex-1 min-w-0 rounded-xl border-2 border-blue-300 bg-blue-50/40 ring-2 ring-offset-1 ring-blue-100 p-4">
+        <div className="flex-1 min-w-0 rounded-xl p-4 transition-all" style={{
+          background: 'linear-gradient(135deg, rgba(0,137,207,0.05), rgba(236,244,252,0.6))',
+          border: '2px solid rgba(0,137,207,0.25)',
+          boxShadow: '0 0 0 4px rgba(0,137,207,0.06), 0 4px 16px rgba(0,137,207,0.08)'
+        }}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-sm font-bold text-blue-700">{cat.label}</p>
+              <p className="text-sm font-bold" style={{ color: '#1b4c6f' }}>{cat.label}</p>
               <p className="text-[11px] text-slate-500 mt-0.5">{cat.sub}</p>
             </div>
-            <CheckCircle size={16} className="text-blue-600 shrink-0" />
+            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0089cf, #00b4d8)' }}>
+              <CheckCircle size={14} className="text-white" />
+            </div>
           </div>
 
           {cat.isStandIn && (
-            <div className="mt-3 flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-[10px] text-amber-700">
+            <div className="mt-3 flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[10px]" style={{
+              background: 'rgba(230,156,0,0.06)',
+              border: '1px solid rgba(230,156,0,0.2)',
+              color: '#b07600'
+            }}>
               <AlertTriangle size={12} className="mt-0.5 shrink-0" />
               Dedicated template not yet available — uses the nearest {cat.nearestTier} template as a stand-in.
             </div>
@@ -148,15 +169,16 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
 
           <button
             onClick={togglePreview}
-            className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-primary)] hover:underline underline-offset-2 transition-colors">
+            className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 transition-colors"
+            style={{ color: '#0089cf' }}>
             {previewOpen ? <EyeOff size={12} /> : <Eye size={12} />}
             {previewOpen ? 'Hide preview' : 'Preview template'}
           </button>
 
           {previewOpen && (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-white max-h-72 overflow-y-auto px-4 py-4 text-[12px] leading-5 text-slate-700">
+            <div className="mt-3 rounded-lg bg-white max-h-72 overflow-y-auto px-4 py-4 text-[12px] leading-5 text-slate-700" style={{ border: '1px solid #cce6f8' }}>
               {previewState.loading && (
-                <div className="flex items-center justify-center gap-2 py-10 text-slate-400 text-xs">
+                <div className="flex items-center justify-center gap-2 py-10 text-xs" style={{ color: '#0089cf' }}>
                   <Loader2 size={14} className="animate-spin" /> Loading preview…
                 </div>
               )}
@@ -179,7 +201,12 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
         <button
           onClick={goNext}
           aria-label="Next category"
-          className="shrink-0 self-center w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors">
+          className="shrink-0 self-center w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105"
+          style={{
+            background: 'rgba(0,137,207,0.06)',
+            border: '1px solid rgba(0,137,207,0.15)',
+            color: '#0089cf'
+          }}>
           <ChevronRight size={16} />
         </button>
       </div>
@@ -190,14 +217,18 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
             key={k}
             onClick={() => setIndex(i)}
             aria-label={`Go to ${B1_CATEGORY_MAP[k].label}`}
-            className={`h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-blue-500' : 'w-1.5 bg-slate-200 hover:bg-slate-300'}`}
+            className="rounded-full transition-all"
+            style={i === index
+              ? { width: '20px', height: '6px', background: 'linear-gradient(90deg, #1b4c6f, #0089cf)' }
+              : { width: '6px', height: '6px', background: '#cce6f8' }
+            }
           />
         ))}
       </div>
 
-      <div className="flex justify-between items-center mt-5 pt-4 border-t border-slate-100">
-        <p className="text-[11px] text-slate-400">Category {index + 1} of {CATEGORY_KEYS.length}</p>
-        <Button onClick={() => onConfirm(key)} className="flex items-center gap-2">
+      <div className="flex justify-between items-center mt-5 pt-4" style={{ borderTop: '1px solid rgba(0,137,207,0.1)' }}>
+        <p className="text-[11px]" style={{ color: '#94a3b8' }}>Category {index + 1} of {CATEGORY_KEYS.length}</p>
+        <Button variant="brand" onClick={() => onConfirm(key)} className="flex items-center gap-2">
           Select & Continue <ChevronRight size={15} />
         </Button>
       </div>
