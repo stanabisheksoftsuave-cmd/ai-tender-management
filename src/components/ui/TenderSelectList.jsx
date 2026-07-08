@@ -8,6 +8,16 @@ const statusVariant = {
   comm_eval:   'comm_eval',
   mgmt_review: 'mgmt_review',
   upload:      'upload',
+  prequal_stage1:      'prequal_stage1',
+  prequal_stage2:      'prequal_stage2',
+  prequal_stage3:      'prequal_stage3',
+  prequal_stage4:      'prequal_stage4',
+  prequal_rejected:    'prequal_rejected',
+  legal_review:        'legal_review',
+  contract_execution:  'contract_execution',
+  active:              'active',
+  contract_closure:    'contract_closure',
+  closed:              'closed',
 }
 
 export default function TenderSelectList({ tenders, status, basePath, title, description, emptyText }) {

@@ -1,11 +1,18 @@
-export default function Card({ children, className = '', hover = false, ...props }) {
+export default function Card({ children, className = '', hover = false, branded = false, glass = false, accent = false, ...props }) {
+  const extraClasses = [
+    hover ? 'card-hover cursor-pointer' : '',
+    branded ? 'olng-card-branded' : '',
+    glass ? 'olng-glass' : '',
+    accent ? 'olng-section-card' : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <div
-      className={`rounded-2xl ${hover ? 'card-hover cursor-pointer' : ''} ${className}`}
+      className={`rounded-2xl ${extraClasses} ${className}`}
       style={{
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        boxShadow: 'var(--color-shadow, 0 1px 4px rgba(0,0,0,0.1), 0 4px 20px rgba(0,0,0,0.1))',
+        background: glass ? undefined : 'var(--color-surface)',
+        border: glass ? undefined : '1px solid var(--color-border)',
+        boxShadow: glass ? undefined : 'var(--color-shadow, 0 1px 4px rgba(0,0,0,0.1), 0 4px 20px rgba(0,0,0,0.1))',
       }}
       {...props}
     >

@@ -5,6 +5,7 @@ const variants = {
   danger:    'bg-red-500/90 hover:bg-red-500 text-white shadow-sm active:scale-[0.97]',
   accent:    'text-white active:scale-[0.97]',
   ai:        'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-sm active:scale-[0.97]',
+  brand:     'olng-btn-generate text-white active:scale-[0.97]',
 }
 
 const sizes = {

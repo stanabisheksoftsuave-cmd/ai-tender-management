@@ -27,14 +27,34 @@ import { technicalCriteria } from '../data/mockData'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const statusVariant = {
+  prequal_stage1:  'prequal_stage1',
+  prequal_stage2:  'prequal_stage2',
+  prequal_stage3:  'prequal_stage3',
+  prequal_stage4:  'prequal_stage4',
   draft:       'warning',
   upload:      'upload',
   tech_eval:   'tech_eval',
   comm_eval:   'comm_eval',
   mgmt_review: 'mgmt_review',
   award:       'award',
+  legal_review:       'legal_review',
+  contract_execution: 'contract_execution',
+  active:             'active',
+  contract_closure:   'contract_closure',
 }
 const isEvaluator = (roleId) => roleId === 'tech_eval' || roleId === 'comm_eval'
+
+const getPofTenderRoute = (tender) => {
+  if (tender.status === 'draft') return `/create-itt/${tender.id}`
+  if (tender.status === 'award') return `/contract/${tender.id}`
+  if (tender.status === 'legal_review') return `/legal-review/${tender.id}`
+  if (tender.status === 'contract_execution') return `/contract-execution/${tender.id}`
+  if (tender.status === 'active') return `/contract-management/${tender.id}`
+  if (tender.status === 'contract_closure') return `/contract-closure/${tender.id}`
+  return `/upload/${tender.id}`
+}
+
+const getContractHolderTenderRoute = (tender) => `/pre-qualification/${tender.id}`
 
 const bidderComplianceByRole = {
   tech_eval: [
@@ -57,7 +77,8 @@ const complianceLabelAr = { compliant: 'مستوفٍ', partial_compliant: 'جز�
 const getVisibleTenders = (roleId, tenders) => {
   if (roleId === 'it_admin')    return []
   if (roleId === 'biz_admin')   return tenders
-  if (roleId === 'pof')         return tenders.filter(t => t.status === 'draft' || t.status === 'upload' || t.status === 'award')
+  if (roleId === 'pof')         return tenders.filter(t => ['draft','upload','award','legal_review','contract_execution','active','contract_closure'].includes(t.status))
+  if (roleId === 'contract_holder') return tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(t.status))
   if (roleId === 'tech_eval')   return tenders.filter(t => t.status === 'tech_eval')
   if (roleId === 'comm_eval')   return tenders.filter(t => t.status === 'comm_eval')
   if (roleId === 'mgmt_review') return tenders.filter(t => t.status === 'mgmt_review')
@@ -99,6 +120,13 @@ const getStatCards = (roleId, tenders) => {
     { label: 'In Evaluation',   value: String(byStatus('tech_eval').length + byStatus('comm_eval').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT', chipVariant: 'urgent', sub: 'Closing next 7 days' },
     { label: 'Under Review',    value: String(byStatus('mgmt_review').length), icon: UserCog, accentColor: '#2563EB', trend: 'SOON',         chipVariant: 'soon',   sub: 'Opening next 7 days' },
     { label: 'AI Extractions',  value: '8',                                  icon: BulbIcon,  accentColor: '#7C3AED', trend: '96% ACC.',     chipVariant: 'acc',    sub: 'Documents processed' },
+  ]
+
+  if (roleId === 'contract_holder') return [
+    { label: 'Bidder Matching',    value: String(byStatus('prequal_stage1').length), icon: Users,          accentColor: '#0891B2', trend: 'Stage 1', chipVariant: '',       sub: 'Matching ERP bidders to SOW' },
+    { label: 'Questionnaire',      value: String(byStatus('prequal_stage2').length), icon: FileText,       accentColor: '#F59E0B', trend: 'Stage 2', chipVariant: 'urgent', sub: 'Generating & distributing PQQ' },
+    { label: 'Response Review',    value: String(byStatus('prequal_stage3').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'Stage 3', chipVariant: '',       sub: 'QHSE / Technical / Admin checks' },
+    { label: 'Financial Assessment', value: String(byStatus('prequal_stage4').length), icon: Clock,        accentColor: '#10B981', trend: 'Stage 4', chipVariant: '',       sub: 'Final qualification decisions' },
   ]
 
   if (roleId === 'it_admin') {
@@ -157,6 +185,13 @@ const getActionItems = (roleId, tenders) => {
     ...tenders.filter(t => t.status === 'draft').map(t  => ({ label: `Export ITT for External Review — ${t.id}: ${t.title}`, urgent: true })),
     ...tenders.filter(t => t.status === 'upload').map(t => ({ label: `Upload Bidder Proposals — ${t.id}: ${t.title}`, urgent: false })),
     ...tenders.filter(t => t.status === 'award').map(t  => ({ label: `Create Contract — ${t.id}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'legal_review').map(t  => ({ label: `Awaiting Legal Review — ${t.id}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'contract_execution').map(t  => ({ label: `Sign Contract — ${t.id}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'active').map(t  => ({ label: `Manage Active Contract — ${t.id}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'contract_closure').map(t  => ({ label: `Close Contract — ${t.id}: ${t.title}`, urgent: false })),
+  ]
+  if (roleId === 'contract_holder') return [
+    ...tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(t.status)).map(t => ({ label: `Continue Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
   ]
   if (roleId === 'it_admin') return [
     { label: 'Review new user registrations', urgent: false },
@@ -231,7 +266,17 @@ const QUICK_ACTIONS_BY_ROLE = {
     { icon: BulbIcon,  label: 'Create ITT with AI', color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
     { icon: Upload,    label: 'Upload Bids',         color: '#0891B2', bg: '#E0F7FA', action: '/upload'     },
     { icon: Briefcase, label: 'Draft Contract',      color: '#059669', bg: '#ECFDF5', action: '/contract'   },
+    { icon: Briefcase, label: 'Manage Contract',     color: '#D97706', bg: '#FFFBEB', action: '/contract-management' },
     { icon: FileText,  label: 'View Tenders',        color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
+  ],
+  contract_holder: [
+    { icon: BulbIcon,  label: 'New Tender',          color: '#0891B2', bg: '#E0F7FA', action: '/contract-strategy' },
+    { icon: Users,     label: 'Pre-Qualification',   color: '#0891B2', bg: '#E0F7FA', action: '/pre-qualification' },
+    { icon: FileText,  label: 'View Tenders',        color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
+  ],
+  legal_review: [
+    { icon: FileText,  label: 'Legal Review', color: '#B45309', bg: '#FFFBEB', action: '/legal-review' },
+    { icon: FileText,  label: 'View Tenders', color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'      },
   ],
   tech_eval: [
     { icon: ClipboardCheck, label: 'Start Evaluation', color: '#2563EB', bg: '#EEF2FF', action: '/technical-eval' },
@@ -320,6 +365,11 @@ export default function Dashboard() {
         {roleId === 'pof' && (
           <Button onClick={() => navigate('/create-itt')}>
             <BulbIcon size={16} style={{ color: '#ffffff' }} /> New ITT with AI
+          </Button>
+        )}
+        {roleId === 'contract_holder' && (
+          <Button onClick={() => navigate('/contract-strategy')}>
+            <BulbIcon size={16} style={{ color: '#ffffff' }} /> New Tender
           </Button>
         )}
       </div>
@@ -638,10 +688,12 @@ export default function Dashboard() {
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
                           style={{ background: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9' }}
                           onClick={() => {
-                            if (roleId === 'pof') navigate(tender.status === 'draft' ? `/create-itt/${tender.id}` : `/upload/${tender.id}`)
+                            if (roleId === 'pof') navigate(getPofTenderRoute(tender))
+                            else if (roleId === 'contract_holder') navigate(getContractHolderTenderRoute(tender))
                             else if (roleId === 'tech_eval') navigate(`/technical-eval/${tender.id}`)
                             else if (roleId === 'comm_eval') navigate(`/commercial-eval/${tender.id}`)
                             else if (roleId === 'mgmt_review') navigate(`/mgmt-review/${tender.id}`)
+                            else if (roleId === 'legal_review') navigate(`/legal-review/${tender.id}`)
                             else navigate('/tenders')
                           }}>
                           <Eye size={12} style={{ color: 'var(--color-primary)' }} />
@@ -667,6 +719,14 @@ export default function Dashboard() {
                               comm_eval:   [{ label: 'Commercial Eval',    route: `/commercial-eval/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               mgmt_review: [{ label: 'Management Review',  route: `/mgmt-review/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               award:       [{ label: 'Draft Contract',     route: `/contract/${tender.id}` },   { label: 'View in Tenders', route: '/tenders' }],
+                              prequal_stage1: [{ label: 'Continue Bidder Matching',      route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              prequal_stage2: [{ label: 'Continue Questionnaire',        route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              prequal_stage3: [{ label: 'Continue Response Review',      route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              prequal_stage4: [{ label: 'Continue Financial Assessment', route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              legal_review:       [{ label: 'Legal Review',        route: `/legal-review/${tender.id}` },        { label: 'View in Tenders', route: '/tenders' }],
+                              contract_execution: [{ label: 'Sign Contract',       route: `/contract-execution/${tender.id}` },  { label: 'View in Tenders', route: '/tenders' }],
+                              active:             [{ label: 'Manage Contract',     route: `/contract-management/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              contract_closure:   [{ label: 'Close Contract',      route: `/contract-closure/${tender.id}` },    { label: 'View in Tenders', route: '/tenders' }],
                             }
                             const items = menuItems[tender.status] || [{ label: 'View in Tenders', route: '/tenders' }]
                             return (

@@ -11,6 +11,11 @@ const NEXT_STATUS = {
   comm_eval:        { status: 'comm_eval_export',  stage: 'Awaiting Contract Engineer Upload', evalProgress: 'not_started' },
   comm_eval_export: { status: 'mgmt_review',       stage: 'Management Review',      evalProgress: 'not_started' },
   mgmt_review:      { status: 'award',             stage: 'Award Recommended' },
+  award:            { status: 'legal_review',      stage: 'Legal Review' },
+  legal_review:     { status: 'contract_execution',stage: 'Contract Execution' },
+  contract_execution:{ status: 'active',           stage: 'Contract Active' },
+  active:           { status: 'contract_closure',  stage: 'Closure In Progress' },
+  contract_closure: { status: 'closed',            stage: 'Closed & Archived' },
 }
 
 export function TenderProvider({ children }) {

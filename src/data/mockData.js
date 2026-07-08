@@ -173,6 +173,123 @@ export const tenders = [
     bidders: 4,
     aiScore: null,
   },
+
+  // ── Post-Award Phases ──────────────────────────────────────────────────────
+  {
+    id: 'ITT-2025-016',
+    title: 'Salalah Port Container Terminal Automation',
+    department: 'Ministry of Transport, Communications & IT',
+    budget: 'OMR 1,120,000',
+    status: 'legal_review',
+    stage: 'Legal Review',
+    created: '2024-12-05',
+    deadline: '2025-02-10',
+    bidders: 4,
+    aiScore: 90,
+  },
+  {
+    id: 'ITT-2025-017',
+    title: 'Duqm Refinery Fire Safety Systems Upgrade',
+    department: 'Oman Electricity Transmission Company',
+    budget: 'OMR 640,000',
+    status: 'contract_execution',
+    stage: 'Contract Execution',
+    created: '2024-11-20',
+    deadline: '2025-01-15',
+    bidders: 3,
+    aiScore: 92,
+  },
+  {
+    id: 'ITT-2025-018',
+    title: 'Nizwa Regional Hospital Medical Equipment Supply',
+    department: 'Ministry of Health',
+    budget: 'OMR 845,000',
+    status: 'active',
+    stage: 'Contract Active',
+    created: '2024-09-10',
+    deadline: '2024-11-05',
+    bidders: 3,
+    aiScore: 88,
+    contractStartDate: '2024-11-20',
+    kpiTracking: true,
+    deliveryProgress: 62,
+    paymentMilestones: [
+      { id: 1, label: 'Mobilisation Advance', amount: 'OMR 84,500', due: '2024-12-01', status: 'paid' },
+      { id: 2, label: 'Equipment Delivery — Phase 1', amount: 'OMR 253,500', due: '2025-02-01', status: 'paid' },
+      { id: 3, label: 'Equipment Delivery — Phase 2', amount: 'OMR 253,500', due: '2025-05-01', status: 'pending' },
+      { id: 4, label: 'Final Acceptance & Retention', amount: 'OMR 253,500', due: '2025-08-01', status: 'upcoming' },
+    ],
+    issues: [
+      { id: 1, label: 'Minor delay in customs clearance for imaging units', severity: 'low', status: 'resolved' },
+      { id: 2, label: 'Calibration certificate pending for lab analysers', severity: 'medium', status: 'open' },
+    ],
+    periodicReviews: [
+      { id: 1, date: '2025-01-15', reviewer: 'John Smith', note: 'Delivery on track, quality checks passed for Phase 1 equipment.' },
+    ],
+  },
+  {
+    id: 'ITT-2025-019',
+    title: 'Sohar Industrial Estate Fibre Backbone Rollout',
+    department: 'Information Technology Authority (ITA)',
+    budget: 'OMR 398,000',
+    status: 'contract_closure',
+    stage: 'Closure In Progress',
+    created: '2024-06-01',
+    deadline: '2024-08-01',
+    bidders: 3,
+    aiScore: 85,
+    contractStartDate: '2024-08-15',
+    kpiTracking: true,
+    deliveryProgress: 100,
+  },
+  {
+    id: 'ITT-2025-020',
+    title: 'Buraimi Border Crossing Security Systems Upgrade',
+    tenderType: 'Works',
+    department: 'Royal Oman Police',
+    status: 'prequal_stage3',
+    stage: 'Pre-Qualification — Response Review',
+    created: '2025-04-01',
+    bidders: 0,
+    aiScore: null,
+    sowFileName: 'Buraimi-Border-Security-SOW.pdf',
+    workCategory: 'Electrical & Instrumentation',
+    prequalBidders: [
+      {
+        id: 102, name: 'InfraCore Systems', country: 'UAE', category: 'Electrical & Instrumentation', isLocal: false,
+        responseUploaded: true,
+        stage3: {
+          qhse: { q1: 'pass', q2: 'pass', q3: 'pass' },
+          technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
+          administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a5: 'pass' },
+        },
+        stage3Ai: {
+          qhse: { q1: 'pass', q2: 'pass', q3: 'pass' },
+          technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
+          administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a5: 'pass' },
+        },
+      },
+      {
+        id: 107, name: 'Al Amana Fire & Safety', country: 'Oman', category: 'Fire & Safety Systems', isLocal: true,
+        responseUploaded: true,
+        stage3: {
+          qhse: { q1: 'pass', q2: 'fail', q3: 'pass' },
+          technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
+          administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a4: 'pass', a5: 'pass' },
+        },
+        stage3Ai: {
+          qhse: { q1: 'pass', q2: 'fail', q3: 'pass' },
+          technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
+          administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a4: 'pass', a5: 'pass' },
+        },
+      },
+      {
+        id: 104, name: 'DataVault Solutions', country: 'Saudi Arabia', category: 'IT & Communications', isLocal: false,
+        responseUploaded: false,
+        stage3: { qhse: {}, technical: {}, administrative: {} },
+      },
+    ],
+  },
 ]
 
 export const bidders = [
@@ -181,6 +298,77 @@ export const bidders = [
   { id: 3, name: 'CloudNexus Corp',     country: 'India',        techScore: 79, commScore: 85, totalBid: 'OMR 882,000',  recommended: false },
   { id: 4, name: 'DataVault Solutions', country: 'Saudi Arabia', techScore: 72, commScore: 78, totalBid: 'OMR 712,000',  recommended: false },
 ]
+
+// ── Pre-Qualification: ERP bidder master registry ──────────────────────────
+// Shaped after the real "Supplier Registration Template - Tendering Phase" —
+// this stands in for the client's ERP bidder database that Stage 1 filters
+// down from, via a Work Category match against the uploaded SOW.
+export const WORK_CATEGORIES = [
+  'Mechanical & Piping Works',
+  'Fire & Safety Systems',
+  'Marine & Civil Works',
+  'Electrical & Instrumentation',
+  'IT & Communications',
+]
+
+export const erpBidders = [
+  { id: 101, name: 'TechSolutions Ltd',       country: 'Oman',         isLocal: true,  category: 'IT & Communications',           regNo: 'CR-1044921', jsrsNo: 'JSRS-2291', molCardNo: 'MOL-88213', yearEstablished: 2011, natureOfBusiness: 'IT systems integration & managed services', contactName: 'Ahmed Al-Balushi', contactEmail: 'a.balushi@techsolutions.om' },
+  { id: 102, name: 'InfraCore Systems',       country: 'UAE',          isLocal: false, category: 'Electrical & Instrumentation',  regNo: 'CR-770234',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2008, natureOfBusiness: 'Electrical & instrumentation contracting',    contactName: 'Rania Haddad',    contactEmail: 'r.haddad@infracore.ae' },
+  { id: 103, name: 'CloudNexus Corp',         country: 'India',        isLocal: false, category: 'IT & Communications',           regNo: 'CR-559812',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2015, natureOfBusiness: 'Cloud infrastructure & networking',           contactName: 'Vikram Rao',      contactEmail: 'v.rao@cloudnexus.in' },
+  { id: 104, name: 'DataVault Solutions',     country: 'Saudi Arabia', isLocal: false, category: 'IT & Communications',           regNo: 'CR-334120',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2013, natureOfBusiness: 'Data centre & storage solutions',             contactName: 'Faisal Al-Otaibi', contactEmail: 'f.otaibi@datavault.sa' },
+  { id: 105, name: 'Gulf Energy Services',    country: 'Oman',         isLocal: true,  category: 'Mechanical & Piping Works',     regNo: 'CR-990117',  jsrsNo: 'JSRS-3312', molCardNo: 'MOL-55127', yearEstablished: 2002, natureOfBusiness: 'Mechanical, piping & rotating equipment services', contactName: 'Salim Al-Harthy', contactEmail: 's.harthy@gulfenergy.om' },
+  { id: 106, name: 'Meridian Contracting',    country: 'Qatar',        isLocal: false, category: 'Marine & Civil Works',          regNo: 'CR-118820',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2005, natureOfBusiness: 'Marine & civil construction',                 contactName: 'Youssef Nassar',  contactEmail: 'y.nassar@meridian.qa' },
+  { id: 107, name: 'Al Amana Fire & Safety',  country: 'Oman',         isLocal: true,  category: 'Fire & Safety Systems',         regNo: 'CR-664519',  jsrsNo: 'JSRS-4470', molCardNo: 'MOL-91002', yearEstablished: 2009, natureOfBusiness: 'Fire detection, suppression & HSE systems',   contactName: 'Mariam Al-Rawahi', contactEmail: 'm.rawahi@alamana.om' },
+  { id: 108, name: 'Barka Marine Works',      country: 'Oman',         isLocal: true,  category: 'Marine & Civil Works',          regNo: 'CR-227741',  jsrsNo: 'JSRS-2005', molCardNo: 'MOL-40218', yearEstablished: 1998, natureOfBusiness: 'Marine construction & dredging',              contactName: 'Khalid Al-Maskari', contactEmail: 'k.maskari@barkamarine.om' },
+]
+
+// ── Stage 3 evaluation criteria — modelled on the real "Pre-Qualification
+// Evaluation Results Template" (QHSE / Technical / Administrative sheets).
+// A Fail on ANY criterion in a sheet fails that sheet; a Fail on ANY sheet
+// fails the bidder's overall Stage 3 result (mirrors the template's own note).
+export const QHSE_CRITERIA = [
+  { id: 'q1', item: 'HSE Policy', detail: "Signed, dated HSE policy document and project organisation chart with HSE roles identified." },
+  { id: 'q2', item: 'HSE Training', detail: 'Training matrix for this project plus sample HSE training records for proposed staff.' },
+  { id: 'q3', item: 'Safety Records', detail: 'HSE performance records for the last 5 years and 2 sample incident investigation/closeout reports.' },
+]
+
+export const TECHNICAL_CRITERIA_PQ = [
+  { id: 't1', item: 'Previous Experience', detail: 'References of similar previous works carried out by the bidder.' },
+  { id: 't2', item: 'Compliance to Technical Specifications', detail: 'Any deviation or qualification against the required manpower/materials/systems specification.' },
+  { id: 't3', item: 'Equipment & Facilities', detail: 'Adequacy of the list of equipment and facilities proposed for the work.' },
+  { id: 't4', item: 'Professional/Trade Certification', detail: 'Availability of any applicable trade certification required for the work.' },
+  { id: 't5', item: 'Quality Management System', detail: 'Valid ISO 9001 (or equivalent) certification covering the scope of work.' },
+]
+
+export const ADMINISTRATIVE_CRITERIA = [
+  { id: 'a1', item: 'Completed & Signed PQQ', detail: 'PQQ document fully completed and signed by an authorised representative.' },
+  { id: 'a2', item: 'Supplier Registration Form', detail: 'Filled template of the Supplier Registration Form.' },
+  { id: 'a3', item: 'Commercial Registration Certificate', detail: "Valid Commercial Registration Certificate." },
+  { id: 'a4', item: 'MOL Omanisation / Green Card', detail: 'Local suppliers only — Not Applicable for foreign companies.', localOnly: true },
+  { id: 'a5', item: 'JSRS Registration Certificate', detail: 'Valid JSRS registration certificate.' },
+]
+
+// ── Stage 4 — simplified financial assessment rule, directionally matching
+// the real Z-score-based "Pre-Qualification Financial Assessment" workbook
+// (full 250-row lookup table not ported; canned recommendation text is
+// lifted near-verbatim from the template for the cases we do cover).
+export const FINANCIAL_RECOMMENDATIONS = {
+  not_submitted: 'NO AUDITED FINANCIAL STATEMENT WAS SUBMITTED — THE COMPANY’S FINANCIAL STANDING CANNOT BE ASSESSED.',
+  misstated: 'FINANCIAL STATEMENT IS MISSTATED OR MISREPRESENTED. HENCE, THE OUTCOME OF THE Z-SCORE CANNOT BE TRUSTED.',
+  green: 'THE COMPANY IS FINANCIALLY IN THE GREEN ZONE AND IS UNLIKELY TO FILE FOR BANKRUPTCY.',
+  amber: 'THE COMPANY IS FINANCIALLY IN THE AMBER ZONE WITH A CHANCE TO FILE FOR BANKRUPTCY. FURTHER FINANCIAL CHECK IS RECOMMENDED IF THE CONTRACT VALUE IS HIGH.',
+  red: 'THE COMPANY IS FINANCIALLY IN THE RED ZONE WITH A HIGH PROBABILITY TO FILE FOR BANKRUPTCY.',
+}
+
+export function assessFinancials({ statementSubmitted, auditOpinion, zZone }) {
+  if (!statementSubmitted) return { result: 'FAIL', recommendation: FINANCIAL_RECOMMENDATIONS.not_submitted }
+  if (auditOpinion === 'Adverse Opinion' || auditOpinion === 'Disclaimer Opinion') {
+    return { result: 'FAIL', recommendation: FINANCIAL_RECOMMENDATIONS.misstated }
+  }
+  if (zZone === 'Red') return { result: 'FAIL', recommendation: FINANCIAL_RECOMMENDATIONS.red }
+  if (zZone === 'Amber') return { result: 'PASS', recommendation: FINANCIAL_RECOMMENDATIONS.amber }
+  return { result: 'PASS', recommendation: FINANCIAL_RECOMMENDATIONS.green }
+}
 
 export const auditLogs = [
   { id: 1,  user: 'John Smith',  role: 'Contract Engineer',  action: 'Created ITT',                                    tender: 'ITT-2025-001', timestamp: '2025-03-10 09:14:32', ip: '10.1.0.10', status: 'success' },

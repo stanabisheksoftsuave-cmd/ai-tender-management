@@ -332,3 +332,294 @@ input:focus, select:focus, textarea:focus { outline: none; }
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.7; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   OLNG BRAND – ITT CREATION PREMIUM ENHANCEMENTS
+   Scoped to [data-theme='olng'] so other themes remain unaffected.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Brand keyframes ── */
+@keyframes olng-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes olng-scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes olng-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,137,207,0.35); }
+  50%       { box-shadow: 0 0 0 10px rgba(0,137,207,0); }
+}
+@keyframes olng-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes olng-progress-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+@keyframes olng-spin-sparkle {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes olng-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes olng-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.7); }
+}
+
+/* ── Utility classes ── */
+.olng-slide-up   { animation: olng-slide-up 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+.olng-scale-in   { animation: olng-scale-in 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+.olng-pulse-glow { animation: olng-pulse-glow 2.2s ease-in-out infinite; }
+.olng-float      { animation: olng-float 3s ease-in-out infinite; }
+
+/* Stagger children with --i index */
+.olng-stagger { animation-delay: calc(var(--i, 0) * 80ms); }
+
+/* ── Branded Card with top gradient stripe ── */
+.olng-card-branded {
+  position: relative;
+  overflow: hidden;
+}
+.olng-card-branded::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1b4c6f 0%, #0089cf 60%, #afd9f4 100%);
+  border-radius: 16px 16px 0 0;
+  z-index: 1;
+}
+
+/* ── Glassmorphism Card ── */
+[data-theme='olng'] .olng-glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(0,137,207,0.12);
+  box-shadow: 0 2px 8px rgba(27,76,111,0.06), 0 8px 32px rgba(27,76,111,0.08);
+}
+
+/* ── Premium Progress Bar ── */
+.olng-progress-bar {
+  position: relative;
+  overflow: hidden;
+  background: #e8f4fc;
+  border-radius: 99px;
+}
+.olng-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #1b4c6f 0%, #0089cf 100%);
+  transition: width 0.6s cubic-bezier(0.16,1,0.3,1);
+  position: relative;
+  overflow: hidden;
+}
+.olng-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: olng-progress-shimmer 2s ease-in-out infinite;
+}
+
+/* ── Branded Step Indicator ── */
+.olng-step-circle {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  position: relative;
+  z-index: 2;
+}
+.olng-step-circle--active {
+  background: linear-gradient(135deg, #1b4c6f, #0089cf);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(0,137,207,0.18), 0 4px 12px rgba(0,137,207,0.25);
+}
+.olng-step-circle--done {
+  background: linear-gradient(135deg, #0089cf, #00b4d8);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,137,207,0.2);
+}
+.olng-step-circle--pending {
+  background: #fff;
+  color: #94a3b8;
+  border: 2px solid #cce6f8;
+}
+
+/* Connecting line between steps */
+.olng-step-connector {
+  flex: 1;
+  height: 2px;
+  background: #cce6f8;
+  margin: 0 -2px;
+  position: relative;
+  z-index: 1;
+  transition: background 0.3s ease;
+}
+.olng-step-connector--done {
+  background: linear-gradient(90deg, #0089cf, #00b4d8);
+}
+
+/* ── Status Banner ── */
+.olng-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(0,137,207,0.06) 0%, rgba(27,76,111,0.04) 100%);
+  border: 1px solid rgba(0,137,207,0.12);
+  border-left: 3px solid #0089cf;
+}
+.olng-status-banner .status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #0089cf;
+  animation: olng-dot-pulse 2s ease-in-out infinite;
+}
+
+/* ── Generate Button ── */
+.olng-btn-generate {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%) !important;
+  box-shadow: 0 4px 20px rgba(0,137,207,0.35), 0 2px 8px rgba(27,76,111,0.2) !important;
+  transition: all 0.3s cubic-bezier(0.16,1,0.3,1) !important;
+}
+.olng-btn-generate:hover {
+  box-shadow: 0 6px 28px rgba(0,137,207,0.45), 0 4px 12px rgba(27,76,111,0.25) !important;
+  transform: translateY(-1px);
+}
+.olng-btn-generate::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  transition: left 0.5s ease;
+}
+.olng-btn-generate:hover::after { left: 120%; }
+
+/* ── Form inputs (OLNG scoped) ── */
+[data-theme='olng'] .olng-input {
+  border: 1.5px solid #cce6f8;
+  border-radius: 10px;
+  background: #fff;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(27,76,111,0.04);
+}
+[data-theme='olng'] .olng-input:focus {
+  border-color: #0089cf;
+  box-shadow: 0 0 0 3px rgba(0,137,207,0.12), 0 1px 3px rgba(27,76,111,0.04);
+}
+[data-theme='olng'] .olng-input::placeholder {
+  color: #94a3b8;
+}
+[data-theme='olng'] .olng-input--error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important;
+  background: #fef2f2 !important;
+}
+
+/* ── AI Generation branded dots ── */
+.olng-gen-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.olng-gen-dot--done {
+  background: linear-gradient(135deg, #0089cf, #00b4d8);
+  box-shadow: 0 2px 8px rgba(0,137,207,0.25);
+}
+.olng-gen-dot--active {
+  background: linear-gradient(135deg, #1b4c6f, #0089cf);
+  box-shadow: 0 0 0 4px rgba(0,137,207,0.15);
+}
+.olng-gen-dot--pending {
+  background: #e8f4fc;
+  border: 1.5px solid #cce6f8;
+}
+
+/* ── Section card accent bar ── */
+.olng-section-card {
+  position: relative;
+  overflow: hidden;
+}
+.olng-section-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: linear-gradient(180deg, #1b4c6f 0%, #0089cf 100%);
+  border-radius: 3px 0 0 3px;
+}
+
+/* ── Export panel decorations ── */
+.olng-export-icon {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0,137,207,0.12) 0%, rgba(27,76,111,0.08) 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: #0089cf;
+}
+
+/* ── Info Alert (brand) ── */
+.olng-info-alert {
+  background: linear-gradient(135deg, rgba(0,137,207,0.06) 0%, rgba(175,217,244,0.15) 100%);
+  border: 1px solid rgba(0,137,207,0.18);
+  border-radius: 10px;
+  color: #1b4c6f;
+}
+
+/* ── Success celebration ── */
+.olng-success-ring {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0,137,207,0.1) 0%, rgba(16,185,129,0.1) 100%);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.olng-success-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: linear-gradient(135deg, #0089cf, #10b981) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.4;
+}
+
+/* ── File upload zone ── */
+.olng-dropzone {
+  border: 2px dashed #cce6f8;
+  border-radius: 14px;
+  transition: all 0.25s ease;
+  background: rgba(236,244,252,0.4);
+}
+.olng-dropzone:hover,
+.olng-dropzone--active {
+  border-color: #0089cf;
+  background: rgba(0,137,207,0.04);
+  box-shadow: 0 0 0 4px rgba(0,137,207,0.06);
+}
+
+/* ── Subtle dot pattern for AI generation bg ── */
+.olng-dot-pattern {
+  background-image: radial-gradient(rgba(0,137,207,0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
