@@ -3,7 +3,8 @@ import JSZip from 'jszip'
 import {
   Bot, Sparkles, CheckCircle, RefreshCw, ChevronRight,
   FileText, AlertCircle, Circle, Download,
-  UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User
+  UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
+  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -16,6 +17,7 @@ import { buildFilledDocxBlob } from '../utils/docxTemplate'
 import SectionFillStep from '../components/itt/SectionFillStep'
 import B1CategoryChooser from '../components/itt/B1CategoryChooser'
 import { B1_CATEGORY_MAP } from '../components/itt/b1Categories'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 // Fixed section order for the real ITT template fill-in wizard: 1 → A → D → B1 → B2 → C → E → F → H → J → K → L → G
 const SECTION_FLOW = [
@@ -77,9 +79,20 @@ export default function ITTCreation() {
   const steps = [t('itt.step1'), t('itt.step2'), t('itt.step3'), t('itt.step4')]
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
+
+  // Direct access to /create-itt (no tenderId) shouldn't jump straight into a
+  // blank form — tenders sitting in "Draft — Pending Export" (including ones
+  // just handed off from Pre-Qualification) need to be picked first.
+  const [skipDraftPicker, setSkipDraftPicker] = useState(false)
+  const draftTenders = useMemo(() => tenders.filter(t => t.status === 'draft'), [tenders])
+  const showDraftPicker = !tenderId && !skipDraftPicker && draftTenders.length > 0
+
+  // Detect if this tender was pre-populated from Contract Strategy
+  const hasStrategyData = existingTender && (existingTender.budget || existingTender.description)
+
   const initialForm = existingTender
-    ? { title: existingTender.title || '', department: existingTender.department || '', budget: existingTender.budget || '', deadline: existingTender.deadline || '', duration: existingTender.duration || '', description: existingTender.description || '' }
-    : { title: '', department: '', budget: '', deadline: '', duration: '', description: '' }
+    ? { title: existingTender.title || '', department: existingTender.department || '', budget: existingTender.budget || '', deadline: existingTender.deadline || '', duration: existingTender.duration || '', description: existingTender.description || '', costCode: existingTender.costCode || '', currency: existingTender.currency || 'USD' }
+    : { title: '', department: '', budget: '', deadline: '', duration: '', description: '', costCode: '', currency: 'USD' }
 
   // A tender handed off from Pre-Qualification has an id but has never been
   // through this wizard's generation step (no sectionAnswers yet) — it should
@@ -136,7 +149,8 @@ export default function ITTCreation() {
     const digits = raw.replace(/[^0-9]/g, '')
     if (!digits) { setField('budget', ''); return }
     const num = parseInt(digits, 10)
-    setField('budget', 'OMR ' + num.toLocaleString('en-US'))
+    const prefix = form.currency || 'USD'
+    setField('budget', prefix + ' ' + num.toLocaleString('en-US'))
   }
 
   // Auto-tick generation tasks, then add draft tender + advance to Review
@@ -157,6 +171,7 @@ export default function ITTCreation() {
               deadline: form.deadline,
               description: form.description,
               duration: form.duration,
+              costCode: form.costCode,
               status: 'draft',
               stage: 'Draft — Pending Export',
               sectionAnswers: existingTender?.sectionAnswers || {},
@@ -173,6 +188,7 @@ export default function ITTCreation() {
               deadline: form.deadline,
               description: form.description,
               duration: form.duration,
+              costCode: form.costCode,
               status: 'draft',
               stage: 'Draft — Pending Export',
               created: new Date().toISOString().split('T')[0],
@@ -235,7 +251,21 @@ export default function ITTCreation() {
   }
 
   const goToNextSection = () => {
-    if (isLastSection) { setStep(3); return }
+    if (isLastSection) {
+      // Check if all sections are completed before going to export
+      const allCompleted = effectiveFlow.every(section => {
+        if (section.id === 'sectionB1') {
+          return b1Category !== null // B1 requires category selection
+        }
+        return sectionAnswers[section.id] && Object.keys(sectionAnswers[section.id]).length > 0
+      })
+      if (!allCompleted) {
+        alert('Please complete all sections before proceeding to export')
+        return
+      }
+      setStep(3)
+      return
+    }
     setCurrentSectionIndex(i => i + 1)
   }
   const goToPrevSection = () => {
@@ -272,9 +302,88 @@ export default function ITTCreation() {
     }
   }
 
+  // Handoff documents from Pre-Qualification are real File objects when
+  // uploaded through the app (in-memory, no backend) — download them as-is.
+  // Seed/mock tenders only carry a filename string, so a placeholder is
+  // generated on download since the original bytes were never captured.
+  const handleDownloadHandoffDoc = (value, label) => {
+    const isRealFile = value instanceof Blob
+    const fileName = isRealFile ? value.name : value
+    const blob = isRealFile
+      ? value
+      : new Blob([`Mock document: ${label}\nFile name: ${fileName}\n\nPlaceholder content — original file was not retained in this demo environment.`], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName || label
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   const currentDraftStatus = ittApproved
     ? { label: 'ITT Exported', sub: 'Exported — awaiting bid upload', cls: 'bg-green-100 text-green-700 border-green-200' }
     : draftStatusMap[step] || draftStatusMap[0]
+
+  if (showDraftPicker) {
+    return (
+      <div className="space-y-5">
+        <div className="olng-slide-up">
+          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1b4c6f' }}>
+            <Inbox size={20} style={{ color: '#0089cf' }} />
+            Create ITT
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Select a tender in <strong>Draft — Pending Export</strong> to continue its ITT, or start a brand-new one from scratch.
+          </p>
+        </div>
+
+        <div className="space-y-3 olng-slide-up" style={{ animationDelay: '60ms' }}>
+          {draftTenders.map(dt => (
+            <Card
+              key={dt.id}
+              branded
+              className="p-4 cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => navigate(`/create-itt/${dt.id}`)}
+            >
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                    <Briefcase size={16} style={{ color: '#0089cf' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{dt.id}</span>
+                      <Badge variant="draft">{dt.stage || 'Draft — Pending Export'}</Badge>
+                      {dt.bidderList?.length > 0 && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                          From Pre-Qualification · {dt.bidderList.length} qualified
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1b4c6f' }}>{dt.title || 'Untitled tender'}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {dt.department || 'No department set'}{dt.deadline ? ` · Deadline ${dt.deadline}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="shrink-0" style={{ color: '#94a3b8' }} />
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <Button
+          variant="secondary"
+          onClick={() => setSkipDraftPicker(true)}
+          className="w-full justify-center py-3"
+        >
+          <Plus size={14} /> Start New ITT (No Pre-Qualification)
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -321,6 +430,21 @@ export default function ITTCreation() {
       {/* ── Step 0: Project Details ── */}
       {step === 0 && (
         <div className="space-y-4 olng-slide-up" style={{ animationDelay: '120ms' }}>
+          {/* Pre-fill Banner — shown when data comes from Contract Strategy */}
+          {hasStrategyData && (
+            <div className="flex items-start gap-2.5 rounded-xl px-4 py-3" style={{
+              background: 'linear-gradient(135deg, rgba(0,137,207,0.06), rgba(16,185,129,0.04))',
+              border: '1px solid rgba(0,137,207,0.15)',
+              borderLeft: '3px solid #0089cf'
+            }}>
+              <Info size={16} style={{ color: '#0089cf' }} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold" style={{ color: '#1b4c6f' }}>{t('strategy.prefillBanner')}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Fields below are populated from the Contract Strategy stage. You can modify them before generating.</p>
+              </div>
+            </div>
+          )}
+
           <Card branded className="p-6">
             <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
@@ -391,6 +515,22 @@ export default function ITTCreation() {
                   </div>
                 )
               })()}
+
+              {/* Cost Code */}
+              <div>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                  <Hash size={12} style={{ color: '#0089cf' }} />
+                  {t('strategy.fieldCostCode')}
+                </label>
+                <input
+                  value={form.costCode}
+                  onChange={e => setField('costCode', e.target.value)}
+                  placeholder="e.g. CC-2025-001"
+                  className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input"
+                />
+              </div>
+
+
               <div className="col-span-2">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1b4c6f' }}>
@@ -492,27 +632,68 @@ export default function ITTCreation() {
             </div>
           </Card>
 
-          {existingTender?.bidderList?.some(b => b.handoffDocs) && (
-            <Card branded className="p-6">
+          {/* Pre-Qualification Handoff Section — if this tender came from pre-qual */}
+          {existingTender?.bidderList && existingTender?.bidderList.length > 0 && (
+            <Card branded accent className="p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                  <PackageCheck size={16} style={{ color: '#0089cf' }} />
+                  <User size={16} style={{ color: '#0089cf' }} />
                 </div>
-                Bidder Documents from Pre-Qualification
+                Qualified Bidders — From Pre-Qualification
               </h3>
-              <div className="space-y-3">
-                {existingTender.bidderList.filter(b => b.handoffDocs).map(b => (
-                  <div key={b.id} className="rounded-lg px-3.5 py-3" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
-                    <p className="text-xs font-semibold mb-2" style={{ color: '#1b4c6f' }}>{b.name}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(b.handoffDocs).map(([key, fileName]) => (
-                        <span key={key} className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-white" style={{ border: '1px solid rgba(0,137,207,0.15)', color: '#1b4c6f' }}>
-                          <CheckCircle size={10} style={{ color: '#0089cf' }} /> {fileName}
-                        </span>
-                      ))}
+              <div className="space-y-2">
+                {existingTender.bidderList.map((bidder, idx) => (
+                  <div key={bidder.id} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold" style={{ background: '#0089cf', color: '#fff' }}>
+                      {idx + 1}
                     </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium" style={{ color: '#1b4c6f' }}>{bidder.name}</p>
+                      <p className="text-xs text-slate-400">{bidder.country}</p>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: '#10b98130', color: '#059669' }}>
+                      ✓ Passed Pre-Qual
+                    </span>
                   </div>
                 ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Handoff Documents Section — if pre-qual documents exist */}
+          {existingTender?.handoffDocuments && Object.keys(existingTender.handoffDocuments).length > 0 && (
+            <Card branded accent className="p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                  <Paperclip size={16} style={{ color: '#0089cf' }} />
+                </div>
+                Internal Reference Documents
+              </h3>
+              <div className="space-y-2 text-sm">
+                {Object.entries(existingTender.handoffDocuments).map(([key, value]) => {
+                  const docLabel = {
+                    benchmarking: 'OEM Benchmarking Rates',
+                    companyEstimate: 'Company Estimate',
+                    riskAssessment: 'Contract Risk Assessment'
+                  }[key] || key
+                  const fileName = value instanceof Blob ? value.name : value
+                  return (
+                    <div key={key} className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
+                      <FileText size={13} style={{ color: '#0089cf' }} className="shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium" style={{ color: '#1b4c6f' }}>{docLabel}</span>
+                        <span className="ml-1.5 text-xs truncate" style={{ color: '#94a3b8' }}>— {fileName}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadHandoffDoc(value, docLabel)}
+                        className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors hover:bg-white shrink-0"
+                        style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}>
+                        <Download size={11} /> Download
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             </Card>
           )}
@@ -544,6 +725,62 @@ export default function ITTCreation() {
       {/* ── Step 2: Fill In ITT Sections ── */}
       {step === 2 && (
         <div className="space-y-4 olng-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Review & Redesign Sections</h3>
+            <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>
+              {effectiveFlow.filter(s =>
+                s.id === 'sectionB1'
+                  ? b1Category !== null
+                  : sectionAnswers[s.id] && Object.keys(sectionAnswers[s.id]).length > 0
+              ).length} of {effectiveFlow.length} completed
+            </span>
+          </div>
+
+          {/* Section dropdown selector */}
+          <Card branded className="p-4">
+            <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Select Section to Edit</label>
+            <select
+              value={currentSectionIndex}
+              onChange={(e) => {
+                const idx = parseInt(e.target.value)
+                setCurrentSectionIndex(idx)
+              }}
+              className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2"
+              style={{
+                borderColor: 'rgba(0,137,207,0.2)',
+                backgroundColor: '#fff',
+                color: '#1b4c6f',
+                focusRing: '#0089cf'
+              }}
+            >
+              {effectiveFlow.map((item, idx) => {
+                const isCompleted = item.id === 'sectionB1'
+                  ? b1Category !== null
+                  : sectionAnswers[item.id] && Object.keys(sectionAnswers[item.id]).length > 0
+                return (
+                  <option key={item.id} value={idx}>
+                    {item.title} {isCompleted ? '✓' : ''}
+                  </option>
+                )
+              })}
+            </select>
+
+            {/* Dependency info messages */}
+            {currentFlowItem.id === 'sectionB1' && !sectionAnswers.sectionD && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs" style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#1e40af' }}>
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>Tip: Complete <strong>Section D — Scope of Work</strong> first for better context when editing B1</span>
+              </div>
+            )}
+
+            {currentFlowItem.id === 'sectionB2' && (!sectionAnswers.sectionD || !b1Category) && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs" style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#1e40af' }}>
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>Tip: Complete <strong>Section D — Scope of Work</strong> and select <strong>Section B1 category</strong> first for context</span>
+              </div>
+            )}
+          </Card>
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{
@@ -564,30 +801,37 @@ export default function ITTCreation() {
             </div>
           </div>
 
-          {currentFlowItem.kind === 'b1-chooser' ? (
-            <B1CategoryChooser
-              selected={b1Category}
-              onConfirm={handleB1Select}
-              onBack={goToPrevSection}
-            />
-          ) : (
-            <SectionFillStep
-              section={currentFlowItem}
-              answers={sectionAnswers[currentFlowItem.id]}
-              prefill={prefillMap}
-              onAnswersChange={handleAnswersChange}
-              onNext={goToNextSection}
-              onBack={goToPrevSection}
-              isFirst={isFirstSection}
-              isLast={isLastSection}
-              standInNotice={currentFlowItem.isStandIn && (
-                <div className="mb-4 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs olng-info-alert" style={{ borderLeft: '3px solid #e69c00' }}>
-                  <AlertCircle size={13} className="mt-0.5 shrink-0" style={{ color: '#e69c00' }} />
-                  <span>Dedicated template not yet available for this category — showing the nearest {currentFlowItem.nearestTier} template as a stand-in.</span>
-                </div>
-              )}
-            />
-          )}
+          <ErrorBoundary>
+            {currentFlowItem && currentFlowItem.kind === 'b1-chooser' ? (
+              <B1CategoryChooser
+                selected={b1Category}
+                onConfirm={handleB1Select}
+                onBack={goToPrevSection}
+              />
+            ) : currentFlowItem ? (
+              <SectionFillStep
+                section={currentFlowItem}
+                answers={sectionAnswers[currentFlowItem.id]}
+                prefill={prefillMap}
+                onAnswersChange={handleAnswersChange}
+                onNext={goToNextSection}
+                onBack={goToPrevSection}
+                isFirst={isFirstSection}
+                isLast={isLastSection}
+                standInNotice={currentFlowItem.isStandIn && (
+                  <div className="mb-4 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs olng-info-alert" style={{ borderLeft: '3px solid #e69c00' }}>
+                    <AlertCircle size={13} className="mt-0.5 shrink-0" style={{ color: '#e69c00' }} />
+                    <span>Dedicated template not yet available for this category — showing the nearest {currentFlowItem.nearestTier} template as a stand-in.</span>
+                  </div>
+                )}
+              />
+            ) : (
+              <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-center text-red-600">
+                <p className="text-sm font-semibold">Section not found</p>
+                <p className="text-xs mt-1">Please select a valid section from the dropdown</p>
+              </div>
+            )}
+          </ErrorBoundary>
         </div>
       )}
 

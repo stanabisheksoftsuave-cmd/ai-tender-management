@@ -244,7 +244,7 @@ export default function TechnicalEvaluation() {
   const { tenderId } = useParams()
   const navigate   = useNavigate()
   const { user }   = useAuth()
-  const { tenders, advanceTender, updateTender } = useTenders()
+  const { tenders, advanceTender, updateTender, submitParallelEval } = useTenders()
 
   const [expandedBidder,   setExpandedBidder]   = useState(null)
   const [notifications,    setNotifications]    = useState([])
@@ -334,7 +334,9 @@ export default function TechnicalEvaluation() {
   // On tender mount: skip landing+AI if all bidders already extracted; trigger re-extraction for new re-uploads
   useEffect(() => {
     if (!tender) return
-    if (tender.status === 'tech_eval' && tender.evalProgress !== 'in_progress') {
+    const activeForTech = tender.status === 'tech_eval' ||
+      (tender.status === 'parallel_eval' && tender.techSide === 'evaluating')
+    if (activeForTech && tender.evalProgress !== 'in_progress') {
       updateTender(tenderId, { evalProgress: 'in_progress' })
     }
     const allBidders = Array.isArray(tender.bidderList)
@@ -461,7 +463,10 @@ export default function TechnicalEvaluation() {
 
   if (!tenderId) {
     const assignedTenders = tenders.filter(
-      t => t.status === 'tech_eval' && t.assignedTechEval?.id === user?.id
+      t => t.assignedTechEval?.id === user?.id && (
+        t.status === 'tech_eval' ||
+        (t.status === 'parallel_eval' && t.techSide === 'evaluating')
+      )
     )
     return (
       <TenderSelectList
@@ -919,7 +924,11 @@ export default function TechnicalEvaluation() {
         <div className="flex justify-end">
           <button
             disabled={!canSubmit}
-            onClick={() => { advanceTender(tenderId); navigate('/dashboard') }}
+            onClick={() => {
+              if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'tech')
+              else advanceTender(tenderId)
+              navigate('/dashboard')
+            }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all
               ${canSubmit
                 ? 'bg-[var(--color-primary)] text-white hover:opacity-90 shadow-md shadow-blue-200'

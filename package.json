@@ -10,13 +10,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "docx": "^9.7.1",
+    "docx-preview": "^0.4.0",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "localtunnel": "^2.0.2",
     "lucide-react": "^1.18.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-excel-renderer": "^1.1.0",
     "react-router-dom": "^7.17.0"
+  },
+  "overrides": {
+    "react-excel-renderer": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

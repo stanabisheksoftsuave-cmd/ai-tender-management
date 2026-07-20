@@ -40,10 +40,13 @@ import LegalReview from './pages/LegalReview'
 import ContractExecution from './pages/ContractExecution'
 import ContractManagement from './pages/ContractManagement'
 import ContractClosure from './pages/ContractClosure'
+import StrategyTemplatesDashboard from './pages/StrategyTemplatesDashboard'
+import ExcelViewer from './pages/ExcelViewer'
+import DocxViewer from './pages/DocxViewer'
 
 function AdminRoute({ children }) {
   const { user } = useAuth()
-  if (user?.role?.id !== 'it_admin') return <Navigate to="/dashboard" replace />
+  if (user?.role?.id !== 'it_admin' && user?.role?.id !== 'biz_admin') return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -94,6 +97,7 @@ function ProtectedRoutes() {
           <Route path="/tenders" element={<TenderList />} />
           <Route path="/contract-strategy" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
           <Route path="/contract-strategy/:tenderId" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
+          <Route path="/strategy-templates/:tenderId" element={<ContractHolderRoute><StrategyTemplatesDashboard /></ContractHolderRoute>} />
           <Route path="/pre-qualification" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
           <Route path="/pre-qualification/:tenderId" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
           <Route path="/create-itt" element={<PofRoute><ITTCreation /></PofRoute>} />
@@ -135,6 +139,8 @@ export default function App() {
               <LanguageProvider>
                 <Routes>
                   <Route path="/login" element={<Login />} />
+                  <Route path="/excel-viewer" element={<ExcelViewer />} />
+                  <Route path="/docx-viewer" element={<DocxViewer />} />
                   <Route path="/*" element={<ProtectedRoutes />} />
                 </Routes>
               </LanguageProvider>

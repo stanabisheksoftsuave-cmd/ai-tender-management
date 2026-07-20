@@ -220,8 +220,124 @@ export function exportPreQualSummaryPDF(tender, qualifiedBidders) {
     y += 10
   })
 
+  // Export failed bidders and their reasons
+  const failedBidders = (tender.prequalBidders || []).filter(b => b.droppedAt || (b.stage4 && b.stage4.result !== 'PASS'))
+  if (failedBidders.length > 0) {
+    y += 10
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(100, 116, 139)
+    doc.text('FAILED / REJECTED BIDDERS', L, y)
+    y += 6
+
+    failedBidders.forEach(b => {
+      // Check for page breaks
+      if (y > 250) {
+        doc.addPage()
+        y = 30
+      }
+
+      doc.setFillColor(254, 242, 242) // red-50
+      doc.rect(L, y - 4, W, 14, 'F')
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(15, 23, 42)
+      doc.text(b.name, L + 3, y + 1.5)
+
+      // Collect reasons
+      let failReasons = []
+      if (b.stage3Reasons) {
+        Object.keys(b.stage3Reasons).forEach(sheet => {
+          Object.keys(b.stage3Reasons[sheet]).forEach(crit => {
+            if (b.stage3Reasons[sheet][crit]) {
+              failReasons.push(`[${sheet.toUpperCase()}] ${b.stage3Reasons[sheet][crit]}`)
+            }
+          })
+        })
+      }
+      
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(220, 38, 38) // red-600
+      let reasonText = failReasons.length > 0 ? `Reasons: ${failReasons.join('; ')}` : (b.droppedAt === 'stage4' || b.stage4?.result !== 'PASS' ? 'Failed Financial Assessment' : 'Failed Pre-Qualification')
+      
+      // text wrapping
+      const splitText = doc.splitTextToSize(reasonText, W - 6)
+      doc.text(splitText, L + 3, y + 6)
+      
+      y += 10 + (splitText.length * 3)
+    })
+  }
+
   reportFooter(doc, tender)
   doc.save(`${tender.id}-PreQual-Summary.pdf`)
+}
+
+export function exportBidderFailReasonsPDF(tender, bidder) {
+  const { doc, L, R, W } = reportShell(tender, 'BIDDER FAILURE REASONING')
+  let y = 78
+
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(15, 23, 42)
+  doc.text(`Bidder: ${bidder.name}`, L, y)
+  y += 6
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text(`${bidder.country} · ${bidder.category}`, L, y)
+  y += 12
+
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(220, 38, 38)
+  doc.text('EVALUATION FAILURES:', L, y)
+  y += 8
+
+  let hasReasons = false
+
+  if (bidder.stage3Reasons) {
+    Object.keys(bidder.stage3Reasons).forEach(sheet => {
+      Object.keys(bidder.stage3Reasons[sheet]).forEach(crit => {
+        if (bidder.stage3Reasons[sheet][crit]) {
+          hasReasons = true
+          
+          if (y > 250) {
+            doc.addPage()
+            y = 30
+          }
+
+          doc.setFillColor(254, 242, 242)
+          doc.rect(L, y - 4, W, 14, 'F')
+          
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(15, 23, 42)
+          doc.text(`[${sheet.toUpperCase()}] Criterion ID: ${crit}`, L + 3, y + 1.5)
+
+          doc.setFontSize(8)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(220, 38, 38)
+          const reasonText = bidder.stage3Reasons[sheet][crit]
+          const splitText = doc.splitTextToSize(`Reason: ${reasonText}`, W - 6)
+          doc.text(splitText, L + 3, y + 6)
+          
+          y += 10 + (splitText.length * 4)
+        }
+      })
+    })
+  }
+
+  if (!hasReasons) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 116, 139)
+    doc.text('No specific failure reasons recorded or bidder failed at a different stage.', L, y)
+  }
+
+  reportFooter(doc, tender)
+  doc.save(`${tender.id}-${bidder.name.replace(/[^a-z0-9]/gi, '_')}-FailReasoning.pdf`)
 }
 
 export function exportClosureReportPDF(tender) {

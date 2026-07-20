@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Users, Bot, Send, ShieldOff, FileText, ArrowLeft, CheckCircle,
   XCircle, Download, Award, ChevronRight, UploadCloud, Ban, Wallet, RotateCcw,
+  UserPlus, Plus, Save
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -10,12 +11,12 @@ import Button from '../components/ui/Button'
 import SectionFillStep from '../components/itt/SectionFillStep'
 import {
   erpBidders, WORK_CATEGORIES, QHSE_CRITERIA, TECHNICAL_CRITERIA_PQ,
-  ADMINISTRATIVE_CRITERIA, assessFinancials,
+  ADMINISTRATIVE_CRITERIA, assessFinancials, HANDOFF_DOCS,
 } from '../data/mockData'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { buildFilledDocxBlob } from '../utils/docxTemplate'
-import { exportPreQualSummaryPDF } from '../utils/exportPDF'
+import { exportPreQualSummaryPDF, exportBidderFailReasonsPDF } from '../utils/exportPDF'
 
 const PREQUAL_STATUSES = ['prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4', 'prequal_rejected']
 
@@ -29,13 +30,6 @@ const SHEETS = [
   { key: 'qhse', label: 'QHSE Pre-Qualification', criteria: QHSE_CRITERIA },
   { key: 'technical', label: 'Technical Pre-Qualification', criteria: TECHNICAL_CRITERIA_PQ },
   { key: 'administrative', label: 'Administrative Pre-Qualification', criteria: ADMINISTRATIVE_CRITERIA },
-]
-
-// Handed to the Contract Engineer alongside the qualified bidderList at ITT handoff.
-const HANDOFF_DOCS = [
-  { key: 'benchmarking',    label: 'OEM Benchmarking Rates' },
-  { key: 'companyEstimate', label: 'Company Estimate' },
-  { key: 'riskAssessment',  label: 'Contract Risk Assessment' },
 ]
 
 function sheetOverall(bidder, sheetKey, criteria) {
@@ -53,17 +47,31 @@ function stage3Overall(bidder) {
   return null
 }
 
+let aiEvaluationsCount = 0
+
 // AI's simulated first-pass evaluation — defaults every applicable criterion to
 // Pass. This is the baseline the Contract Holder reviews and can override; it's
 // stored separately (stage3Ai) so overrides can be visually distinguished and reset.
 function generateAiStage3(bidder) {
-  const result = {}
+  aiEvaluationsCount++
+  const forcePass = aiEvaluationsCount <= 2
+
+  const marks = {}
+  const reasons = {}
   SHEETS.forEach(sheet => {
-    const marks = {}
-    sheet.criteria.filter(c => !(c.localOnly && !bidder.isLocal)).forEach(c => { marks[c.id] = 'pass' })
-    result[sheet.key] = marks
+    marks[sheet.key] = {}
+    reasons[sheet.key] = {}
+    sheet.criteria.filter(c => !(c.localOnly && !bidder.isLocal)).forEach(c => { 
+      // 15% chance to mock a fail for demonstration of the flow
+      if (!forcePass && Math.random() < 0.15) {
+        marks[sheet.key][c.id] = 'fail'
+        reasons[sheet.key][c.id] = 'AI detected missing or outdated information in the provided document.'
+      } else {
+        marks[sheet.key][c.id] = 'pass' 
+      }
+    })
   })
-  return result
+  return { marks, reasons }
 }
 
 export default function PreQualification() {
@@ -89,11 +97,14 @@ export default function PreQualification() {
   const [processingId, setProcessingId] = useState(null)
   const [processingPhase, setProcessingPhase] = useState(null) // 'upload' | 'ai'
   const [selectedUploadIdRaw, setSelectedUploadIdRaw] = useState(null)
+  const [financialAssessmentNeeded, setFinancialAssessmentNeeded] = useState(true)
 
   // Stage 4 local state
   const [finance, setFinance] = useState({}) // { [bidderId]: { statementSubmitted, auditOpinion, zZone } }
   const [finalizing, setFinalizing] = useState(false)
   const [selectedAssessIdRaw, setSelectedAssessIdRaw] = useState(null)
+  const [handoffDocuments, setHandoffDocuments] = useState(tender?.handoffDocuments || {})
+  const [showAddBidder, setShowAddBidder] = useState(false)
 
   useEffect(() => {
     if (matching) {
@@ -198,6 +209,46 @@ export default function PreQualification() {
     })
   }
 
+  // ── Export Bidders List as CSV ──
+  const exportBiddersCSV = () => {
+    const header = 'Name,Country,Category,Contact Name,Contact Email\n'
+    const rows = prequalBidders.map(b => {
+      const erp = erpBidders.find(e => e.id === b.id)
+      return `"${b.name}","${b.country}","${b.category}","${erp?.contactName || ''}","${erp?.contactEmail || ''}"`
+    }).join('\n')
+    const blob = new Blob([header + rows], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Bidders-${tender.id}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── Add a new bidder from ERP to the prequalBidders list ──
+  const availableBiddersToAdd = erpBidders.filter(
+    b => !prequalBidders.some(pb => pb.id === b.id)
+  )
+
+  const addBidderToList = (bidderId) => {
+    const b = erpBidders.find(e => e.id === bidderId)
+    if (!b) return
+    const newBidder = {
+      id: b.id,
+      name: b.name,
+      country: b.country,
+      category: b.category,
+      isLocal: b.isLocal,
+      responseUploaded: false,
+      stage3: { qhse: {}, technical: {}, administrative: {} },
+    }
+    const updated = [...prequalBidders, newBidder]
+    updateTender(tender.id, { prequalBidders: updated })
+    setShowAddBidder(false)
+  }
+
   const handleGeneratePqq = async () => {
     setGenerating(true)
     try {
@@ -228,8 +279,15 @@ export default function PreQualification() {
       setProcessingPhase('ai')
       setTimeout(() => {
         const bidder = prequalBidders.find(b => b.id === bidderId)
-        const aiMarks = generateAiStage3(bidder)
-        patchBidder(bidderId, { responseUploaded: true, responseFileName: file.name, stage3: aiMarks, stage3Ai: aiMarks })
+        const aiResult = generateAiStage3(bidder)
+        patchBidder(bidderId, { 
+          responseUploaded: true, 
+          responseFileName: file.name, 
+          stage3: aiResult.marks, 
+          stage3Ai: aiResult.marks, 
+          stage3Reasons: aiResult.reasons,
+          clarificationRequested: false 
+        })
         setProcessingId(null)
         setProcessingPhase(null)
       }, 1100)
@@ -239,13 +297,66 @@ export default function PreQualification() {
   const setSheetMark = (bidderId, sheetKey, criterionId, value) => {
     const bidder = prequalBidders.find(b => b.id === bidderId)
     if (!bidder) return
-    patchBidder(bidderId, { stage3: { ...bidder.stage3, [sheetKey]: { ...bidder.stage3[sheetKey], [criterionId]: value } } })
+    let reason = bidder.stage3Reasons?.[sheetKey]?.[criterionId]
+    if (value === 'fail') {
+      const input = prompt('Please provide a reason for failing this criteria:')
+      if (input !== null) {
+        reason = input
+      } else {
+        return // Cancel
+      }
+    } else {
+      reason = undefined // Clear reason on pass
+    }
+
+    patchBidder(bidderId, { 
+      stage3: { ...bidder.stage3, [sheetKey]: { ...bidder.stage3[sheetKey], [criterionId]: value } },
+      stage3Reasons: { ...bidder.stage3Reasons, [sheetKey]: { ...(bidder.stage3Reasons?.[sheetKey] || {}), [criterionId]: reason } }
+    })
   }
 
   const resetMarkToAi = (bidderId, sheetKey, criterionId) => {
     const bidder = prequalBidders.find(b => b.id === bidderId)
     if (!bidder?.stage3Ai) return
-    setSheetMark(bidderId, sheetKey, criterionId, bidder.stage3Ai[sheetKey][criterionId])
+    const aiValue = bidder.stage3Ai[sheetKey][criterionId]
+    // We don't restore AI reason on reset for simplicity, or we could if we stored it
+    patchBidder(bidderId, { 
+      stage3: { ...bidder.stage3, [sheetKey]: { ...bidder.stage3[sheetKey], [criterionId]: aiValue } },
+      stage3Reasons: { ...bidder.stage3Reasons, [sheetKey]: { ...(bidder.stage3Reasons?.[sheetKey] || {}), [criterionId]: undefined } }
+    })
+  }
+
+  const handleRequestClarification = (bidderId) => {
+    patchBidder(bidderId, {
+      responseUploaded: false,
+      clarificationRequested: true,
+      stage3: { qhse: {}, technical: {}, administrative: {} },
+      stage3Reasons: { qhse: {}, technical: {}, administrative: {} }
+    })
+  }
+
+  // Contract Holder marks a bidder that did not submit a response as Not
+  // Participating. It sets droppedAt so the bidder is filtered out of the dropdown,
+  // evaluation table and the proceed gate — while remaining on record (restorable).
+  const markNotParticipating = (bidderId) => {
+    const b = prequalBidders.find(x => x.id === bidderId)
+    if (!b) return
+    if (!window.confirm(`Mark "${b.name}" as Not Participating?\n\nThey did not submit a response and will be removed from this pre-qualification. You can restore them later.`)) return
+    patchBidder(bidderId, { droppedAt: 'no_response', responseUploaded: false, clarificationRequested: false })
+  }
+
+  const restoreBidder = (bidderId) => {
+    patchBidder(bidderId, { droppedAt: undefined })
+  }
+
+  // Bidders removed for not submitting a response (Stage 3 only).
+  const notParticipatedBidders = prequalBidders.filter(b => b.droppedAt === 'no_response')
+
+  // Save current Stage 3 progress and exit — marks already persist on each change,
+  // so this re-commits the current state and returns to the pre-qualification list.
+  const handleSaveDraft = () => {
+    updateTender(tender.id, { prequalBidders })
+    navigate('/pre-qualification')
   }
 
   const allStage3Decided = activeBidders.length > 0 && activeBidders.every(b => b.responseUploaded && stage3Overall(b))
@@ -265,6 +376,37 @@ export default function PreQualification() {
     updateTender(tender.id, { status: 'prequal_stage4', stage: 'Pre-Qualification — Financial Assessment', prequalBidders: nextBidders })
   }
 
+  // When financial assessment is NOT required, Stage 3 pass results are final:
+  // qualify the passed bidders directly and hand off to the Strategy Templates flow.
+  const finalizeStage3AsFinal = () => {
+    const passed = activeBidders.filter(b => stage3Overall(b) === 'pass')
+    const failed = activeBidders.filter(b => stage3Overall(b) === 'fail')
+    const nextBidders = [
+      ...passed,
+      ...failed.map(b => ({ ...b, droppedAt: 'stage3' })),
+      ...prequalBidders.filter(b => b.droppedAt),
+    ]
+    if (passed.length === 0) {
+      updateTender(tender.id, { status: 'prequal_rejected', prequalBidders: nextBidders })
+      return
+    }
+    updateTender(tender.id, {
+      status: 'draft',
+      stage: 'Draft — Pending Export',
+      prequalBidders: nextBidders,
+      bidderList: passed.map(b => ({ id: b.id, name: b.name, country: b.country })),
+      bidders: passed.length,
+      handoffDocuments,
+    })
+    navigate(`/strategy-templates/${tender.id}`)
+  }
+
+  // Stage 3 submit — branch on whether a financial assessment is required.
+  const handleStage3Submit = () => {
+    if (financialAssessmentNeeded) finalizeStage3()
+    else finalizeStage3AsFinal()
+  }
+
   const setFinanceField = (bidderId, key, value) =>
     setFinance(prev => ({ ...prev, [bidderId]: { ...(prev[bidderId] || { statementSubmitted: true, auditOpinion: 'Unqualified Opinion', zZone: 'Green' }), [key]: value } }))
 
@@ -276,14 +418,6 @@ export default function PreQualification() {
 
   const allStage4Assessed = activeBidders.length > 0 && activeBidders.every(b => b.stage4?.result)
   const qualifiedFinal = activeBidders.filter(b => b.stage4?.result === 'PASS')
-  const allHandoffDocsUploaded = qualifiedFinal.length > 0 && qualifiedFinal.every(b => HANDOFF_DOCS.every(d => b.handoffDocs?.[d.key]))
-
-  const uploadHandoffDoc = (bidderId, docKey, file) => {
-    if (!file) return
-    const bidder = prequalBidders.find(b => b.id === bidderId)
-    if (!bidder) return
-    patchBidder(bidderId, { handoffDocs: { ...bidder.handoffDocs, [docKey]: file.name } })
-  }
 
   const finalizeStage4 = () => {
     setFinalizing(true)
@@ -302,10 +436,11 @@ export default function PreQualification() {
         status: 'draft',
         stage: 'Draft — Pending Export',
         prequalBidders: nextBidders,
-        bidderList: qualifiedFinal.map(b => ({ id: b.id, name: b.name, country: b.country, handoffDocs: b.handoffDocs })),
+        bidderList: qualifiedFinal.map(b => ({ id: b.id, name: b.name, country: b.country })),
         bidders: qualifiedFinal.length,
+        handoffDocuments,
       })
-      navigate('/tenders')
+      navigate(`/strategy-templates/${tender.id}`)
     }, 400)
   }
 
@@ -316,8 +451,8 @@ export default function PreQualification() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                <ArrowLeft size={12} /> Dashboard
+              <button onClick={() => navigate(`/strategy-templates/${tender.id}`)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                <ArrowLeft size={12} /> Strategies
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
@@ -335,12 +470,12 @@ export default function PreQualification() {
           <Card className="p-5 space-y-4">
             <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Stage 1 — Bidder Matching</h4>
             <p className="text-xs text-slate-500">
-              Upload the tender's Statement of Work and select a Work Category. The system will match the ERP
+              Upload the tender's Scope of Work and select a Work Category. The system will match the ERP
               bidder registry against this tender's scope before pre-qualification is issued.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1 block">Statement of Work (SOW)</label>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Scope of Work (SOW)</label>
                 <label className="flex items-center gap-2 text-sm border border-dashed border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:border-[var(--color-primary)] transition-colors">
                   <UploadCloud size={14} className="text-slate-400" />
                   <span className="text-slate-600 truncate">{sowFileName || 'Choose file to upload...'}</span>
@@ -406,7 +541,16 @@ export default function PreQualification() {
       {tender.status === 'prequal_stage2' && (
         <>
           <Card className="p-4">
-            <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Shortlisted Bidders</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shortlisted Bidders</h4>
+              <button
+                onClick={exportBiddersCSV}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50"
+                style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}
+              >
+                <Download size={11} /> Export Bidders List
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {prequalBidders.map(b => (
                 <span key={b.id} className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">{b.name}</span>
@@ -447,6 +591,54 @@ export default function PreQualification() {
       {/* ── Stage 3: Response Review ── */}
       {tender.status === 'prequal_stage3' && (
         <>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Stage 3 — Response Review</h4>
+            {/* Add Bidders Dropdown */}
+            {availableBiddersToAdd.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowAddBidder(!showAddBidder)}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
+                  style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}
+                >
+                  <UserPlus size={12} /> Add Bidders
+                </button>
+                {showAddBidder && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 z-50 w-64 py-1 max-h-60 overflow-y-auto" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.12)' }}>
+                    {availableBiddersToAdd.map(b => (
+                      <button
+                        key={b.id}
+                        onClick={() => addBidderToList(b.id)}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                      >
+                        <Plus size={12} style={{ color: '#0089cf' }} />
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{b.name}</p>
+                          <p className="text-[10px] text-slate-400">{b.country} · {b.category}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Card className="p-3.5">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={financialAssessmentNeeded}
+                onChange={e => setFinancialAssessmentNeeded(e.target.checked)}
+                className="accent-[var(--color-primary)] w-4 h-4"
+              />
+              Financial assessment required
+              <span className="text-[11px] text-slate-400 font-normal">
+                — {financialAssessmentNeeded ? 'submit moves to Financial Assessment' : 'submit finalises and returns to Strategy Templates'}
+              </span>
+            </label>
+          </Card>
+
           {(pendingUploadBidders.length > 0 || processingId != null) && (
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -462,7 +654,11 @@ export default function PreQualification() {
                     disabled={processingId != null}
                     className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:opacity-60"
                   >
-                    {pendingUploadBidders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {pendingUploadBidders.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.clarificationRequested ? '(Awaiting Clarification)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <label className={`flex items-center gap-1.5 text-xs font-semibold text-white px-4 py-2.5 rounded-lg transition-all ${processingId != null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -471,7 +667,19 @@ export default function PreQualification() {
                   <input type="file" className="hidden" disabled={processingId != null}
                     onChange={e => { if (selectedUploadId != null) handleResponseFileChosen(selectedUploadId, e.target.files?.[0]) }} />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => { if (selectedUploadId != null) markNotParticipating(selectedUploadId) }}
+                  disabled={processingId != null || selectedUploadId == null}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-lg border bg-white transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                >
+                  <Ban size={13} /> Mark as Not Participating
+                </button>
               </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                If a bidder does not submit a response, mark them as Not Participating to remove them from evaluation.
+              </p>
               {processingId != null && (
                 <div className="mt-3 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                   {processingPhase === 'upload'
@@ -482,86 +690,146 @@ export default function PreQualification() {
             </Card>
           )}
 
-          <div className="space-y-3">
-            {prequalBidders.filter(bidder => bidder.responseUploaded).map(bidder => {
-              const overall = stage3Overall(bidder)
-              return (
-                <Card key={bidder.id} className="overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-slate-800">{bidder.name}</span>
-                        <span className="text-xs text-slate-400">{bidder.country}</span>
-                        {overall === 'pass' && <Badge variant="success"><CheckCircle size={10} /> Overall Pass</Badge>}
-                        {overall === 'fail' && <Badge variant="error"><XCircle size={10} /> Overall Fail</Badge>}
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {bidder.category}{bidder.responseFileName ? ` · ${bidder.responseFileName}` : ''}
-                      </p>
+          {notParticipatedBidders.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Ban size={14} className="text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-700">Did Not Participate</h3>
+                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{notParticipatedBidders.length}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">Removed for not submitting a response — excluded from evaluation. Restore if a response is received later.</p>
+              <div className="space-y-2">
+                {notParticipatedBidders.map(b => (
+                  <div key={b.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-500 line-through">{b.name}</p>
+                      <p className="text-[10px] text-slate-400">{b.country} · {b.category}</p>
                     </div>
+                    <button
+                      onClick={() => restoreBidder(b.id)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[var(--color-primary)] px-2.5 py-1 rounded-lg border border-slate-200 hover:border-[var(--color-primary)]/40 transition-colors shrink-0"
+                    >
+                      <RotateCcw size={11} /> Restore
+                    </button>
                   </div>
-                  {bidder.responseUploaded && (
-                    <div className="divide-y divide-slate-50">
-                      {SHEETS.map(sheet => {
-                        const sheetResult = sheetOverall(bidder, sheet.key, sheet.criteria)
-                        return (
-                          <div key={sheet.key} className="px-4 py-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <p className="text-xs font-semibold text-slate-600">{sheet.label}</p>
-                              {sheetResult === 'pass' && <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Pass</span>}
-                              {sheetResult === 'fail' && <span className="text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Fail</span>}
-                            </div>
-                            <div className="space-y-2">
-                              {sheet.criteria.filter(c => !(c.localOnly && !bidder.isLocal)).map(c => {
-                                const mark = bidder.stage3?.[sheet.key]?.[c.id]
-                                const aiMark = bidder.stage3Ai?.[sheet.key]?.[c.id]
-                                const overridden = aiMark != null && mark !== aiMark
-                                return (
-                                  <div key={c.id} className="flex items-center justify-between gap-3 flex-wrap">
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-medium text-slate-700">{c.item}</p>
-                                      <p className="text-[11px] text-slate-400">{c.detail}</p>
-                                      {overridden ? (
-                                        <button onClick={() => resetMarkToAi(bidder.id, sheet.key, c.id)}
-                                          className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 mt-0.5">
-                                          <RotateCcw size={9} /> Overridden by Contract Holder · reset to AI
-                                        </button>
-                                      ) : (
-                                        <span className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
-                                          <Bot size={9} /> AI suggested
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-1.5 shrink-0">
-                                      <button onClick={() => setSheetMark(bidder.id, sheet.key, c.id, 'pass')}
-                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${mark === 'pass' ? 'border-emerald-300 text-emerald-700 bg-emerald-50 ring-1 ring-emerald-300' : 'border-slate-200 text-slate-500 bg-white hover:border-emerald-300'}`}>Pass</button>
-                                      <button onClick={() => setSheetMark(bidder.id, sheet.key, c.id, 'fail')}
-                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${mark === 'fail' ? 'border-red-300 text-red-700 bg-red-50 ring-1 ring-red-300' : 'border-slate-200 text-slate-500 bg-white hover:border-red-300'}`}>Fail</button>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
-          </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
-          <Card className={`p-4 transition-opacity ${!allStage3Decided ? 'opacity-60' : ''}`}>
+          <Card className="overflow-x-auto pb-2">
+            <table className="w-full text-left border-collapse min-w-max">
+              <thead>
+                <tr>
+                  <th className="p-3 border-b border-slate-200 bg-slate-50 sticky left-0 z-10 w-80 shadow-[1px_0_0_0_#e2e8f0]">Criteria</th>
+                  {prequalBidders.filter(b => b.responseUploaded).map(bidder => {
+                    const overall = stage3Overall(bidder)
+                    return (
+                      <th key={bidder.id} className="p-3 border-b border-slate-200 bg-slate-50 border-l">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <div className="flex items-center gap-1.5 flex-wrap justify-center mb-1">
+                            <span className="text-sm font-semibold text-slate-800">{bidder.name}</span>
+                            {overall === 'pass' && <Badge variant="success"><CheckCircle size={10} /> Pass</Badge>}
+                            {overall === 'fail' && <Badge variant="error"><XCircle size={10} /> Fail</Badge>}
+                          </div>
+                          {overall === 'fail' && (
+                            <>
+                              <button 
+                                onClick={() => handleRequestClarification(bidder.id)}
+                                className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors mt-1 font-semibold w-full"
+                              >
+                                Request Clarification
+                              </button>
+                              <button 
+                                onClick={() => exportBidderFailReasonsPDF(tender, bidder)}
+                                className="flex items-center justify-center gap-1 text-[10px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50 transition-colors mt-1 mb-1 font-semibold w-full"
+                              >
+                                <Download size={10} /> Export Reason
+                              </button>
+                            </>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-normal">{bidder.country} · {bidder.category}</span>
+                        </div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {SHEETS.map(sheet => (
+                  <React.Fragment key={sheet.key}>
+                    <tr>
+                      <td colSpan={prequalBidders.filter(b => b.responseUploaded).length + 1} className="px-3 py-2 bg-slate-100 font-semibold text-slate-700 text-xs uppercase tracking-wider sticky left-0 shadow-[1px_0_0_0_#f1f5f9]">
+                        {sheet.label}
+                      </td>
+                    </tr>
+                    {sheet.criteria.map(c => (
+                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+                        <td className="p-3 sticky left-0 bg-white border-r border-slate-100 z-10 group-hover:bg-slate-50 transition-colors shadow-[1px_0_0_0_#f1f5f9]">
+                          <p className="text-xs font-medium text-slate-700">{c.item}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 whitespace-normal w-72">{c.detail}</p>
+                        </td>
+                        {prequalBidders.filter(b => b.responseUploaded).map(bidder => {
+                          if (c.localOnly && !bidder.isLocal) {
+                            return <td key={bidder.id} className="p-3 text-center align-top border-l border-slate-100 bg-slate-50/50"><span className="text-[10px] text-slate-400">N/A</span></td>
+                          }
+                          const mark = bidder.stage3?.[sheet.key]?.[c.id]
+                          const aiMark = bidder.stage3Ai?.[sheet.key]?.[c.id]
+                          const overridden = aiMark != null && mark !== aiMark
+                          return (
+                            <td key={bidder.id} className="p-3 text-center align-top border-l border-slate-100">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <div className="flex gap-1.5 shrink-0 justify-center">
+                                  <button onClick={() => setSheetMark(bidder.id, sheet.key, c.id, 'pass')}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${mark === 'pass' ? 'border-emerald-300 text-emerald-700 bg-emerald-50 ring-1 ring-emerald-300' : 'border-slate-200 text-slate-500 bg-white hover:border-emerald-300'}`}>Pass</button>
+                                  <button onClick={() => setSheetMark(bidder.id, sheet.key, c.id, 'fail')}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${mark === 'fail' ? 'border-red-300 text-red-700 bg-red-50 ring-1 ring-red-300' : 'border-slate-200 text-slate-500 bg-white hover:border-red-300'}`}>Fail</button>
+                                </div>
+                                {overridden ? (
+                                  <button onClick={() => resetMarkToAi(bidder.id, sheet.key, c.id)}
+                                    className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700">
+                                    <RotateCcw size={9} /> Reset
+                                  </button>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                                    <Bot size={9} /> AI suggested
+                                  </span>
+                                )}
+                                {mark === 'fail' && bidder.stage3Reasons?.[sheet.key]?.[c.id] && (
+                                  <div className="text-[9px] text-red-600 mt-1 max-w-[120px] text-left leading-tight bg-red-50 p-1 rounded border border-red-100">
+                                    <span className="font-semibold block mb-0.5 text-[8px] uppercase tracking-wider">Reason</span>
+                                    {bidder.stage3Reasons[sheet.key][c.id]}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card className="p-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <p className="text-xs text-slate-500">
-                {allStage3Decided
-                  ? `${activeBidders.filter(b => stage3Overall(b) === 'pass').length} of ${activeBidders.length} bidders passed Stage 3.`
-                  : 'Upload responses and complete QHSE, Technical and Administrative marking for every bidder before proceeding.'}
-              </p>
-              <Button disabled={!allStage3Decided} onClick={finalizeStage3}>
-                Proceed to Financial Assessment <ChevronRight size={14} />
-              </Button>
+              <div className="space-y-2.5">
+                <p className={`text-xs text-slate-500 ${!allStage3Decided ? 'opacity-70' : ''}`}>
+                  {allStage3Decided
+                    ? `${activeBidders.filter(b => stage3Overall(b) === 'pass').length} of ${activeBidders.length} bidders passed Stage 3.`
+                    : 'Upload responses and complete QHSE, Technical and Administrative marking for every bidder before proceeding.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="secondary" onClick={handleSaveDraft}>
+                  <Save size={13} /> Save to Draft
+                </Button>
+                <Button disabled={!allStage3Decided} onClick={handleStage3Submit}>
+                  Submit <ChevronRight size={14} />
+                </Button>
+              </div>
             </div>
           </Card>
         </>
@@ -632,38 +900,7 @@ export default function PreQualification() {
             ))}
           </div>
 
-          {allStage4Assessed && qualifiedFinal.length > 0 && (
-            <Card className="overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                <FileText size={14} className="text-[var(--color-primary)]" />
-                <h3 className="text-sm font-semibold text-slate-800">Bidder Documents for ITT Handoff</h3>
-                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Shared with the Contract Engineer</span>
-              </div>
-              <div className="divide-y divide-slate-50">
-                {qualifiedFinal.map(bidder => (
-                  <div key={bidder.id} className="px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-800 mb-2">{bidder.name}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {HANDOFF_DOCS.map(doc => {
-                        const fileName = bidder.handoffDocs?.[doc.key]
-                        return (
-                          <label key={doc.key}
-                            className={`flex items-center gap-2 text-xs rounded-lg border px-3 py-2 cursor-pointer transition-colors ${fileName ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-dashed border-slate-300 text-slate-500 hover:border-[var(--color-primary)]'}`}>
-                            {fileName ? <CheckCircle size={12} className="shrink-0" /> : <UploadCloud size={12} className="shrink-0" />}
-                            <span className="min-w-0">
-                              <span className="block font-medium">{doc.label}</span>
-                              <span className="block truncate text-[10px] opacity-80">{fileName || 'Upload file…'}</span>
-                            </span>
-                            <input type="file" className="hidden" onChange={e => uploadHandoffDoc(bidder.id, doc.key, e.target.files?.[0])} />
-                          </label>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+
 
           <Card className={`p-4 transition-opacity ${!allStage4Assessed ? 'opacity-60' : ''}`}>
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -672,9 +909,7 @@ export default function PreQualification() {
                 <p className="text-xs text-slate-400 mt-0.5">
                   {!allStage4Assessed
                     ? 'Assess every bidder before finalising.'
-                    : qualifiedFinal.length > 0 && !allHandoffDocsUploaded
-                      ? 'Upload all 3 handoff documents for every qualified bidder before proceeding.'
-                      : `${qualifiedFinal.length} of ${activeBidders.length} bidders financially qualified.`}
+                    : `${qualifiedFinal.length} of ${activeBidders.length} bidders financially qualified.`}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -683,8 +918,8 @@ export default function PreQualification() {
                     <Download size={13} /> Export Pre-Qual Summary
                   </Button>
                 )}
-                <Button disabled={!allStage4Assessed || (qualifiedFinal.length > 0 && !allHandoffDocsUploaded) || finalizing} onClick={finalizeStage4}>
-                  {finalizing ? 'Processing…' : qualifiedFinal.length > 0 ? 'Confirm & Proceed to ITT' : 'Reject & Archive'}
+                <Button disabled={!allStage4Assessed || finalizing} onClick={finalizeStage4}>
+                  {finalizing ? 'Processing…' : qualifiedFinal.length > 0 ? 'Submit' : 'Reject & Archive'}
                 </Button>
               </div>
             </div>

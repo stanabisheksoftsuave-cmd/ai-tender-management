@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft, ChevronRight, Users, Calendar, Building2, Lock, Activity, UserPlus, Save, Phone, Bell, FileText, AlertTriangle, Send, UploadCloud, Download } from 'lucide-react'
+import { Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft, ChevronRight, Users, Calendar, Building2, Lock, Activity, UserPlus, Save, Phone, Bell, FileText, AlertTriangle, Send, UploadCloud, Ban, RotateCcw, Wrench, Wallet, GitBranch, ArrowRightLeft } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -34,7 +34,7 @@ const LOG_MESSAGES = [
 export default function BidderUpload() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
-  const { tenders, advanceTender, updateTender } = useTenders()
+  const { tenders, advanceTender, updateTender, uploadParallelReport } = useTenders()
   const { lang, t, } = useLanguage()
   const { users } = useAuth()
   const uploadTenders = tenders.filter(t => t.status === 'upload')
@@ -57,7 +57,7 @@ export default function BidderUpload() {
 
   // Evaluator assignment modal
   const [showAssignModal, setShowAssignModal] = useState(false)
-  const [assignments, setAssignments] = useState({ techEval: '', commEval: '' })
+  const [assignments, setAssignments] = useState({ techEval: '', commEval: '', mode: 'linear' })
   const [assignModalErrors, setAssignModalErrors] = useState({})
 
   // Correction request portal (for POF re-upload flow)
@@ -77,6 +77,7 @@ export default function BidderUpload() {
   // Assign Document modal (when a file is dropped on the zone)
   const [pendingFile, setPendingFile] = useState(null)
   const [assignTo, setAssignTo] = useState('')
+  const [assignDocType, setAssignDocType] = useState('technical') // 'technical' | 'commercial'
   const [newBidderForm, setNewBidderForm] = useState({ company: '', contact: '', phone: '' })
   const [assignErrors, setAssignErrors] = useState({})
 
@@ -105,8 +106,8 @@ export default function BidderUpload() {
     if (!extracting) return
     const interval = setInterval(() => {
       setBidders(prev => {
-        const uploaded = prev.filter(b => b.status !== 'no_document')
-        if (uploaded.every(b => b.status === 'completed')) return prev
+        const uploaded = prev.filter(b => ['queued', 'processing', 'completed'].includes(b.status))
+        if (uploaded.length === 0 || uploaded.every(b => b.status === 'completed')) return prev
         const hasProcessing = prev.some(b => b.status === 'processing')
         return prev.map(b => {
           if (b.status === 'queued' && !hasProcessing) return { ...b, status: 'processing' }
@@ -124,7 +125,7 @@ export default function BidderUpload() {
 
   // Stop when all uploaded bidders are extracted
   useEffect(() => {
-    const uploaded = bidders.filter(b => b.status !== 'no_document')
+    const uploaded = bidders.filter(b => ['queued', 'processing', 'completed'].includes(b.status))
     if (extracting && uploaded.length > 0 && uploaded.every(b => b.status === 'completed')) {
       setExtracting(false)
     }
@@ -158,53 +159,85 @@ export default function BidderUpload() {
 
   // ── Handlers ──
 
+  const fmtSize = (bytes) => bytes > 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${(bytes / 1024).toFixed(0)} KB`
+
+  // A bidder is ready for extraction once BOTH documents are attached.
+  const docsComplete = (b) => !!(b.techDoc && b.commDoc)
+
+  // Recompute a bidder's status after a document change: queued once both docs
+  // are present (unless already processing/completed/opted-out).
+  const withStatus = (b) => {
+    if (b.status === 'not_participating') return b
+    if (['processing', 'completed'].includes(b.status)) return b
+    return { ...b, status: docsComplete(b) ? 'queued' : 'no_document' }
+  }
+
   const openAssignModal = (incoming) => {
-    const file = Array.from(incoming).find(f => /\.(zip|rar)$/i.test(f.name))
+    const file = Array.from(incoming)[0]
     if (!file) return
-    const size = file.size > 1024 * 1024
-      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-      : `${(file.size / 1024).toFixed(0)} KB`
-    setPendingFile({ name: file.name, size })
-    const unassigned = bidders.find(b => b.status === 'no_document')
+    setPendingFile({ name: file.name, size: fmtSize(file.size) })
+    const unassigned = bidders.find(b => b.status !== 'not_participating' && !docsComplete(b))
     setAssignTo(unassigned ? String(unassigned.id) : 'new')
+    setAssignDocType(unassigned && unassigned.techDoc && !unassigned.commDoc ? 'commercial' : 'technical')
     setNewBidderForm({ company: '', contact: '', phone: '' })
     setAssignErrors({})
   }
 
   const confirmAssign = () => {
     if (!pendingFile) return
+    const docKey = assignDocType === 'commercial' ? 'commDoc' : 'techDoc'
+    const doc = { name: pendingFile.name, size: pendingFile.size }
     if (assignTo === 'new') {
       const errs = {}
       if (!newBidderForm.company.trim()) errs.company = 'Required'
       if (!newBidderForm.contact.trim()) errs.contact = 'Required'
       if (Object.keys(errs).length) { setAssignErrors(errs); return }
       const newId = Math.max(0, ...bidders.map(b => b.id)) + 1
-      setBidders(prev => [...prev, {
+      setBidders(prev => [...prev, withStatus({
         id: newId, company: newBidderForm.company.trim(), contact: newBidderForm.contact.trim(),
         phone: newBidderForm.phone.trim(),
-        fileName: pendingFile.name, fileSize: pendingFile.size,
-        status: 'queued', extracted: 0, _max: 120,
-      }])
+        techDoc: null, commDoc: null, [docKey]: doc,
+        status: 'no_document', extracted: 0, _max: 120,
+      })])
     } else {
       setBidders(prev => prev.map(b =>
-        b.id === Number(assignTo)
-          ? { ...b, fileName: pendingFile.name, fileSize: pendingFile.size, status: 'queued', extracted: 0, _max: 120 }
-          : b
+        b.id === Number(assignTo) ? withStatus({ ...b, [docKey]: doc }) : b
       ))
     }
     setPendingFile(null)
   }
 
-  const attachFileToBidder = (bidderId, incoming) => {
-    const file = Array.from(incoming).find(f => /\.(zip|rar)$/i.test(f.name))
+  const attachDocToBidder = (bidderId, docType, incoming) => {
+    const file = Array.from(incoming)[0]
     if (!file) return
-    const size = file.size > 1024 * 1024
-      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-      : `${(file.size / 1024).toFixed(0)} KB`
+    const docKey = docType === 'commercial' ? 'commDoc' : 'techDoc'
+    const doc = { name: file.name, size: fmtSize(file.size) }
     setBidders(prev => prev.map(b =>
-      b.id === bidderId
-        ? { ...b, fileName: file.name, fileSize: size, status: 'queued', extracted: 0, _max: 120 }
-        : b
+      b.id === bidderId ? withStatus({ ...b, [docKey]: doc }) : b
+    ))
+  }
+
+  const removeDoc = (bidderId, docType) => {
+    const docKey = docType === 'commercial' ? 'commDoc' : 'techDoc'
+    setBidders(prev => prev.map(b =>
+      b.id === bidderId ? withStatus({ ...b, [docKey]: null, extracted: 0, status: b.status === 'not_participating' ? 'not_participating' : b.status }) : b
+    ))
+  }
+
+  const markNotParticipating = (bidderId) => {
+    const b = bidders.find(x => x.id === bidderId)
+    if (!b) return
+    if (!window.confirm(`Mark "${b.company}" as Not Participating?\n\nThey will be excluded from extraction and evaluation. You can restore them later.`)) return
+    setBidders(prev => prev.map(x =>
+      x.id === bidderId ? { ...x, status: 'not_participating', extracted: 0 } : x
+    ))
+  }
+
+  const restoreBidder = (bidderId) => {
+    setBidders(prev => prev.map(x =>
+      x.id === bidderId ? withStatus({ ...x, status: 'no_document' }) : x
     ))
   }
 
@@ -217,7 +250,7 @@ export default function BidderUpload() {
     setBidders(prev => [...prev, {
       id: newId, company: bidderForm.company.trim(), contact: bidderForm.contact.trim(),
       phone: bidderForm.phone.trim(),
-      fileName: null, fileSize: null, status: 'no_document', extracted: 0, _max: 120,
+      techDoc: null, commDoc: null, status: 'no_document', extracted: 0, _max: 120,
     }])
     setBidderForm({ company: '', contact: '', phone: '' })
     setBidderErrors({})
@@ -229,17 +262,31 @@ export default function BidderUpload() {
     processing:  <Badge variant="warning"><Clock size={10} /> {t('bidder.processing')}</Badge>,
     queued:      <Badge variant="info">{t('bidder.queued')}</Badge>,
     no_document: <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{t('ing.awaitingDoc')}</span>,
+    not_participating: <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Not Participating</span>,
     error:       <Badge variant="error"><AlertCircle size={10} /> {lang === 'ar' ? 'خطأ' : 'Error'}</Badge>,
   }
 
-  const uploadedBidders = bidders.filter(b => b.status !== 'no_document')
-  const allExtracted = uploadedBidders.length > 0 && uploadedBidders.every(b => b.status === 'completed')
+  const activeBidders = bidders.filter(b => b.status !== 'not_participating')
+  const uploadedBidders = bidders.filter(b => ['queued', 'processing', 'completed'].includes(b.status))
+  const allExtracted = activeBidders.length > 0 &&
+    activeBidders.every(b => b.status === 'completed') &&
+    uploadedBidders.length > 0
   const hasQueued = bidders.some(b => b.status === 'queued')
 
   // Tenders awaiting POF upload of evaluation reports
-  const evalExportTenders = tenders.filter(t => t.status === 'tech_eval_export' || t.status === 'comm_eval_export')
-  const [evalUploaded, setEvalUploaded] = useState({}) // { tenderId: true }
-  const [evalDragging, setEvalDragging] = useState({}) // { tenderId: true }
+  // Pending evaluation-report uploads. Linear tenders expose one report at a time
+  // (via their export status); parallel tenders can expose both sides at once.
+  const pendingReports = []
+  tenders.forEach(t => {
+    if (t.status === 'tech_eval_export') pendingReports.push({ tender: t, side: 'tech', mode: 'linear' })
+    if (t.status === 'comm_eval_export') pendingReports.push({ tender: t, side: 'comm', mode: 'linear' })
+    if (t.status === 'parallel_eval') {
+      if (t.techSide === 'awaiting_report') pendingReports.push({ tender: t, side: 'tech', mode: 'parallel' })
+      if (t.commSide === 'awaiting_report') pendingReports.push({ tender: t, side: 'comm', mode: 'parallel' })
+    }
+  })
+  const [evalUploaded, setEvalUploaded] = useState({}) // { `${tenderId}-${side}`: true }
+  const [evalDragging, setEvalDragging] = useState({}) // { `${tenderId}-${side}`: true }
 
   // Tenders in tech_eval with pending correction requests for the POF
   const correctionTenders = tenders.filter(
@@ -292,7 +339,7 @@ export default function BidderUpload() {
   }
 
   const proceedToEvaluation = () => {
-    setAssignments({ techEval: '', commEval: '' })
+    setAssignments({ techEval: '', commEval: '', mode: 'linear' })
     setAssignModalErrors({})
     setShowAssignModal(true)
   }
@@ -303,7 +350,7 @@ export default function BidderUpload() {
     if (!assignments.commEval) errs.commEval = 'Required'
     if (Object.keys(errs).length) { setAssignModalErrors(errs); return }
 
-    const bidderList = bidders.map(b => ({
+    const bidderList = activeBidders.map(b => ({
       id: b.id,
       name: b.company,
       country: b.phone ? b.phone.split(' ')[0] : '—',
@@ -312,13 +359,20 @@ export default function BidderUpload() {
     }))
     const techUser = users.find(u => u.id === Number(assignments.techEval))
     const commUser = users.find(u => u.id === Number(assignments.commEval))
+    const isParallel = assignments.mode === 'parallel'
     updateTender(selectedTender.id, {
       bidderList,
-      bidders: bidders.length,
+      bidders: bidderList.length,
       assignedTechEval: techUser ? { id: techUser.id, name: techUser.name } : null,
       assignedCommEval: commUser ? { id: commUser.id, name: commUser.name } : null,
+      evaluationMode: isParallel ? 'parallel' : 'linear',
+      ...(isParallel
+        ? { status: 'parallel_eval', stage: 'Parallel Evaluation', evalProgress: 'not_started', techSide: 'evaluating', commSide: 'evaluating' }
+        : {}),
     })
-    advanceTender(selectedTender.id)
+    // Linear keeps the existing status chain (upload → tech_eval → …).
+    // Parallel is placed directly into 'parallel_eval' above.
+    if (!isParallel) advanceTender(selectedTender.id)
     setShowAssignModal(false)
     navigate('/tenders')
   }
@@ -652,27 +706,37 @@ export default function BidderUpload() {
         </div>
       )}
         {/* ── Evaluation Report Uploads (Tech & Comm) ── */}
-        {evalExportTenders.length > 0 && (
+        {pendingReports.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <UploadCloud size={14} className="text-orange-500" />
               <h3 className="text-sm font-semibold text-slate-700">Evaluation Report Uploads</h3>
               <span className="text-[10px] font-semibold text-orange-700 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full animate-pulse">
-                {evalExportTenders.length} pending
+                {pendingReports.length} pending
               </span>
             </div>
             <p className="text-xs text-slate-400 -mt-1">
               Upload the signed evaluation report from the evaluator to advance each tender to its next stage.
             </p>
-            {evalExportTenders.map(tender => {
-              const isTech  = tender.status === 'tech_eval_export'
-              const uploaded = evalUploaded[tender.id]
-              const dragging = evalDragging[tender.id]
-              const nextStage = isTech ? 'Commercial Evaluation' : 'Management Review'
+            {pendingReports.map(({ tender, side, mode }) => {
+              const isTech  = side === 'tech'
+              const key = `${tender.id}-${side}`
+              const uploaded = evalUploaded[key]
+              const dragging = evalDragging[key]
               const reportLabel = isTech ? 'Technical' : 'Commercial'
+              const otherSideDone = mode === 'parallel' &&
+                (isTech ? tender.commSide === 'done' : tender.techSide === 'done')
+              const nextStage = mode === 'parallel'
+                ? (otherSideDone ? 'Management Review' : 'Awaiting the other evaluation')
+                : (isTech ? 'Commercial Evaluation' : 'Management Review')
+              const doUpload = () => {
+                if (mode === 'parallel') uploadParallelReport(tender.id, side)
+                else advanceTender(tender.id)
+                setEvalUploaded(prev => ({ ...prev, [key]: true }))
+              }
 
               return (
-                <Card key={tender.id} className={`overflow-hidden border-2 transition-all ${uploaded ? 'border-emerald-300' : 'border-orange-200'}`}>
+                <Card key={key} className={`overflow-hidden border-2 transition-all ${uploaded ? 'border-emerald-300' : 'border-orange-200'}`}>
                   {/* Tender header */}
                   <div className={`px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${uploaded ? 'bg-emerald-50' : 'bg-orange-50'}`}>
                     <div className="flex items-center gap-2 min-w-0">
@@ -680,11 +744,14 @@ export default function BidderUpload() {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isTech ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
                         {reportLabel} Eval Report
                       </span>
+                      {mode === 'parallel' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-indigo-100 text-indigo-700">Parallel</span>
+                      )}
                       <p className="text-xs font-semibold text-slate-700 truncate">{tender.title}</p>
                     </div>
                     {uploaded ? (
                       <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
-                        <CheckCircle size={10} /> Uploaded · Advancing to {nextStage}
+                        <CheckCircle size={10} /> Uploaded · {nextStage}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-white border border-orange-200 px-2.5 py-1 rounded-full shrink-0">
@@ -698,21 +765,22 @@ export default function BidderUpload() {
                       <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
                         <CheckCircle size={16} className="text-emerald-500 shrink-0" />
                         <div className="flex-1">
-                          <p className="text-xs font-semibold text-emerald-800">Report uploaded successfully</p>
-                          <p className="text-[11px] text-emerald-600 mt-0.5">Tender advanced to <strong>{nextStage}</strong>.</p>
+                          <p className="text-xs font-semibold text-emerald-800">{reportLabel} report uploaded successfully</p>
+                          <p className="text-[11px] text-emerald-600 mt-0.5">
+                            {mode === 'parallel' && !otherSideDone
+                              ? <>Waiting for the {isTech ? 'Commercial' : 'Technical'} report before Management Review.</>
+                              : <>Tender advanced to <strong>{nextStage}</strong>.</>}
+                          </p>
                         </div>
                       </div>
                     ) : (
                       <div
-                        onDragOver={e => { e.preventDefault(); setEvalDragging(prev => ({ ...prev, [tender.id]: true })) }}
-                        onDragLeave={() => setEvalDragging(prev => ({ ...prev, [tender.id]: false }))}
+                        onDragOver={e => { e.preventDefault(); setEvalDragging(prev => ({ ...prev, [key]: true })) }}
+                        onDragLeave={() => setEvalDragging(prev => ({ ...prev, [key]: false }))}
                         onDrop={e => {
                           e.preventDefault()
-                          setEvalDragging(prev => ({ ...prev, [tender.id]: false }))
-                          if (e.dataTransfer.files?.length) {
-                            advanceTender(tender.id)
-                            setEvalUploaded(prev => ({ ...prev, [tender.id]: true }))
-                          }
+                          setEvalDragging(prev => ({ ...prev, [key]: false }))
+                          if (e.dataTransfer.files?.length) doUpload()
                         }}
                         className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2.5 py-8 transition-all cursor-pointer
                           ${dragging ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/40'}`}>
@@ -730,11 +798,7 @@ export default function BidderUpload() {
                             Browse File
                           </span>
                           <input type="file" accept=".pdf,.docx,.xlsx" className="hidden" onChange={e => {
-                            if (e.target.files?.length) {
-                              advanceTender(tender.id)
-                              setEvalUploaded(prev => ({ ...prev, [tender.id]: true }))
-                              e.target.value = ''
-                            }
+                            if (e.target.files?.length) { doUpload(); e.target.value = '' }
                           }} />
                         </label>
                         <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX</p>
@@ -944,11 +1008,11 @@ export default function BidderUpload() {
               <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center ${dragging ? 'bg-[var(--color-primary)]' : 'bg-slate-100'}`}>
                 <Upload size={24} className={dragging ? 'text-white' : 'text-slate-400'} />
               </div>
-              <p className="text-sm font-medium text-slate-700 mb-1">{t('ing.dropHere')}</p>
-              <p className="text-xs text-slate-400 mb-4">{t('ing.supports')}</p>
+              <p className="text-sm font-medium text-slate-700 mb-1">Drop a bidder document here</p>
+              <p className="text-xs text-slate-400 mb-4">Technical or Commercial · PDF, DOCX, XLSX, ZIP</p>
               <label className="cursor-pointer">
                 <span className="px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">{t('ing.browseFiles')}</span>
-                <input type="file" multiple accept=".zip,.rar" className="hidden" onChange={e => { openAssignModal(e.target.files); e.target.value = '' }} />
+                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" className="hidden" onChange={e => { openAssignModal(e.target.files); e.target.value = '' }} />
               </label>
             </div>
           </Card>
@@ -1007,13 +1071,18 @@ export default function BidderUpload() {
             </div>
           )}
 
-          {bidders.map(b => (
-            <Card key={b.id} className="p-4">
+          {bidders.map(b => {
+            const isOut = b.status === 'not_participating'
+            const editable = !['processing', 'completed'].includes(b.status)
+            return (
+            <Card key={b.id} className={`p-4 ${isOut ? 'opacity-75' : ''}`}>
               <div className="flex items-start gap-3">
                 {/* Status icon */}
                 <div className={`p-2.5 rounded-xl shrink-0
-                  ${b.status === 'completed' ? 'bg-green-50' : b.status === 'processing' ? 'bg-amber-50' : b.status === 'no_document' ? 'bg-slate-50' : 'bg-blue-50'}`}>
-                  {b.status === 'no_document'
+                  ${b.status === 'completed' ? 'bg-green-50' : b.status === 'processing' ? 'bg-amber-50' : b.status === 'not_participating' ? 'bg-slate-100' : b.status === 'no_document' ? 'bg-slate-50' : 'bg-blue-50'}`}>
+                  {b.status === 'not_participating'
+                    ? <Ban size={18} className="text-slate-400" />
+                    : b.status === 'no_document'
                     ? <Users size={18} className="text-slate-400" />
                     : <FileArchive size={18} className={b.status === 'completed' ? 'text-green-500' : b.status === 'processing' ? 'text-amber-500' : 'text-blue-400'} />}
                 </div>
@@ -1022,7 +1091,7 @@ export default function BidderUpload() {
                   {/* Company + status + remove */}
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold text-slate-800 truncate">{b.company}</span>
+                      <span className={`text-sm font-semibold truncate ${isOut ? 'text-slate-500' : 'text-slate-800'}`}>{b.company}</span>
                       {statusBadge[b.status]}
                     </div>
                     <button onClick={() => setBidders(prev => prev.filter(x => x.id !== b.id))} className="p-1 hover:bg-red-50 rounded text-slate-300 hover:text-red-500 shrink-0">
@@ -1040,40 +1109,84 @@ export default function BidderUpload() {
                     )}
                   </div>
 
-                  {/* File info or attach prompt */}
-                  {b.fileName
-                    ? <p className="text-xs text-slate-400 truncate">{b.fileName} · {b.fileSize}</p>
-                    : (
-                      <label className="cursor-pointer mt-1 inline-flex items-center gap-1.5 text-xs text-[var(--color-primary)] hover:underline">
-                        <Upload size={11} /> {t('ing.attachDoc')}
-                        <input type="file" accept=".zip,.rar" className="hidden" onChange={e => { attachFileToBidder(b.id, e.target.files); e.target.value = '' }} />
-                      </label>
-                    )}
-
-                  {/* Processing progress */}
-                  {b.status === 'processing' && (
-                    <div className="mt-2">
-                      <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                        <span>Extracting data...</span>
-                        <span>{Math.round((b.extracted / (b._max || 142)) * 100)}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${Math.round((b.extracted / (b._max || 142)) * 100)}%` }} />
-                      </div>
+                  {isOut ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-xs text-slate-500"><Ban size={12} /> Excluded from evaluation</span>
+                      <button onClick={() => restoreBidder(b.id)}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)] hover:underline">
+                        <RotateCcw size={11} /> Restore
+                      </button>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {/* Two required document slots */}
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          { type: 'technical',  doc: b.techDoc, Icon: Wrench, label: 'Technical',  color: 'text-blue-500',   bg: 'bg-blue-50' },
+                          { type: 'commercial', doc: b.commDoc, Icon: Wallet, label: 'Commercial', color: 'text-violet-500', bg: 'bg-violet-50' },
+                        ].map(({ type, doc, Icon, label, color, bg }) => (
+                          <div key={type} className={`rounded-lg border px-2.5 py-2 ${doc ? 'border-emerald-200 bg-emerald-50/50' : 'border-dashed border-slate-200 bg-slate-50/60'}`}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className={`w-5 h-5 rounded flex items-center justify-center ${bg}`}><Icon size={11} className={color} /></span>
+                              <span className="text-[11px] font-semibold text-slate-600">{label}</span>
+                              <span className="text-red-400 text-[11px]">*</span>
+                            </div>
+                            {doc ? (
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="flex items-center gap-1 text-[11px] text-emerald-700 min-w-0">
+                                  <CheckCircle size={11} className="shrink-0" />
+                                  <span className="truncate">{doc.name}</span>
+                                </span>
+                                {editable && (
+                                  <button onClick={() => removeDoc(b.id, type)} className="text-slate-300 hover:text-red-400 shrink-0"><X size={11} /></button>
+                                )}
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer inline-flex items-center gap-1 text-[11px] text-[var(--color-primary)] hover:underline">
+                                <Upload size={10} /> Upload {label.toLowerCase()}
+                                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" className="hidden"
+                                  onChange={e => { attachDocToBidder(b.id, type, e.target.files); e.target.value = '' }} />
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
 
-                  {/* Extracted summary */}
-                  {b.status === 'completed' && (
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{b.extracted} events extracted</span>
-                      <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">AI mapped &amp; indexed</span>
-                    </div>
+                      {/* Processing progress */}
+                      {b.status === 'processing' && (
+                        <div className="mt-2">
+                          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                            <span>Extracting data...</span>
+                            <span>{Math.round((b.extracted / (b._max || 142)) * 100)}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${Math.round((b.extracted / (b._max || 142)) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extracted summary */}
+                      {b.status === 'completed' && (
+                        <div className="mt-2 flex items-center gap-3">
+                          <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{b.extracted} events extracted</span>
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">AI mapped &amp; indexed</span>
+                        </div>
+                      )}
+
+                      {/* Not participating action */}
+                      {editable && (
+                        <button onClick={() => markNotParticipating(b.id)}
+                          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors">
+                          <Ban size={11} /> Mark as Not Participating
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </Card>
-          ))}
+            )
+          })}
 
           {allExtracted && (
             <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
@@ -1162,20 +1275,41 @@ export default function BidderUpload() {
                 </div>
               </div>
 
+              {/* Document type */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1.5">Document type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'technical',  Icon: Wrench, label: 'Technical' },
+                    { key: 'commercial', Icon: Wallet, label: 'Commercial' },
+                  ].map(({ key, Icon, label }) => (
+                    <button key={key} type="button" onClick={() => setAssignDocType(key)}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors
+                        ${assignDocType === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                      <Icon size={13} /> {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Bidder selector */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">{t('ing.assignTo')}</label>
                 <div className="space-y-1.5">
-                  {bidders.filter(b => b.status === 'no_document').map(b => (
+                  {bidders.filter(b => b.status !== 'not_participating' && !docsComplete(b)).map(b => {
+                    const slotFilled = assignDocType === 'commercial' ? !!b.commDoc : !!b.techDoc
+                    return (
                     <label key={b.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
                       ${assignTo === String(b.id) ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
                       <input type="radio" name="assignTo" value={String(b.id)} checked={assignTo === String(b.id)} onChange={e => setAssignTo(e.target.value)} className="text-[var(--color-primary)]" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">{b.company}</p>
-                        <p className="text-xs text-slate-400">{b.contact}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-700 truncate">{b.company}</p>
+                        <p className="text-xs text-slate-400 truncate">{b.contact}</p>
                       </div>
+                      {slotFilled && <span className="text-[10px] text-amber-600 shrink-0">replaces {assignDocType}</span>}
                     </label>
-                  ))}
+                    )
+                  })}
                   <label className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
                     ${assignTo === 'new' ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="assignTo" value="new" checked={assignTo === 'new'} onChange={() => setAssignTo('new')} className="text-[var(--color-primary)]" />
@@ -1241,12 +1375,32 @@ export default function BidderUpload() {
 
             <div className="px-5 py-2 bg-blue-50 border-b border-blue-100">
               <p className="text-[11px] text-blue-700">
-                Assign evaluators before moving <span className="font-semibold">{selectedTender?.id}</span> to Technical Evaluation.
+                Assign evaluators before moving <span className="font-semibold">{selectedTender?.id}</span> to evaluation.
                 Each evaluator will only see tenders assigned to them.
               </p>
             </div>
 
             <div className="px-5 py-4 space-y-4">
+              {/* Evaluation mode */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Evaluation Flow</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'linear',   Icon: GitBranch,      title: 'Linear',   sub: 'Technical first, then Commercial' },
+                    { key: 'parallel', Icon: ArrowRightLeft, title: 'Parallel', sub: 'Both evaluate at the same time' },
+                  ].map(({ key, Icon, title, sub }) => (
+                    <button key={key} type="button" onClick={() => setAssignments(a => ({ ...a, mode: key }))}
+                      className={`text-left px-3 py-2.5 rounded-lg border transition-colors
+                        ${assignments.mode === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <div className={`flex items-center gap-1.5 text-xs font-semibold ${assignments.mode === key ? 'text-[var(--color-primary)]' : 'text-slate-600'}`}>
+                        <Icon size={13} /> {title}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Technical Evaluator */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1.5">

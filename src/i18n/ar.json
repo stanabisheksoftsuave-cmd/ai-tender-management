@@ -241,6 +241,13 @@
   "itt.fieldDuration":   "مدة العقد",
   "itt.fieldDesc":       "وصف المشروع",
 
+  "strategy.fieldCostCode":     "رمز التكلفة",
+  "strategy.fieldContractMode": "نوع العقد",
+  "strategy.fieldContractRisk": "المخاطر الإجمالية للعقد",
+  "strategy.fieldHsseRisk":     "إرفاق سجل مخاطر الصحة والسلامة",
+  "strategy.fieldScopeOverview":"نظرة عامة على النطاق",
+  "strategy.prefillBanner":     "تم ملء البيانات مسبقاً من استراتيجية العقد — يمكنك التعديل قبل الإنشاء.",
+
   "bidder.extracted":  "تم الاستخراج",
   "bidder.processing": "قيد المعالجة",
   "bidder.queued":     "في قائمة الانتظار",
