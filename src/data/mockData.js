@@ -247,13 +247,25 @@ export const tenders = [
     title: 'Buraimi Border Crossing Security Systems Upgrade',
     tenderType: 'Works',
     department: 'Royal Oman Police',
-    status: 'prequal_stage3',
-    stage: 'Pre-Qualification — Response Review',
+    status: 'draft',
+    stage: 'Draft — Pending Export',
     created: '2025-04-01',
-    bidders: 0,
+    deadline: '2025-06-15',
+    budget: 'OMR 1,245,000',
+    bidders: 2,
     aiScore: null,
     sowFileName: 'Buraimi-Border-Security-SOW.pdf',
     workCategory: 'Electrical & Instrumentation',
+    description: 'Upgrade of border crossing security systems including surveillance, access control, and communication infrastructure.',
+    bidderList: [
+      { id: 102, name: 'InfraCore Systems', country: 'UAE' },
+      { id: 107, name: 'Al Amana Fire & Safety', country: 'Oman' },
+    ],
+    handoffDocuments: {
+      benchmarking: 'OEM-Benchmarking-Rates.xlsx',
+      companyEstimate: 'Internal-Company-Estimate.xlsx',
+      riskAssessment: 'Contract-Risk-Assessment.xlsx',
+    },
     prequalBidders: [
       {
         id: 102, name: 'InfraCore Systems', country: 'UAE', category: 'Electrical & Instrumentation', isLocal: false,
@@ -268,6 +280,7 @@ export const tenders = [
           technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
           administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a5: 'pass' },
         },
+        stage4: { result: 'PASS' },
       },
       {
         id: 107, name: 'Al Amana Fire & Safety', country: 'Oman', category: 'Fire & Safety Systems', isLocal: true,
@@ -282,11 +295,13 @@ export const tenders = [
           technical: { t1: 'pass', t2: 'pass', t3: 'pass', t4: 'pass', t5: 'pass' },
           administrative: { a1: 'pass', a2: 'pass', a3: 'pass', a4: 'pass', a5: 'pass' },
         },
+        stage4: { result: 'PASS' },
       },
       {
         id: 104, name: 'DataVault Solutions', country: 'Saudi Arabia', category: 'IT & Communications', isLocal: false,
         responseUploaded: false,
         stage3: { qhse: {}, technical: {}, administrative: {} },
+        droppedAt: 'stage1',
       },
     ],
   },
@@ -320,6 +335,13 @@ export const erpBidders = [
   { id: 106, name: 'Meridian Contracting',    country: 'Qatar',        isLocal: false, category: 'Marine & Civil Works',          regNo: 'CR-118820',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2005, natureOfBusiness: 'Marine & civil construction',                 contactName: 'Youssef Nassar',  contactEmail: 'y.nassar@meridian.qa' },
   { id: 107, name: 'Al Amana Fire & Safety',  country: 'Oman',         isLocal: true,  category: 'Fire & Safety Systems',         regNo: 'CR-664519',  jsrsNo: 'JSRS-4470', molCardNo: 'MOL-91002', yearEstablished: 2009, natureOfBusiness: 'Fire detection, suppression & HSE systems',   contactName: 'Mariam Al-Rawahi', contactEmail: 'm.rawahi@alamana.om' },
   { id: 108, name: 'Barka Marine Works',      country: 'Oman',         isLocal: true,  category: 'Marine & Civil Works',          regNo: 'CR-227741',  jsrsNo: 'JSRS-2005', molCardNo: 'MOL-40218', yearEstablished: 1998, natureOfBusiness: 'Marine construction & dredging',              contactName: 'Khalid Al-Maskari', contactEmail: 'k.maskari@barkamarine.om' },
+]
+
+// ── Stage 4 handoff documents — tender-level internal company documents
+export const HANDOFF_DOCS = [
+  { key: 'benchmarking',    label: 'OEM Benchmarking Rates' },
+  { key: 'companyEstimate', label: 'Company Estimate' },
+  { key: 'riskAssessment',  label: 'Contract Risk Assessment' },
 ]
 
 // ── Stage 3 evaluation criteria — modelled on the real "Pre-Qualification

@@ -44,7 +44,7 @@ export default function CommercialEvaluation() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { tenders, advanceTender } = useTenders()
+  const { tenders, advanceTender, submitParallelEval } = useTenders()
 
   // All hooks must be called before any conditional returns
   const [criteria, setCriteria] = useState(defaultCriteria)
@@ -79,7 +79,10 @@ export default function CommercialEvaluation() {
 
   if (!tenderId) {
     const assignedTenders = tenders.filter(
-      t => t.status === 'comm_eval' && t.assignedCommEval?.id === user?.id
+      t => t.assignedCommEval?.id === user?.id && (
+        t.status === 'comm_eval' ||
+        (t.status === 'parallel_eval' && t.commSide === 'evaluating')
+      )
     )
     return (
       <TenderSelectList
@@ -393,7 +396,10 @@ export default function CommercialEvaluation() {
             <Button variant="secondary" size="sm"><Save size={13} /> Save Draft</Button>
             <Button size="sm" onClick={() => {
               if (!allScored) { setSubmitError(`${missingScoresCount} score${missingScoresCount > 1 ? 's' : ''} missing — all criteria must be scored before submitting.`); return }
-              setSubmitError(''); advanceTender(tenderId); setSubmitted(true)
+              setSubmitError('')
+              if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'comm')
+              else advanceTender(tenderId)
+              setSubmitted(true)
             }}><Send size={13} /> Submit & Export Report</Button>
           </div>
           {submitError && (

@@ -241,6 +241,13 @@
   "itt.fieldDuration":   "Contract Duration",
   "itt.fieldDesc":       "Project Description",
 
+  "strategy.fieldCostCode":     "Cost Code",
+  "strategy.fieldContractMode": "Contract Mode",
+  "strategy.fieldContractRisk": "Overall Contract Risk",
+  "strategy.fieldHsseRisk":     "Attach HSSE Risk Register",
+  "strategy.fieldScopeOverview":"Scope Overview",
+  "strategy.prefillBanner":     "Pre-filled from Contract Strategy — you can edit before generating.",
+
   "bidder.extracted":  "Extracted",
   "bidder.processing": "Processing",
   "bidder.queued":     "Queued",

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, Loader2, Download, ArrowDownToLine, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Loader2, Download, ArrowDown, CheckCircle2 } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { parseDocxTemplate } from '../../utils/docxTemplate'
@@ -211,8 +211,8 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-2.5 text-xs">
               {allFilled
-                ? <span className="flex items-center gap-1.5 font-bold" style={{ color: '#0089cf' }}><CheckCircle2 size={14} /> All fields filled</span>
-                : <span className="font-semibold" style={{ color: '#1b4c6f' }}>{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">fields filled</span></span>}
+                ? <span className="flex items-center gap-1.5 font-bold" style={{ color: '#0089cf' }}><CheckCircle2 size={14} /> All AI-filled fields · can be overwritten</span>
+                : <span className="font-semibold" style={{ color: '#1b4c6f' }}>{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">AI-filled fields · can be overwritten</span></span>}
               {!allFilled && (
                 <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{
                   color: '#e69c00',
@@ -226,7 +226,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
               disabled={allFilled}
               className="flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed transition-colors"
               style={{ color: '#0089cf' }}>
-              <ArrowDownToLine size={12} /> Jump to next empty
+              <ArrowDown size={12} /> Jump to next empty
             </button>
           </div>
           <div className="olng-progress-bar h-2">
@@ -272,8 +272,8 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
         <p className="text-[11px]" style={{ color: '#94a3b8' }}>
           {model
             ? (allFilled
-                ? `All ${total} field${total === 1 ? '' : 's'} completed`
-                : `${filledCount} of ${total} field${total === 1 ? '' : 's'} filled`)
+                ? `All ${total} AI-filled field${total === 1 ? '' : 's'} · can be overwritten`
+                : `${filledCount} of ${total} AI-filled field${total === 1 ? '' : 's'} · can be overwritten`)
             : ''}
         </p>
         <Button variant="brand" onClick={handleNext} disabled={loading} className="flex items-center gap-2">

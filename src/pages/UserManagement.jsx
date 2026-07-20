@@ -145,10 +145,10 @@ function Toggle({ on, onChange, locked }) {
 export default function UserManagement() {
   const { user: currentUser, users, updateUser, addUser, removeUser } = useAuth()
   const isItAdmin = currentUser?.role?.id === 'it_admin'
-  const { tenders, updateTender } = useTenders()
+  const { tenders, updateTender, dropdownConfig, updateDropdownConfig } = useTenders()
   const { isDark } = useTheme()
 
-  const [tab,           setTab]           = useState('users')
+  const [tab,           setTab]           = useState(isItAdmin ? 'users' : 'dropdowns')
   const [search,        setSearch]        = useState('')
   const [filterRole,    setFilterRole]    = useState('all')
   const [menuOpen,      setMenuOpen]      = useState(null)
@@ -194,6 +194,10 @@ export default function UserManagement() {
   const [showReassign,   setShowReassign]   = useState(false)
   const [reassignSource, setReassignSource] = useState(null)
   const [reassignTarget, setReassignTarget] = useState('')
+
+  // ── Dropdown Config state ──
+  const [newDropdownItem, setNewDropdownItem] = useState({})
+  const [dropdownSaved, setDropdownSaved] = useState(null)
 
   // ── Theme palette ──────────────────────────────────────────────────────────
   const surface = isDark ? '#111827' : 'var(--color-surface)'
@@ -366,7 +370,9 @@ export default function UserManagement() {
       {/* ── Tabs ── */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
         style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--color-border)' }}>
-        {[{ id: 'users', label: 'Users' }, { id: 'access', label: 'Access Control' }].map(t => (
+         {[{ id: 'users', label: 'Users' }, { id: 'access', label: 'Access Control' }, { id: 'dropdowns', label: 'Dropdowns' }]
+          .filter(t => isItAdmin || t.id === 'dropdowns')
+          .map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
             style={tab === t.id
@@ -629,6 +635,228 @@ export default function UserManagement() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ══════════════════════════ DROPDOWNS TAB ═════════════════════════ */}
+      {tab === 'dropdowns' && (
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="rounded-2xl p-5"
+            style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow }}>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: 'var(--color-primary)15' }}>
+                <IcoEdit size={16} style={{ color: 'var(--color-primary)' }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: text }}>Dropdown Configuration</h3>
+                <p className="text-[11px]" style={{ color: sub }}>Configure the dropdown options used across Contract Strategy and other pages</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dropdown Sections */}
+          {[
+            { key: 'contractModes', label: 'Contract Mode', icon: IcoShield, description: 'Options for the Contract Mode dropdown in Contract Strategy' },
+            { key: 'tenderTypes', label: 'Tender Type', icon: IcoKey, description: 'Options for the Tender Type dropdown in Contract Strategy' },
+            { key: 'contractRisks', label: 'Contract Risk', icon: IcoEdit, description: 'Risk level options for Overall Contract Risk' },
+          ].map(section => {
+            const items = dropdownConfig[section.key] || []
+            const SIcon = section.icon
+            return (
+              <div key={section.key} className="rounded-2xl overflow-hidden"
+                style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow }}>
+                {/* Section Header */}
+                <div className="flex items-center justify-between px-5 py-4"
+                  style={{ borderBottom: `1px solid ${border}`, background: surfBg }}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: 'var(--color-primary)12' }}>
+                      <SIcon size={14} style={{ color: 'var(--color-primary)' }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: text }}>{section.label}</p>
+                      <p className="text-[10px]" style={{ color: sub }}>{section.description}</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: 'var(--color-primary)12', color: 'var(--color-primary)' }}>
+                    {items.length} options
+                  </span>
+                </div>
+
+                {/* Items List */}
+                <div className="px-5 py-3 space-y-2">
+                  {items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between px-3.5 py-2.5 rounded-xl group transition-colors"
+                      style={{ border: `1px solid ${border}` }}
+                      onMouseOver={e => e.currentTarget.style.background = surfBg}
+                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: 'var(--color-primary)10', color: 'var(--color-primary)' }}>
+                          {idx + 1}
+                        </span>
+                        <span className="text-sm font-medium" style={{ color: text }}>{item}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = items.filter((_, i) => i !== idx)
+                          updateDropdownConfig(section.key, updated)
+                        }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                        style={{ color: '#EF4444' }}
+                        onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                        <IcoTrash size={13} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add New Item */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      value={newDropdownItem[section.key] || ''}
+                      onChange={e => setNewDropdownItem(prev => ({ ...prev, [section.key]: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && (newDropdownItem[section.key] || '').trim()) {
+                          const val = newDropdownItem[section.key].trim()
+                          if (!items.includes(val)) {
+                            updateDropdownConfig(section.key, [...items, val])
+                            setNewDropdownItem(prev => ({ ...prev, [section.key]: '' }))
+                            setDropdownSaved(section.key)
+                            setTimeout(() => setDropdownSaved(null), 1500)
+                          }
+                        }
+                      }}
+                      placeholder={`Add new ${section.label.toLowerCase()} option...`}
+                      style={{ ...inp(), flex: 1 }}
+                    />
+                    <button
+                      onClick={() => {
+                        const val = (newDropdownItem[section.key] || '').trim()
+                        if (val && !items.includes(val)) {
+                          updateDropdownConfig(section.key, [...items, val])
+                          setNewDropdownItem(prev => ({ ...prev, [section.key]: '' }))
+                          setDropdownSaved(section.key)
+                          setTimeout(() => setDropdownSaved(null), 1500)
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-colors"
+                      style={{ background: dropdownSaved === section.key ? '#059669' : 'var(--color-primary)', border: 'none', cursor: 'pointer' }}>
+                      {dropdownSaved === section.key
+                        ? <><IcoCheckCircle size={12} /> Added!</>
+                        : <><IcoPlus size={12} /> Add</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Currencies Section */}
+          <div className="rounded-2xl overflow-hidden"
+            style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow }}>
+            <div className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: `1px solid ${border}`, background: surfBg }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'var(--color-primary)12' }}>
+                  <IcoKey size={14} style={{ color: 'var(--color-primary)' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: text }}>Currencies</p>
+                  <p className="text-[10px]" style={{ color: sub }}>Currency options for budget and financial fields</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                style={{ background: 'var(--color-primary)12', color: 'var(--color-primary)' }}>
+                {(dropdownConfig.currencies || []).length} currencies
+              </span>
+            </div>
+
+            <div className="px-5 py-3 space-y-2">
+              {(dropdownConfig.currencies || []).map((cur, idx) => (
+                <div key={idx} className="flex items-center justify-between px-3.5 py-2.5 rounded-xl group transition-colors"
+                  style={{ border: `1px solid ${border}` }}
+                  onMouseOver={e => e.currentTarget.style.background = surfBg}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+                      style={{ background: 'var(--color-primary)10', color: 'var(--color-primary)' }}>
+                      {cur.symbol}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: text }}>{cur.code}</p>
+                      <p className="text-[10px]" style={{ color: sub }}>{cur.label}</p>
+                    </div>
+                  </div>
+                  {(dropdownConfig.currencies || []).length > 1 && (
+                    <button
+                      onClick={() => {
+                        const updated = (dropdownConfig.currencies || []).filter((_, i) => i !== idx)
+                        updateDropdownConfig('currencies', updated)
+                      }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                      style={{ color: '#EF4444' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
+                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                      <IcoTrash size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Add Currency */}
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  value={newDropdownItem.currCode || ''}
+                  onChange={e => setNewDropdownItem(prev => ({ ...prev, currCode: e.target.value.toUpperCase() }))}
+                  placeholder="Code (e.g. INR)"
+                  maxLength={3}
+                  style={{ ...inp(), width: 90 }}
+                />
+                <input
+                  value={newDropdownItem.currSymbol || ''}
+                  onChange={e => setNewDropdownItem(prev => ({ ...prev, currSymbol: e.target.value }))}
+                  placeholder="Symbol (e.g. ₹)"
+                  maxLength={3}
+                  style={{ ...inp(), width: 90 }}
+                />
+                <input
+                  value={newDropdownItem.currLabel || ''}
+                  onChange={e => setNewDropdownItem(prev => ({ ...prev, currLabel: e.target.value }))}
+                  placeholder="Label (e.g. INR — Indian Rupee)"
+                  style={{ ...inp(), flex: 1 }}
+                />
+                <button
+                  onClick={() => {
+                    const code = (newDropdownItem.currCode || '').trim()
+                    const symbol = (newDropdownItem.currSymbol || '').trim()
+                    const label = (newDropdownItem.currLabel || '').trim()
+                    if (code && symbol && label) {
+                      const existing = (dropdownConfig.currencies || []).map(c => c.code)
+                      if (!existing.includes(code)) {
+                        updateDropdownConfig('currencies', [
+                          ...(dropdownConfig.currencies || []),
+                          { code, symbol, label }
+                        ])
+                        setNewDropdownItem(prev => ({ ...prev, currCode: '', currSymbol: '', currLabel: '' }))
+                        setDropdownSaved('currencies')
+                        setTimeout(() => setDropdownSaved(null), 1500)
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white transition-colors"
+                  style={{ background: dropdownSaved === 'currencies' ? '#059669' : 'var(--color-primary)', border: 'none', cursor: 'pointer' }}>
+                  {dropdownSaved === 'currencies'
+                    ? <><IcoCheckCircle size={12} /> Added!</>
+                    : <><IcoPlus size={12} /> Add</>}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

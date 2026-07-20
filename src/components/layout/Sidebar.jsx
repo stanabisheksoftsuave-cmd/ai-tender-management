@@ -1,7 +1,9 @@
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useTenders } from '../../context/TenderContext'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
 const Icon = ({ src, size = 16, color }) => (
@@ -19,6 +21,23 @@ const Icon = ({ src, size = 16, color }) => (
     className="shrink-0"
   />
 )
+
+// Fixed strategy sub-items always shown
+const STRATEGY_BASE_ITEMS = [
+  { key: 'sow',                label: 'Contract Initiating Form' },
+  { key: 'strategy-templates', label: 'Strategy Templates' },
+]
+
+// Template/workflow sub-items — shown only when included in the tender's selected templates.
+// Keys must match the template ids used on the Strategy Templates page (?form=<key>).
+const STRATEGY_TEMPLATE_ITEMS = [
+  { key: 'company-estimate',    label: 'Company Estimate' },
+  { key: 'contract-risk',       label: 'Contract Risk' },
+  { key: 'benchmarking-oem',    label: 'Benchmarking OEM' },
+  { key: 'hse-risk',            label: 'HSE Risk Assessment' },
+  { key: 'negotiation-strategy',label: 'Negotiation Strategy' },
+  { key: 'pre-qual',            label: 'Pre-Qualification' },
+]
 
 const navByRole = {
   it_admin: [
@@ -41,8 +60,8 @@ const navByRole = {
   contract_holder: [
     { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
     { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
-    { to: '/contract-strategy',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.contractStrategy' },
-    { to: '/pre-qualification',  icon: '/src/assets/icons/users.svg',       labelKey: 'nav.preQualification' },
+    { to: '/contract-strategy',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.contractStrategy',
+      hasChildren: true },
   ],
   tech_eval: [
     { to: '/dashboard',      icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
@@ -67,11 +86,47 @@ export default function Sidebar() {
   const { user, logout } = useAuth()
   const { lang, setLang, t } = useLanguage()
   const { theme } = useTheme()
+  const { tenders } = useTenders()
+  const location = useLocation()
   const navItems = navByRole[user?.role?.id] || []
   const isRtl = lang === 'ar'
 
+  // Tender id from the current URL (/…/:tenderId) drives which strategy sub-items appear.
+  const pathParts = location.pathname.split('/')
+  const tenderIdFromUrl = pathParts.length > 2 ? pathParts[2] : null
+  const activeTender = tenderIdFromUrl ? tenders.find(t => t.id === tenderIdFromUrl) : null
+
+  // Which templates the Contract Holder chose to include (defaults to all until acknowledged).
+  const allTemplateKeys = STRATEGY_TEMPLATE_ITEMS.map(it => it.key)
+  const selectedTemplateKeys = Array.isArray(activeTender?.selectedTemplates)
+    ? activeTender.selectedTemplates
+    : allTemplateKeys
+
+  const strategySubItems = [
+    ...STRATEGY_BASE_ITEMS,
+    ...STRATEGY_TEMPLATE_ITEMS.filter(it => selectedTemplateKeys.includes(it.key)),
+  ]
+
   const isOlng   = theme === 'olng'
   const isBright = theme === 'bright'
+
+  // Is the current path under the Contract Strategy umbrella?
+  const strategyPaths = ['/contract-strategy', '/strategy-templates', '/pre-qualification']
+  const isStrategySection = strategyPaths.some(p => location.pathname.startsWith(p))
+  const [strategyOpen, setStrategyOpen] = useState(isStrategySection)
+
+  // Determine which sub-item is active based on current path
+  const activeSubKey = (() => {
+    if (location.pathname.startsWith('/pre-qualification')) return 'pre-qual'
+    if (location.pathname.startsWith('/strategy-templates')) {
+      const searchParams = new URLSearchParams(location.search)
+      const formParam = searchParams.get('form')
+      if (formParam) return formParam
+      return 'strategy-templates'
+    }
+    if (location.pathname.startsWith('/contract-strategy')) return 'sow'
+    return null
+  })()
 
   // sidebar token colours
   const sidebarBg = isOlng ? '#1b4c6f' : isBright ? '#1e293b' : 'var(--color-sidebar)'
@@ -91,6 +146,10 @@ export default function Sidebar() {
   const logoutColor      = 'rgba(255,255,255,0.40)'
   const logoutHoverBg    = 'rgba(239,68,68,0.12)'
   const logoutHoverColor = '#F87171'
+
+  const handleStrategyToggle = () => {
+    setStrategyOpen(prev => !prev)
+  }
 
   return (
     <aside
@@ -145,41 +204,142 @@ export default function Sidebar() {
 
       {/* ── Nav items ── */}
       <nav className="flex-1 px-3 overflow-y-auto space-y-0.5">
-        {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} className="block">
-            {({ isActive }) => (
-              <div
-                className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
-                style={{
-                  background:  isActive ? activeNavBg : 'transparent',
-                  borderLeft:  isActive ? activeNavBorder : '2px solid transparent',
-                  color: isActive ? '#ffffff' : inactiveColor,
-                }}
-                onMouseOver={e => { if (!isActive) e.currentTarget.style.background = hoverBg }}
-                onMouseOut={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
-              >
-                <span className="flex items-center gap-2.5">
-                  <img
-                    src={item.icon}
-                    alt=""
-                    width={15}
-                    height={15}
+        {navItems.map((item) => {
+          // ── Contract Strategy with collapsible children ──
+          if (item.hasChildren) {
+            const isParentActive = isStrategySection
+            return (
+              <div key={item.to}>
+                {/* Parent: Contract Strategy */}
+                <button
+                  onClick={handleStrategyToggle}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  style={{
+                    background: isParentActive ? activeNavBg : 'transparent',
+                    borderLeft: isParentActive ? activeNavBorder : '2px solid transparent',
+                    color: isParentActive ? '#ffffff' : inactiveColor,
+                  }}
+                  onMouseOver={e => { if (!isParentActive) e.currentTarget.style.background = hoverBg }}
+                  onMouseOut={e => { if (!isParentActive) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <img
+                      src={item.icon}
+                      alt=""
+                      width={15}
+                      height={15}
+                      style={{
+                        filter: isParentActive
+                          ? 'brightness(0) invert(1)'
+                          : 'brightness(0) invert(0.55)',
+                      }}
+                    />
+                    {t(item.labelKey)}
+                  </span>
+                  {/* Chevron indicator */}
+                  <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                     style={{
-                      filter: isActive
-                        ? 'brightness(0) invert(1)'
-                        : 'brightness(0) invert(0.55)',
+                      transition: 'transform 0.2s ease',
+                      transform: strategyOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                      opacity: 0.5,
                     }}
-                  />
-                  {t(item.labelKey)}
-                </span>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ background: accent, boxShadow: `0 0 6px ${accent}` }} />
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+
+                {/* Children: sub-items */}
+                {strategyOpen && (
+                  <div className="mt-0.5 space-y-px" style={{ paddingLeft: isRtl ? 0 : '18px', paddingRight: isRtl ? '18px' : 0 }}>
+                    {strategySubItems.map(sub => {
+                      const isSubActive = activeSubKey === sub.key
+
+                      const isCifCompleted = !!tenderIdFromUrl
+                      const isDisabled = !isCifCompleted && sub.key !== 'sow'
+                      
+                      const targetPath = sub.key === 'pre-qual'
+                        ? `/pre-qualification/${tenderIdFromUrl || ''}`
+                        : sub.key === 'sow'
+                          ? (tenderIdFromUrl ? `/contract-strategy/${tenderIdFromUrl}` : '/contract-strategy')
+                          : sub.key === 'strategy-templates'
+                            ? `/strategy-templates/${tenderIdFromUrl || ''}`
+                            : `/strategy-templates/${tenderIdFromUrl || ''}?form=${sub.key}`
+                          
+                      return (
+                        <NavLink
+                          key={sub.key}
+                          to={targetPath}
+                          className={`block ${isDisabled ? 'pointer-events-none opacity-50 cursor-not-allowed' : ''}`}
+                          onClick={e => {
+                            if (isDisabled) {
+                              e.preventDefault()
+                            }
+                          }}
+                        >
+                          <div
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
+                            style={{
+                              background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
+                              color: isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)',
+                              borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
+                            }}
+                            onMouseOver={e => { if (!isSubActive) e.currentTarget.style.background = hoverBg }}
+                            onMouseOut={e => { if (!isSubActive) e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <span className="w-1 h-1 rounded-full shrink-0" style={{
+                              background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
+                              boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
+                            }} />
+                            {sub.label}
+                          </div>
+                        </NavLink>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
-            )}
-          </NavLink>
-        ))}
+            )
+          }
+
+          // ── Regular nav item ──
+          return (
+            <NavLink key={item.to} to={item.to} className="block">
+              {({ isActive }) => (
+                <div
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  style={{
+                    background:  isActive ? activeNavBg : 'transparent',
+                    borderLeft:  isActive ? activeNavBorder : '2px solid transparent',
+                    color: isActive ? '#ffffff' : inactiveColor,
+                  }}
+                  onMouseOver={e => { if (!isActive) e.currentTarget.style.background = hoverBg }}
+                  onMouseOut={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <img
+                      src={item.icon}
+                      alt=""
+                      width={15}
+                      height={15}
+                      style={{
+                        filter: isActive
+                          ? 'brightness(0) invert(1)'
+                          : 'brightness(0) invert(0.55)',
+                      }}
+                    />
+                    {t(item.labelKey)}
+                  </span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: accent, boxShadow: `0 0 6px ${accent}` }} />
+                  )}
+                </div>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
 
       {/* ── Footer ── */}
