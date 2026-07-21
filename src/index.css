@@ -382,6 +382,14 @@ input:focus, select:focus, textarea:focus { outline: none; }
 /* Stagger children with --i index */
 .olng-stagger { animation-delay: calc(var(--i, 0) * 80ms); }
 
+/* ── AI-editable SOW text: highlight selection to signal it can be edited ── */
+.olng-sow-editable { cursor: text; }
+.olng-sow-editable::selection,
+.olng-sow-editable *::selection {
+  background: rgba(0, 137, 207, 0.22);
+  color: #10344d;
+}
+
 /* ── Branded Card with top gradient stripe ── */
 .olng-card-branded {
   position: relative;

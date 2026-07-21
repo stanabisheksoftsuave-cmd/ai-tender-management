@@ -4,7 +4,7 @@ import {
   Target, Building2, ShieldOff, ArrowRight, FileText, AlertCircle,
   DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert,
   UploadCloud, X, Paperclip, Bot, Sparkles, CheckCircle, RefreshCw,
-  Circle, Download, Edit3, ChevronRight
+  Circle, Download, Edit3, ChevronRight, Wand2, Undo2
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -80,6 +80,127 @@ function generateSowContent(form, tenderId) {
   }
 }
 
+/* ─────────── SOW inline AI editing helpers ───────────
+   A "path" identifies an editable text node inside the SOW document:
+     content:<sectionIdx>              → section.content
+     item:<sectionIdx>:<itemIdx>       → section.items[i].value
+     sub:<sectionIdx>:<subIdx>:<liIdx> → section.subsections[s].items[i]        */
+
+function readSowPath(doc, path) {
+  const [kind, ...ix] = path.split(':')
+  const [a, b, c] = ix.map(Number)
+  const section = doc.sections[a]
+  if (!section) return ''
+  if (kind === 'content') return section.content || ''
+  if (kind === 'item') return section.items?.[b]?.value || ''
+  if (kind === 'sub') return section.subsections?.[b]?.items?.[c] || ''
+  return ''
+}
+
+function writeSowPath(doc, path, text) {
+  const [kind, ...ix] = path.split(':')
+  const [a, b, c] = ix.map(Number)
+  return {
+    ...doc,
+    sections: doc.sections.map((section, si) => {
+      if (si !== a) return section
+      if (kind === 'content') return { ...section, content: text }
+      if (kind === 'item') return { ...section, items: section.items.map((it, ii) => ii === b ? { ...it, value: text } : it) }
+      if (kind === 'sub') return {
+        ...section,
+        subsections: section.subsections.map((sub, bi) => bi !== b ? sub : {
+          ...sub, items: sub.items.map((li, li2) => li2 === c ? text : li),
+        }),
+      }
+      return section
+    }),
+  }
+}
+
+const FORMAL_SWAPS = [
+  [/\bget\b/gi, 'obtain'], [/\bfix\b/gi, 'rectify'], [/\bmake sure\b/gi, 'ensure'],
+  [/\bhelp\b/gi, 'assist'], [/\bneed to\b/gi, 'shall'], [/\bmust\b/gi, 'shall'],
+  [/\bwill\b/gi, 'shall'], [/\bstart\b/gi, 'commence'], [/\bend\b/gi, 'conclude'],
+  [/\buse\b/gi, 'utilise'], [/\bshow\b/gi, 'demonstrate'], [/\babout\b/gi, 'regarding'],
+]
+
+const sentenceCase = s => s.charAt(0).toUpperCase() + s.slice(1)
+
+/**
+ * Mock "AI" rewrite engine — interprets a natural-language instruction and
+ * transforms the selected SOW text accordingly. Swap this for a real LLM call.
+ */
+function applyAiInstruction(selected, instruction) {
+  const ins = instruction.trim()
+  const q = ins.toLowerCase()
+  const lines = selected.split('\n')
+  const bulletLines = lines.filter(l => /^\s*[•\-*]/.test(l))
+  const isBulleted = bulletLines.length > 0
+
+  // "replace X with Y" / "change X to Y"
+  const swap = q.match(/(?:replace|change|swap)\s+["“']?(.+?)["”']?\s+(?:with|to|by)\s+["“']?(.+?)["”']?\s*$/i)
+  if (swap) {
+    const [, from, to] = ins.match(/(?:replace|change|swap)\s+["“']?(.+?)["”']?\s+(?:with|to|by)\s+["“']?(.+?)["”']?\s*$/i)
+    const rx = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+    return selected.replace(rx, to)
+  }
+
+  if (/\b(remove|delete|drop|strike)\b/.test(q)) {
+    // "remove the last two bullets" / "remove milestone 3"
+    const target = q.match(/\b(?:remove|delete|drop)\b\s+(?:the\s+)?(.+)/)?.[1]
+    if (isBulleted && target) {
+      const kept = lines.filter(l => !(/^\s*[•\-*]/.test(l) && target.split(/\s+/).some(w => w.length > 3 && l.toLowerCase().includes(w))))
+      if (kept.length !== lines.length) return kept.join('\n')
+    }
+    return ''
+  }
+
+  if (/\b(shorten|concise|brief|summari[sz]e|trim|tighten)\b/.test(q)) {
+    if (isBulleted) {
+      return lines.map(l => {
+        if (!/^\s*[•\-*]/.test(l)) return l
+        const [head, ...rest] = l.split(/[:—-]\s+/)
+        return rest.length ? `${head.trim()}${rest[0] ? `: ${rest[0].split(/(?<=\.)\s/)[0].trim()}` : ''}` : l
+      }).join('\n')
+    }
+    const sentences = selected.split(/(?<=\.)\s+/)
+    return sentences.slice(0, Math.max(1, Math.ceil(sentences.length / 2))).join(' ').trim()
+  }
+
+  if (/\b(expand|elaborate|more detail|detailed|add detail)\b/.test(q)) {
+    if (isBulleted) {
+      return lines.map(l => /^\s*[•\-*]/.test(l) && !/\.$/.test(l.trim())
+        ? `${l.trimEnd()}, subject to Contract Holder review and written acceptance.`
+        : l).join('\n')
+    }
+    return `${selected.trimEnd()} All such activities shall be planned, documented and executed in accordance with Oman LNG procedures, and evidence of compliance shall be made available for audit on request.`
+  }
+
+  if (/\b(formal|professional|contractual|legal)\b/.test(q)) {
+    return FORMAL_SWAPS.reduce((acc, [rx, to]) => acc.replace(rx, to), selected)
+  }
+
+  if (/\b(number|numbered|ordered)\b/.test(q) && isBulleted) {
+    let n = 0
+    return lines.map(l => /^\s*[•\-*]/.test(l) ? `${++n}. ${l.replace(/^\s*[•\-*]\s*/, '')}` : l).join('\n')
+  }
+
+  if (/\bbullet|list\b/.test(q) && !isBulleted) {
+    return selected.split(/(?<=\.)\s+/).filter(Boolean).map(s => `• ${s.trim().replace(/\.$/, '')}`).join('\n')
+  }
+
+  if (/\b(upper ?case|capital)\b/.test(q)) return selected.toUpperCase()
+  if (/\b(lower ?case)\b/.test(q)) return selected.toLowerCase()
+
+  // "add …" / fallback: fold the instruction in as an additional clause
+  const addition = ins.replace(/^\s*(please\s+)?(add|include|insert|append|mention|state)\s+(a\s+|an\s+|the\s+)?/i, '').replace(/\.$/, '')
+  if (isBulleted) {
+    const marker = lines.find(l => /^\s*[•\-*]/.test(l)).match(/^\s*([•\-*])/)[1]
+    return `${selected.trimEnd()}\n${marker} ${sentenceCase(addition)}`
+  }
+  return `${selected.trimEnd()} ${sentenceCase(addition)}.`
+}
+
 export default function ContractStrategy() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
@@ -119,6 +240,20 @@ export default function ContractStrategy() {
   const [sowContent, setSowContent] = useState(null)
   const [sowEditing, setSowEditing] = useState(false)
   const [sowEditText, setSowEditText] = useState('')
+
+  // Inline AI editing: text selection inside the SOW preview opens a prompt popup
+  const sowBodyRef = useRef(null)
+  const [sowSel, setSowSel] = useState(null)   // { path, start, end, text, top, left }
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [sowUndo, setSowUndo] = useState(null) // previous sowContent, for one-step revert
+
+  useEffect(() => {
+    if (!sowSel) return
+    const onKey = e => { if (e.key === 'Escape') setSowSel(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sowSel])
 
   if (user?.role?.id !== 'contract_holder') return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
@@ -223,6 +358,69 @@ export default function ContractStrategy() {
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, genStep])
+
+  /** Capture a text selection inside the SOW preview and anchor the prompt popup to it */
+  const handleSowSelect = () => {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return
+    const range = selection.getRangeAt(0)
+    const startEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer
+    const host = startEl?.closest?.('[data-sow-path]')
+    if (!host || !sowBodyRef.current?.contains(host) || !host.contains(range.endContainer)) { setSowSel(null); return }
+
+    const text = range.toString()
+    if (!text.trim()) { setSowSel(null); return }
+
+    // Offset of the selection within the section's raw text
+    const pre = document.createRange()
+    pre.selectNodeContents(host)
+    pre.setEnd(range.startContainer, range.startOffset)
+    const start = pre.toString().length
+
+    const rect = range.getBoundingClientRect()
+    const bodyRect = sowBodyRef.current.getBoundingClientRect()
+    setSowSel({
+      path: host.dataset.sowPath,
+      start, end: start + text.length, text,
+      top: rect.bottom - bodyRect.top + 10,
+      left: Math.max(0, Math.min(rect.left - bodyRect.left, bodyRect.width - 400)),
+    })
+    setAiPrompt('')
+  }
+
+  /** Run the instruction against the selected text and splice the result back in */
+  const handleApplyAiEdit = () => {
+    if (!sowSel || !aiPrompt.trim() || aiBusy) return
+    setAiBusy(true)
+    setTimeout(() => {
+      const original = readSowPath(sowContent, sowSel.path)
+      const selected = original.slice(sowSel.start, sowSel.end)
+      const rewritten = applyAiInstruction(selected, aiPrompt)
+      let next = original.slice(0, sowSel.start) + rewritten + original.slice(sowSel.end)
+      next = next.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n')
+
+      const updatedSow = writeSowPath(sowContent, sowSel.path, next)
+      setSowUndo(sowContent)
+      setSowContent(updatedSow)
+      if (savedTenderId) updateTender(savedTenderId, { sowDocument: updatedSow })
+      // Keep the page description in sync when the Objective section is edited
+      if (sowSel.path === 'content:1') {
+        setField('description', next)
+        if (savedTenderId) updateTender(savedTenderId, { description: next })
+      }
+      window.getSelection()?.removeAllRanges()
+      setAiBusy(false)
+      setSowSel(null)
+      setAiPrompt('')
+    }, 700)
+  }
+
+  const handleUndoAiEdit = () => {
+    if (!sowUndo) return
+    setSowContent(sowUndo)
+    if (savedTenderId) updateTender(savedTenderId, { sowDocument: sowUndo })
+    setSowUndo(null)
+  }
 
   const handleDownloadSow = () => {
     if (!sowContent) return
@@ -559,8 +757,20 @@ export default function ContractStrategy() {
               <div>
                 <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>{sowContent.title}</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Reference: {sowContent.reference} · {form.contractMode} · {form.budget}</p>
+                <p className="flex items-center gap-1 text-[10.5px] mt-1 font-medium" style={{ color: '#0089cf' }}>
+                  <Wand2 size={10} /> Select any text in the document to edit it with AI
+                </p>
               </div>
               <div className="flex items-center gap-2">
+                {sowUndo && (
+                  <button
+                    onClick={handleUndoAiEdit}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
+                    style={{ color: '#64748b', border: '1px solid rgba(100,116,139,0.2)' }}
+                  >
+                    <Undo2 size={11} /> Undo AI Edit
+                  </button>
+                )}
                 <button
                   onClick={() => { setSowEditing(!sowEditing); if (!sowEditing) setSowEditText(form.description) }}
                   className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
@@ -578,8 +788,13 @@ export default function ContractStrategy() {
               </div>
             </div>
 
-            {/* Document body */}
-            <div className="px-6 py-5 space-y-5 text-sm leading-relaxed" style={{ color: '#334155' }}>
+            {/* Document body — select any text to open the AI instruction popup */}
+            <div
+              ref={sowBodyRef}
+              onMouseUp={handleSowSelect}
+              className="relative px-6 py-5 space-y-5 text-sm leading-relaxed"
+              style={{ color: '#334155' }}
+            >
               {sowContent.sections.map((section, si) => (
                 <div key={si}>
                   <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1b4c6f' }}>
@@ -588,7 +803,10 @@ export default function ContractStrategy() {
                   </h4>
 
                   {section.content && (
-                    <div className="pl-4 text-[12.5px] whitespace-pre-line text-slate-600 leading-6">
+                    <div
+                      data-sow-path={`content:${si}`}
+                      className="pl-4 text-[12.5px] whitespace-pre-line text-slate-600 leading-6 olng-sow-editable"
+                    >
                       {section.content}
                     </div>
                   )}
@@ -601,7 +819,7 @@ export default function ContractStrategy() {
                           border: '1px solid rgba(0,137,207,0.08)'
                         }}>
                           <span className="text-[11px] text-slate-400">{item.label}</span>
-                          <span className="text-[11px] font-semibold" style={{ color: item.color || '#1b4c6f' }}>
+                          <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1b4c6f' }}>
                             {item.value}
                           </span>
                         </div>
@@ -618,7 +836,7 @@ export default function ContractStrategy() {
                             {sub.items.map((item, ii) => (
                               <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#0089cf' }} />
-                                {item}
+                                <span data-sow-path={`sub:${si}:${si2}:${ii}`} className="olng-sow-editable">{item}</span>
                               </li>
                             ))}
                           </ul>
@@ -628,6 +846,78 @@ export default function ContractStrategy() {
                   )}
                 </div>
               ))}
+
+              {/* ── AI instruction popup (anchored to the selected text) ── */}
+              {sowSel && (
+                <div
+                  onMouseUp={e => e.stopPropagation()}
+                  className="absolute z-30 w-[400px] rounded-xl olng-slide-up"
+                  style={{
+                    top: sowSel.top, left: sowSel.left,
+                    background: '#fff',
+                    border: '1px solid rgba(0,137,207,0.25)',
+                    boxShadow: '0 12px 32px rgba(27,76,111,0.18)',
+                  }}
+                >
+                  <div className="flex items-center justify-between px-3.5 py-2.5" style={{
+                    background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))',
+                    borderBottom: '1px solid rgba(0,137,207,0.12)',
+                  }}>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: '#0089cf' }}>
+                      <Wand2 size={12} /> Edit with AI
+                    </span>
+                    <button onClick={() => setSowSel(null)} className="text-slate-400 hover:text-slate-600">
+                      <X size={13} />
+                    </button>
+                  </div>
+
+                  <div className="p-3.5">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Selected text</p>
+                    <p className="text-[11px] text-slate-500 italic line-clamp-3 mb-3 pl-2" style={{ borderLeft: '2px solid rgba(0,137,207,0.3)' }}>
+                      {sowSel.text}
+                    </p>
+
+                    <textarea
+                      autoFocus
+                      rows={2}
+                      value={aiPrompt}
+                      onChange={e => setAiPrompt(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyAiEdit() }
+                      }}
+                      placeholder="Tell AI how to update this… e.g. “make it more formal”, “shorten this”, “replace 14 days with 21 days”"
+                      className="w-full px-3 py-2 text-[12px] focus:outline-none resize-none transition-all olng-input"
+                    />
+
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {['Make it more formal', 'Shorten this', 'Expand with more detail', 'Convert to bullet points'].map(sug => (
+                        <button
+                          key={sug}
+                          onClick={() => setAiPrompt(sug)}
+                          className="text-[10px] px-2 py-1 rounded-md transition-all hover:bg-white"
+                          style={{ color: '#0089cf', background: 'rgba(0,137,207,0.06)', border: '1px solid rgba(0,137,207,0.15)' }}
+                        >
+                          {sug}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-3">
+                      <Button variant="secondary" onClick={() => setSowSel(null)} className="text-[11px] py-1.5 px-3">Cancel</Button>
+                      <Button
+                        variant="brand"
+                        disabled={!aiPrompt.trim() || aiBusy}
+                        onClick={handleApplyAiEdit}
+                        className="text-[11px] py-1.5 px-3 flex items-center gap-1.5"
+                      >
+                        {aiBusy
+                          ? <><RefreshCw size={11} className="animate-spin" /> Applying…</>
+                          : <><Sparkles size={11} /> Apply</>}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
 
