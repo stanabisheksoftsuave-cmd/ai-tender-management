@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react'
-import { Search, Filter, Plus, Eye, Download, Upload, ChevronRight, Briefcase, FileText, RefreshCw, X } from 'lucide-react'
+import { Sparkles, Plus, Eye, Download, Upload, ChevronRight, Briefcase, FileText, RefreshCw, RotateCcw, X, SendHorizontal } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { exportTenderPDF } from '../utils/exportPDF'
+import { runTenderQuery, QUERY_SUGGESTIONS } from '../utils/tenderQuery'
 
 const REASSIGN_OPTIONS = [
   { status: 'upload',      stage: 'Awaiting Ingestion',      label: 'Bid Ingestion' },
@@ -109,9 +110,10 @@ export default function TenderList() {
   const { user, users } = useAuth()
   const { tenders, reassignTender, updateTender } = useTenders()
   const { lang, t } = useLanguage()
-  const [search, setSearch] = useState('')
+  const [prompt, setPrompt] = useState('')                       // AI chat input
+  const [aiResult, setAiResult] = useState(null)                 // { query, results, explanation }
+  const [thinking, setThinking] = useState(false)
   const [expanded, setExpanded] = useState(null)
-  const [activeFilter, setActiveFilter] = useState('all')
   const [reassignModal, setReassignModal] = useState(null)       // pof: stage reassign
   const [evalModal, setEvalModal] = useState(null)               // biz_admin: evaluator reassign
   const [selectedEvaluator, setSelectedEvaluator] = useState('')
@@ -143,24 +145,29 @@ export default function TenderList() {
 
   const statusLabels = lang === 'ar' ? statusLabelsAr : statusLabelsEn
 
-  const tabs = [
-    { key: 'all',      label: lang === 'ar' ? 'جميع المناقصات' : 'All Tenders', fn: () => true },
-    { key: 'prequal',  label: lang === 'ar' ? 'التأهيل المسبق' : 'Pre-Qual',    fn: td => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(td.status) },
-    { key: 'progress', label: lang === 'ar' ? 'قيد التقدم'     : 'In Progress',  fn: td => ['draft', 'upload'].includes(td.status) },
-    { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' },
-    { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' },
-    { key: 'review',   label: lang === 'ar' ? 'المراجعة'       : 'Review',       fn: td => td.status === 'mgmt_review' },
-    { key: 'award',    label: lang === 'ar' ? 'الترسية'        : 'Awarded',      fn: td => td.status === 'award' },
-    { key: 'contract', label: lang === 'ar' ? 'العقد'          : 'Contract',     fn: td => ['legal_review','contract_execution','active','contract_closure'].includes(td.status) },
-    { key: 'closed',   label: lang === 'ar' ? 'مغلقة'          : 'Closed',       fn: td => ['closed','prequal_rejected'].includes(td.status) },
-  ]
+  // AI prompt → filtered list. Everything is resolved locally from the tender
+  // records; the short delay just makes the assistant feel like it's working.
+  const askAi = (text) => {
+    const query = String(text ?? prompt).trim()
+    if (!query) return
+    setPrompt(query)
+    setThinking(true)
+    setExpanded(null)
+    setTimeout(() => {
+      const { results, explanation } = runTenderQuery(query, tenders)
+      setAiResult({ query, results, explanation })
+      setThinking(false)
+    }, 350)
+  }
 
-  const filtered = tenders.filter(t => {
-    const tabFn = tabs.find(tab => tab.key === activeFilter)?.fn ?? (() => true)
-    const tabFilter = activeFilter === 'all' ? true : tabFn(t)
-    const searchFilter = t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase())
-    return tabFilter && searchFilter
-  })
+  const resetAi = () => {
+    setPrompt('')
+    setAiResult(null)
+    setThinking(false)
+    setExpanded(null)
+  }
+
+  const filtered = aiResult ? aiResult.results : tenders
 
   return (
     <div className="space-y-5">
@@ -273,20 +280,8 @@ export default function TenderList() {
       })()}
 
       {/* Controls */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={lang === 'ar' ? 'البحث بالرقم أو العنوان...' : 'Search by ID or title...'}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-          />
-        </div>
+      <div className="flex items-center justify-end gap-2">
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm">
-            <Filter size={13} /> {t('common.filter')}
-          </Button>
           {isContractHolder && (
             <Button onClick={() => navigate('/contract-strategy')} size="sm">
               <Plus size={13} /> New Tender
@@ -305,21 +300,82 @@ export default function TenderList() {
         </div>
       </div>
 
-      {/* Summary bar */}
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-              ${activeFilter === tab.key
-                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-          >
-            {tab.label} <span className="ml-1 opacity-60">({tenders.filter(tab.fn).length})</span>
-          </button>
-        ))}
-      </div>
+      {/* AI Assistant — natural-language filtering replaces the old tabs/search */}
+      <Card>
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, var(--color-primary))' }}>
+              <Sparkles size={14} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                {lang === 'ar' ? 'مساعد المناقصات الذكي' : 'Tender AI Assistant'}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                {lang === 'ar'
+                  ? 'اكتب ما تريد رؤيته — مثل "المناقصات فوق مليون ريال"'
+                  : 'Ask for what you need — e.g. "tenders above OMR 1 million with more than 3 bidders"'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Sparkles size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400" />
+              <input
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') askAi() }}
+                placeholder={lang === 'ar' ? 'اسأل عن المناقصات التي تحتاجها...' : 'Ask the AI to list the tenders you need...'}
+                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-300"
+              />
+            </div>
+            <Button size="sm" onClick={() => askAi()} disabled={!prompt.trim() || thinking}>
+              <SendHorizontal size={13} /> {thinking ? (lang === 'ar' ? 'جارٍ التحليل...' : 'Thinking...') : (lang === 'ar' ? 'اسأل' : 'Ask')}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={resetAi} disabled={!aiResult && !prompt}>
+              <RotateCcw size={13} /> {lang === 'ar' ? 'إعادة تعيين' : 'Reset'}
+            </Button>
+          </div>
+
+          {/* Suggestion chips */}
+          {!aiResult && !thinking && (
+            <div className="flex flex-wrap gap-2">
+              {QUERY_SUGGESTIONS.map(s => (
+                <button key={s} onClick={() => askAi(s)}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 bg-white hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-colors">
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* AI response bubble */}
+          {thinking && (
+            <div className="flex items-center gap-2 text-xs text-violet-600 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
+              <Sparkles size={13} className="animate-pulse" />
+              {lang === 'ar' ? 'يتم تحليل الطلب...' : 'Analysing your request...'}
+            </div>
+          )}
+          {!thinking && aiResult && (
+            <div className="flex items-start justify-between gap-3 text-xs bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5">
+              <div className="flex gap-2">
+                <Sparkles size={13} className="text-violet-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-violet-700 font-medium">
+                    {aiResult.results.length} {lang === 'ar' ? 'مناقصة مطابقة' : `of ${tenders.length} tenders matched`}
+                  </p>
+                  <p className="text-violet-500/80 mt-0.5">{aiResult.explanation}</p>
+                </div>
+              </div>
+              <button onClick={resetAi} className="shrink-0 text-violet-400 hover:text-violet-600" title="Reset">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Table */}
       <Card>
@@ -337,6 +393,19 @@ export default function TenderList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <Sparkles size={20} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-sm text-slate-500">
+                      {lang === 'ar' ? 'لا توجد مناقصات مطابقة لطلبك.' : 'No tenders matched that request.'}
+                    </p>
+                    <button onClick={resetAi} className="mt-3 text-xs text-[var(--color-primary)] hover:underline">
+                      {lang === 'ar' ? 'إعادة تعيين وعرض الكل' : 'Reset and show all tenders'}
+                    </button>
+                  </td>
+                </tr>
+              )}
               {filtered.map(td => (
                 <Fragment key={td.id}>
                   <tr
