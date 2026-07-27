@@ -7,6 +7,8 @@ const pageMeta = {
   '/dashboard':      { titleKey: 'page.dashboard',  subKey: 'page.dashboard.sub' },
   '/tenders':        { titleKey: 'page.tenders',     subKey: 'page.tenders.sub' },
   '/contract-strategy':  { titleKey: 'page.contractStrategy',  subKey: 'page.contractStrategy.sub' },
+  '/strategy-templates': { titleKey: 'page.strategyTemplates', subKey: 'page.strategyTemplates.sub' },
+  '/psf-strategy':       { titleKey: 'page.psfStrategy',       subKey: 'page.psfStrategy.sub' },
   '/pre-qualification':  { titleKey: 'page.preQualification',  subKey: 'page.preQualification.sub' },
   '/create-itt':     { titleKey: 'page.createItt',   subKey: 'page.createItt.sub' },
   '/upload':         { titleKey: 'page.ingestion',   subKey: 'page.ingestion.sub' },

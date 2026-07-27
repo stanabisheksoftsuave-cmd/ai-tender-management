@@ -6,7 +6,7 @@ import { parseDocxTemplate } from '../../utils/docxTemplate'
 
 const normKey = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.:]+$/, '')
 
-export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onBack, isFirst, isLast, standInNotice, prefill = {} }) {
+export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, standInNotice, prefill = {}, readOnly = false, readOnlyNote }) {
   const [load, setLoad] = useState({ docxUrl: null, model: null, error: null })
   const [values, setValues] = useState([])
   const debounceRef = useRef(null)
@@ -33,7 +33,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
         setValues(initial)
         inputRefs.current = {}
         cursorRef.current = -1
-        if (usedPrefill && !answers) onAnswersChange(section.id, initial)
+        if (usedPrefill && !answers && !readOnly) onAnswersChange(section.id, initial)
       })
       .catch(err => {
         if (cancelled) return
@@ -92,6 +92,16 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
     if (seg.type === 'text') return <span key={i}>{seg.text}</span>
     const value = values[seg.fieldIndex] ?? ''
     const filled = isFilled(seg.fieldIndex)
+    if (readOnly) {
+      const tone = filled
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+        : 'border-slate-200 bg-slate-100 text-slate-400'
+      return (
+        <span key={i} className={`inline-block px-1.5 py-0.5 mx-0.5 align-baseline text-[13px] rounded border whitespace-pre-wrap ${tone}`}>
+          {value || '—'}
+        </span>
+      )
+    }
     const long = value.length > 60 || value.includes('\n')
     const tone = filled
       ? 'border-emerald-300 bg-emerald-50 text-emerald-900 focus:ring-emerald-300'
@@ -186,6 +196,16 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
             <FileText size={16} style={{ color: '#0089cf' }} />
           </div>
           <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>{section.title}</h3>
+          {section.optional && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ color: '#64748b', background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)' }}>
+              Optional
+            </span>
+          )}
+          {readOnly && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ color: '#64748b', background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)' }}>
+              Read only
+            </span>
+          )}
         </div>
         <button
           onClick={onBack}
@@ -223,7 +243,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
             </div>
             <button
               onClick={jumpToNextEmpty}
-              disabled={allFilled}
+              disabled={allFilled || readOnly}
               className="flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed transition-colors"
               style={{ color: '#0089cf' }}>
               <ArrowDown size={12} /> Jump to next empty
@@ -276,9 +296,26 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
                 : `${filledCount} of ${total} AI-filled field${total === 1 ? '' : 's'} · can be overwritten`)
             : ''}
         </p>
-        <Button variant="brand" onClick={handleNext} disabled={loading} className="flex items-center gap-2">
-          {isLast ? <>Proceed to Export <Download size={15} /></> : <>Save & Continue <ChevronRight size={15} /></>}
-        </Button>
+        <div className="flex items-center gap-2">
+          {readOnly ? (
+            <span className="text-[11px] font-medium px-3 py-1.5 rounded-lg" style={{ color: '#64748b', background: 'rgba(100,116,139,0.08)', border: '1px solid rgba(100,116,139,0.15)' }}>
+              {readOnlyNote || 'Read-only — owned by another role'}
+            </span>
+          ) : (
+            <>
+              {onSkip && (
+                <Button variant="secondary" onClick={onSkip} disabled={loading} className="flex items-center gap-1.5">
+                  Skip (optional) <ChevronRight size={14} />
+                </Button>
+              )}
+              <Button variant="brand" onClick={handleNext} disabled={loading} className="flex items-center gap-2">
+                {isLast
+                  ? (lastLabel ? <>{lastLabel} <CheckCircle2 size={15} /></> : <>Proceed to Export <Download size={15} /></>)
+                  : (nextLabel ? <>{nextLabel} <CheckCircle2 size={15} /></> : <>Save & Continue <ChevronRight size={15} /></>)}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </Card>
   )

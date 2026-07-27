@@ -12,6 +12,7 @@ const statusVariant = {
   prequal_stage2:      'prequal_stage2',
   prequal_stage3:      'prequal_stage3',
   prequal_stage4:      'prequal_stage4',
+  prequal_final_review: 'prequal_final_review',
   prequal_rejected:    'prequal_rejected',
   legal_review:        'legal_review',
   contract_execution:  'contract_execution',

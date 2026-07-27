@@ -23,6 +23,7 @@ const variants = {
   prequal_stage2:    'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
   prequal_stage3:    'bg-teal-50 text-teal-700 ring-1 ring-teal-200',
   prequal_stage4:    'bg-teal-50 text-teal-700 ring-1 ring-teal-200',
+  prequal_final_review: 'bg-teal-50 text-teal-700 ring-1 ring-teal-200',
   prequal_rejected:  'bg-red-50 text-red-700 ring-1 ring-red-200',
   legal_review:      'bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200',
   contract_execution:'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',

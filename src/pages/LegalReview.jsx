@@ -12,6 +12,7 @@ import TenderSelectList from '../components/ui/TenderSelectList'
 import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+import { useNavigation } from '../context/NavigationContext'
 
 // ── Legal review criteria ────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ const decisionCfg = {
 export default function LegalReview() {
   const { tenderId } = useParams()
   const navigate     = useNavigate()
+  const { goBack }   = useNavigation()
   const { user }     = useAuth()
   const { tenders, advanceTender } = useTenders()
   const tender = tenders.find(t => t.id === tenderId)
@@ -120,9 +122,9 @@ export default function LegalReview() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <button onClick={() => navigate('/dashboard')}
+              <button onClick={goBack}
                 className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                <ArrowLeft size={12} /> Dashboard
+                <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>

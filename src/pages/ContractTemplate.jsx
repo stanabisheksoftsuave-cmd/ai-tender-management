@@ -7,6 +7,8 @@ import TenderSelectList from '../components/ui/TenderSelectList'
 import { bidders as seedBidders, contractTemplates } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+import { useDismissable, useBackHandler } from '../context/NavigationContext'
+import { openHtmlDoc, rejectionLetterDoc } from '../utils/docGen'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -40,19 +42,28 @@ const flowStages = [
 ]
 
 // ── Combined score helper ─────────────────────────────────────────────────────
-const combined = b => Math.round((b.techScore ?? 75) * 0.6 + (b.commScore ?? 70) * 0.4)
+// Simple average of the technical and commercial results, out of 100.
+const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ContractTemplate() {
   const { tenderId } = useParams()
   const navigate     = useNavigate()
   const { user }     = useAuth()
-  const { tenders, advanceTender }  = useTenders()
+  const { tenders, updateTender }  = useTenders()
   const tender       = tenders.find(t => t.id === tenderId)
 
-  const [selected, setSelected] = useState(null)
-  const [preview,  setPreview]  = useState(null)
-  const [sent,     setSent]     = useState(false)
+  const [selected,    setSelected]    = useState(null)
+  const [preview,     setPreview]     = useState(null)
+  const [sent,        setSent]        = useState(false)
+  const [sentLetters, setSentLetters] = useState(false)
+
+  useDismissable(!!preview, () => setPreview(null))
+
+  useBackHandler(() => {
+    if (selected && !sent) { setSelected(null); return true }
+    return false
+  })
 
   // ── Role gate ──
   if (user?.role?.id !== 'pof') return (
@@ -98,6 +109,17 @@ export default function ContractTemplate() {
 
   // All bidders ranked (for the scores overview)
   const ranked = [...tenderBidders].sort((a, b) => combined(b) - combined(a))
+
+  // Unsuccessful bidders — everyone except the awarded party — get a regret letter.
+  const failedBidders = ranked.filter(b => awardedBidder && b.id !== awardedBidder.id)
+  const letterDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+  const openRejectionLetter = (b) => {
+    const d = rejectionLetterDoc({
+      tenderId: tender.id, tenderTitle: tender.title, bidderName: b.name,
+      department: tender.department, awardedTo: awardedBidder?.name, dateStr: letterDate,
+    })
+    openHtmlDoc(d.title, d.content)
+  }
 
   return (
     <div className="space-y-5">
@@ -149,9 +171,9 @@ export default function ContractTemplate() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Bidder</th>
-                <th className="text-center px-3 py-3 font-semibold text-blue-500">Technical<br/><span className="font-normal text-slate-400">60%</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-violet-500">Commercial<br/><span className="font-normal text-slate-400">40%</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-slate-600">Combined</th>
+                <th className="text-center px-3 py-3 font-semibold text-blue-500">Technical<br/><span className="font-normal text-slate-400">/100</span></th>
+                <th className="text-center px-3 py-3 font-semibold text-violet-500">Commercial<br/><span className="font-normal text-slate-400">/100</span></th>
+                <th className="text-center px-3 py-3 font-semibold text-slate-600">Combined<br/><span className="font-normal text-slate-400">avg</span></th>
                 <th className="text-center px-3 py-3 font-semibold text-slate-600">Status</th>
               </tr>
             </thead>
@@ -322,12 +344,62 @@ export default function ContractTemplate() {
                     <CheckCircle size={15} />
                     Contract drafted for {awardedBidder.name}.
                   </div>
-                  <Button onClick={() => { advanceTender(tender.id); navigate('/tenders') }}>
-                    <Send size={14} /> Submit for Legal Review <ChevronRight size={14} />
+                  <p className="text-xs text-slate-500">
+                    Draft the contract for the winner and issue the regret letters below, then finalise — the procurement flow completes here (it does not proceed to legal review).
+                  </p>
+                  <Button onClick={() => { updateTender(tender.id, { status: 'active', stage: 'Contract Active', contractCompleted: true }); navigate('/tenders') }}>
+                    <CheckCircle size={14} /> Finalise Contract <ChevronRight size={14} />
                   </Button>
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Unsuccessful bidder notifications (after the contract is drafted) ── */}
+      {sent && awardedBidder && failedBidders.length > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <FileText size={16} className="text-[var(--color-primary)]" />
+            <h3 className="font-semibold text-slate-800 text-sm">Notify Unsuccessful Bidders</h3>
+            <Badge variant="non_compliant">{failedBidders.length} not selected</Badge>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">
+            Generate a regret letter for each bidder who was not awarded, then send the notifications so the outcome is communicated.
+          </p>
+          <div className="space-y-2">
+            {failedBidders.map(b => (
+              <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-2.5 flex-wrap">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 font-bold text-sm flex items-center justify-center shrink-0">{b.name?.[0]}</div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-700 truncate">{b.name}</p>
+                    <p className="text-[11px] text-slate-400">Combined score {combined(b)}/100 · Not selected</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {sentLetters && (
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                      <CheckCircle size={12} /> Sent
+                    </span>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={() => openRejectionLetter(b)}>
+                    <Eye size={12} /> View Letter
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-[11px] text-slate-400">
+              {sentLetters
+                ? 'Regret letters have been sent to all unsuccessful bidders.'
+                : 'Each letter carries the tender outcome and a courteous regret message.'}
+            </p>
+            <Button disabled={sentLetters} onClick={() => setSentLetters(true)}>
+              <Send size={13} /> {sentLetters ? 'Notifications Sent' : `Send Regret Letters (${failedBidders.length})`}
+            </Button>
           </div>
         </Card>
       )}
@@ -345,7 +417,7 @@ export default function ContractTemplate() {
               <button onClick={() => setPreview(null)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
             </div>
             <div className="p-5 space-y-4">
-              {['1. Parties & Recitals','2. Scope of Work','3. Contract Price & Payment','4. Delivery & Milestones','5. Warranties & SLA','6. Liability & Indemnity','7. Dispute Resolution','8. Governing Law'].map(section => (
+              {['1. Parties & Recitals','2. Statement of Work','3. Contract Price & Payment','4. Delivery & Milestones','5. Warranties & SLA','6. Liability & Indemnity','7. Dispute Resolution','8. Governing Law'].map(section => (
                 <div key={section}>
                   <h4 className="text-xs font-semibold text-slate-700 mb-1">{section}</h4>
                   <div className="h-2 bg-slate-100 rounded mb-1 w-4/5" />

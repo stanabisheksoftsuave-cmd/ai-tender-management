@@ -31,6 +31,7 @@ const statusVariant = {
   prequal_stage2:  'prequal_stage2',
   prequal_stage3:  'prequal_stage3',
   prequal_stage4:  'prequal_stage4',
+  prequal_final_review: 'prequal_final_review',
   draft:       'warning',
   upload:      'upload',
   tech_eval:   'tech_eval',
@@ -46,6 +47,7 @@ const isEvaluator = (roleId) => roleId === 'tech_eval' || roleId === 'comm_eval'
 
 const getPofTenderRoute = (tender) => {
   if (tender.status === 'draft') return `/create-itt/${tender.id}`
+  if (tender.status === 'comm_eval') return `/commercial-eval/${tender.id}`
   if (tender.status === 'award') return `/contract/${tender.id}`
   if (tender.status === 'legal_review') return `/legal-review/${tender.id}`
   if (tender.status === 'contract_execution') return `/contract-execution/${tender.id}`
@@ -54,7 +56,11 @@ const getPofTenderRoute = (tender) => {
   return `/upload/${tender.id}`
 }
 
-const getContractHolderTenderRoute = (tender) => `/pre-qualification/${tender.id}`
+const getContractHolderTenderRoute = (tender) => {
+  if (tender.status === 'tech_eval') return `/technical-eval/${tender.id}`
+  if (tender.status === 'draft')     return `/create-itt/${tender.id}`
+  return `/pre-qualification/${tender.id}`
+}
 
 const bidderComplianceByRole = {
   tech_eval: [
@@ -77,8 +83,9 @@ const complianceLabelAr = { compliant: 'مستوفٍ', partial_compliant: 'جز�
 const getVisibleTenders = (roleId, tenders) => {
   if (roleId === 'it_admin')    return []
   if (roleId === 'biz_admin')   return tenders
-  if (roleId === 'pof')         return tenders.filter(t => ['draft','upload','award','legal_review','contract_execution','active','contract_closure'].includes(t.status))
-  if (roleId === 'contract_holder') return tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(t.status))
+  // prequal_stage4 is the financial assessment the Contract Engineer owns.
+  if (roleId === 'pof')         return tenders.filter(t => ['prequal_stage4','draft','upload','comm_eval','award','legal_review','contract_execution','active','contract_closure'].includes(t.status))
+  if (roleId === 'contract_holder') return tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_final_review','prequal_rejected','draft','tech_eval'].includes(t.status))
   if (roleId === 'tech_eval')   return tenders.filter(t => t.status === 'tech_eval')
   if (roleId === 'comm_eval')   return tenders.filter(t => t.status === 'comm_eval')
   if (roleId === 'mgmt_review') return tenders.filter(t => t.status === 'mgmt_review')
@@ -126,7 +133,8 @@ const getStatCards = (roleId, tenders) => {
     { label: 'Bidder Matching',    value: String(byStatus('prequal_stage1').length), icon: Users,          accentColor: '#0891B2', trend: 'Stage 1', chipVariant: '',       sub: 'Matching ERP bidders to SOW' },
     { label: 'Questionnaire',      value: String(byStatus('prequal_stage2').length), icon: FileText,       accentColor: '#F59E0B', trend: 'Stage 2', chipVariant: 'urgent', sub: 'Generating & distributing PQQ' },
     { label: 'Response Review',    value: String(byStatus('prequal_stage3').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'Stage 3', chipVariant: '',       sub: 'QHSE / Technical / Admin checks' },
-    { label: 'Financial Assessment', value: String(byStatus('prequal_stage4').length), icon: Clock,        accentColor: '#10B981', trend: 'Stage 4', chipVariant: '',       sub: 'Final qualification decisions' },
+    { label: 'With Contract Engineer', value: String(byStatus('prequal_stage4').length), icon: Clock,      accentColor: '#0891B2', trend: 'Stage 4', chipVariant: '',       sub: 'Awaiting financial assessment' },
+    { label: 'Final Review',       value: String(byStatus('prequal_final_review').length), icon: ClipboardCheck, accentColor: '#10B981', trend: 'Stage 5', chipVariant: 'urgent', sub: 'Assessment returned — ready to submit' },
   ]
 
   if (roleId === 'it_admin') {
@@ -182,6 +190,7 @@ const getActionItems = (roleId, tenders) => {
     ]
   }
   if (roleId === 'pof') return [
+    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Complete Financial Assessment — ${t.id}: ${t.title}`, urgent: true })),
     ...tenders.filter(t => t.status === 'draft').map(t  => ({ label: `Export ITT for External Review — ${t.id}: ${t.title}`, urgent: true })),
     ...tenders.filter(t => t.status === 'upload').map(t => ({ label: `Upload Bidder Proposals — ${t.id}: ${t.title}`, urgent: false })),
     ...tenders.filter(t => t.status === 'award').map(t  => ({ label: `Create Contract — ${t.id}: ${t.title}`, urgent: false })),
@@ -191,7 +200,9 @@ const getActionItems = (roleId, tenders) => {
     ...tenders.filter(t => t.status === 'contract_closure').map(t  => ({ label: `Close Contract — ${t.id}: ${t.title}`, urgent: false })),
   ]
   if (roleId === 'contract_holder') return [
-    ...tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(t.status)).map(t => ({ label: `Continue Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3'].includes(t.status)).map(t => ({ label: `Continue Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'prequal_final_review').map(t => ({ label: `Review & Submit Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Awaiting Contract Engineer's Financial Assessment — ${t.id}: ${t.title}`, urgent: false })),
   ]
   if (roleId === 'it_admin') return [
     { label: 'Review new user registrations', urgent: false },
@@ -263,29 +274,29 @@ const QUICK_ACTIONS_BY_ROLE = {
     { icon: BulbIcon,       label: 'AI Insights',  color: '#D97706', bg: '#FFFBEB', action: null         },
   ],
   pof: [
-    { icon: BulbIcon,  label: 'Create ITT with AI', color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
-    { icon: Upload,    label: 'Upload Bids',         color: '#0891B2', bg: '#E0F7FA', action: '/upload'     },
-    { icon: Briefcase, label: 'Draft Contract',      color: '#059669', bg: '#ECFDF5', action: '/contract'   },
-    { icon: Briefcase, label: 'Manage Contract',     color: '#D97706', bg: '#FFFBEB', action: '/contract-management' },
-    { icon: FileText,  label: 'View Tenders',        color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
+    { icon: BulbIcon,  label: 'ITT Draft',             color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
+    { icon: Users,     label: 'PQQ Financial',         color: '#0891B2', bg: '#E0F7FA', action: '/pre-qualification' },
+    { icon: BarChart3, label: 'Commercial Assessment', color: '#6366F1', bg: '#EEF2FF', action: '/commercial-eval' },
+    { icon: Upload,    label: 'Upload Bids',           color: '#0891B2', bg: '#E0F7FA', action: '/upload'     },
+    { icon: Briefcase, label: 'Draft Contract',        color: '#059669', bg: '#ECFDF5', action: '/contract'   },
+    { icon: FileText,  label: 'View Tenders',          color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
   ],
   contract_holder: [
-    { icon: BulbIcon,  label: 'New Tender',          color: '#0891B2', bg: '#E0F7FA', action: '/contract-strategy' },
-    { icon: Users,     label: 'Pre-Qualification',   color: '#0891B2', bg: '#E0F7FA', action: '/pre-qualification' },
-    { icon: FileText,  label: 'View Tenders',        color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
+    { icon: BulbIcon,       label: 'New Tender',           color: '#0891B2', bg: '#E0F7FA', action: '/contract-strategy' },
+    { icon: BulbIcon,       label: 'Create ITT',           color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
+    { icon: ClipboardCheck, label: 'Technical Evaluation', color: '#2563EB', bg: '#EEF2FF', action: '/technical-eval' },
+    { icon: FileText,       label: 'View Tenders',         color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
   ],
   legal_review: [
     { icon: FileText,  label: 'Legal Review', color: '#B45309', bg: '#FFFBEB', action: '/legal-review' },
     { icon: FileText,  label: 'View Tenders', color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'      },
   ],
   tech_eval: [
-    { icon: ClipboardCheck, label: 'Start Evaluation', color: '#2563EB', bg: '#EEF2FF', action: '/technical-eval' },
     { icon: FileText,       label: 'View Tenders',     color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'        },
     { icon: BulbIcon,       label: 'AI Score Assist',  color: '#D97706', bg: '#FFFBEB', action: null              },
     { icon: BulbIcon,       label: 'Ask AI',            color: '#0891B2', bg: '#E0F7FA', action: null              },
   ],
   comm_eval: [
-    { icon: BarChart3, label: 'Start Evaluation', color: '#2563EB', bg: '#EEF2FF', action: '/commercial-eval' },
     { icon: FileText,  label: 'View Tenders',     color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'         },
     { icon: BulbIcon,  label: 'AI Score Assist',  color: '#D97706', bg: '#FFFBEB', action: null               },
     { icon: BulbIcon,  label: 'Ask AI',            color: '#0891B2', bg: '#E0F7FA', action: null               },
@@ -723,6 +734,7 @@ export default function Dashboard() {
                               prequal_stage2: [{ label: 'Continue Questionnaire',        route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               prequal_stage3: [{ label: 'Continue Response Review',      route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               prequal_stage4: [{ label: 'Continue Financial Assessment', route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              prequal_final_review: [{ label: 'Review & Submit Pre-Qualification', route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               legal_review:       [{ label: 'Legal Review',        route: `/legal-review/${tender.id}` },        { label: 'View in Tenders', route: '/tenders' }],
                               contract_execution: [{ label: 'Sign Contract',       route: `/contract-execution/${tender.id}` },  { label: 'View in Tenders', route: '/tenders' }],
                               active:             [{ label: 'Manage Contract',     route: `/contract-management/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],

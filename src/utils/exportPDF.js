@@ -97,7 +97,7 @@ export function exportTenderPDF(tender) {
   }
 
   // Scope section
-  text('SCOPE OF WORK', L, 8, 'bold', [100, 116, 139])
+  text('STATEMENT OF WORK', L, 8, 'bold', [100, 116, 139])
   y += 6
   const scope = `The Contractor shall provide ${tender.title} for ${tender.department}, encompassing the full design, implementation, testing, and handover of all required deliverables as specified in this Invitation to Tender. The scope includes procurement, installation, integration, user acceptance testing, staff training, and ongoing support and maintenance as per agreed SLA terms.`
   wrap(scope, L, W)
@@ -338,6 +338,92 @@ export function exportBidderFailReasonsPDF(tender, bidder) {
 
   reportFooter(doc, tender)
   doc.save(`${tender.id}-${bidder.name.replace(/[^a-z0-9]/gi, '_')}-FailReasoning.pdf`)
+}
+
+/**
+ * Procurement Submission Form — Strategy.
+ * @param {object} tender
+ * @param {object} psf     the generated PSF document (see PsfStrategy.jsx buildPsf)
+ */
+export function exportPsfPDF(tender, psf = {}) {
+  const { doc, L, W } = reportShell(tender, 'PROCUREMENT SUBMISSION FORM')
+  let y = 78
+
+  const section = (label) => {
+    if (y > 250) { doc.addPage(); y = 30 }
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(100, 116, 139)
+    doc.text(label, L, y)
+    y += 7
+  }
+
+  const row = (label, value) => {
+    if (y > 262) { doc.addPage(); y = 30 }
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 116, 139)
+    doc.text(label, L, y)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(15, 23, 42)
+    doc.text(String(value ?? '—'), L + W, y, { align: 'right' })
+    y += 7
+  }
+
+  const paragraph = (text) => {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(51, 65, 85)
+    doc.splitTextToSize(String(text || '—'), W).forEach(line => {
+      if (y > 268) { doc.addPage(); y = 30 }
+      doc.text(line, L, y)
+      y += 5
+    })
+    y += 4
+  }
+
+  section('SUBMISSION TYPE')
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(37, 99, 235)
+  doc.text('[X] Strategy      [ ] Strategy Amendment      [ ] Award      [ ] Variation', L, y)
+  y += 10
+
+  section('SUBMISSION DETAILS')
+  row('Title', psf.title)
+  row('Contract / PR Number', psf.contractNumber)
+  row('Anticipated Value', psf.anticipatedValue)
+  row('Duration', psf.duration)
+  row('Source of Funds', psf.sourceOfFunds)
+  row('Cost Centre', psf.costCentre)
+  row('Expenditure Type', psf.expenditureType)
+  y += 4
+
+  section('BACKGROUND')
+  paragraph(psf.background)
+
+  section('EXECUTIVE SUMMARY')
+  paragraph(psf.executiveSummary)
+
+  section('REVIEWS / APPROVALS')
+  Object.entries(psf.reviews || {}).forEach(([body, checked]) => {
+    if (y > 262) { doc.addPage(); y = 30 }
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(15, 23, 42)
+    doc.text(`${checked ? '[X]' : '[ ]'}  ${body}`, L, y)
+    y += 6
+  })
+
+  const assignees = tender.assignedContractEngineers || (tender.assignedContractEngineer ? [tender.assignedContractEngineer] : [])
+  if (assignees.length) {
+    y += 4
+    section(assignees.length > 1 ? 'ASSIGNED CONTRACT ENGINEERS' : 'ASSIGNED CONTRACT ENGINEER')
+    row(assignees.map(c => c.name).join(', '), tender.psfCompletedAt || '')
+  }
+
+  reportFooter(doc, tender)
+  doc.save(`${tender.id}-PSF-Strategy.pdf`)
 }
 
 export function exportClosureReportPDF(tender) {

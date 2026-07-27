@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { Component } from 'react'
 
 class ErrorBoundary extends Component {
@@ -22,6 +22,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { TenderProvider } from './context/TenderContext'
 import { LanguageProvider } from './context/LanguageContext'
+import { NavigationProvider } from './context/NavigationContext'
 import MainLayout from './components/layout/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -41,6 +42,7 @@ import ContractExecution from './pages/ContractExecution'
 import ContractManagement from './pages/ContractManagement'
 import ContractClosure from './pages/ContractClosure'
 import StrategyTemplatesDashboard from './pages/StrategyTemplatesDashboard'
+import PsfStrategy from './pages/PsfStrategy'
 import ExcelViewer from './pages/ExcelViewer'
 import DocxViewer from './pages/DocxViewer'
 
@@ -50,15 +52,17 @@ function AdminRoute({ children }) {
   return children
 }
 
+// Technical evaluation is now owned by the Contract Holder.
 function TechEvalRoute({ children }) {
   const { user } = useAuth()
-  if (user?.role?.id !== 'tech_eval') return <Navigate to="/dashboard" replace />
+  if (user?.role?.id !== 'contract_holder') return <Navigate to="/dashboard" replace />
   return children
 }
 
+// Commercial evaluation is now owned by the Contract Engineer.
 function CommEvalRoute({ children }) {
   const { user } = useAuth()
-  if (user?.role?.id !== 'comm_eval') return <Navigate to="/dashboard" replace />
+  if (user?.role?.id !== 'pof') return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -86,6 +90,35 @@ function ContractHolderRoute({ children }) {
   return children
 }
 
+// Pre-qualification is the Contract Holder's, except the financial assessment
+// stage, which the Contract Engineer owns. The page itself gates per stage.
+function PreQualRoute({ children }) {
+  const { user } = useAuth()
+  const roleId = user?.role?.id
+  if (roleId !== 'contract_holder' && roleId !== 'pof') return <Navigate to="/dashboard" replace />
+  return children
+}
+
+function IttSectionRoute({ children }) {
+  const { user } = useAuth()
+  const roleId = user?.role?.id
+  if (!['pof','contract_holder','hse','icv'].includes(roleId)) return <Navigate to="/dashboard" replace />
+  return children
+}
+
+// Both /create-itt (picker) and /create-itt/:tenderId (a specific ITT) render
+// ITTCreation. Keying it by the tender id forces a fresh mount when you switch
+// between them — otherwise the wizard keeps its previous step, and a generated
+// ITT opened from the picker would wrongly show the "being prepared" screen.
+function CreateIttRoute() {
+  const { tenderId } = useParams()
+  return (
+    <IttSectionRoute>
+      <ITTCreation key={tenderId || 'picker'} />
+    </IttSectionRoute>
+  )
+}
+
 function ProtectedRoutes() {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
@@ -98,10 +131,11 @@ function ProtectedRoutes() {
           <Route path="/contract-strategy" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
           <Route path="/contract-strategy/:tenderId" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
           <Route path="/strategy-templates/:tenderId" element={<ContractHolderRoute><StrategyTemplatesDashboard /></ContractHolderRoute>} />
-          <Route path="/pre-qualification" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
-          <Route path="/pre-qualification/:tenderId" element={<ContractHolderRoute><PreQualification /></ContractHolderRoute>} />
-          <Route path="/create-itt" element={<PofRoute><ITTCreation /></PofRoute>} />
-          <Route path="/create-itt/:tenderId" element={<PofRoute><ITTCreation /></PofRoute>} />
+          <Route path="/psf-strategy/:tenderId" element={<ContractHolderRoute><PsfStrategy /></ContractHolderRoute>} />
+          <Route path="/pre-qualification" element={<PreQualRoute><PreQualification /></PreQualRoute>} />
+          <Route path="/pre-qualification/:tenderId" element={<PreQualRoute><PreQualification /></PreQualRoute>} />
+          <Route path="/create-itt" element={<CreateIttRoute />} />
+          <Route path="/create-itt/:tenderId" element={<CreateIttRoute />} />
           <Route path="/upload" element={<PofRoute><BidderUpload /></PofRoute>} />
           <Route path="/upload/:tenderId" element={<PofRoute><BidderUpload /></PofRoute>} />
           <Route path="/technical-eval" element={<TechEvalRoute><TechnicalEvaluation /></TechEvalRoute>} />
@@ -137,12 +171,14 @@ export default function App() {
           <AuthProvider>
             <TenderProvider>
               <LanguageProvider>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/excel-viewer" element={<ExcelViewer />} />
-                  <Route path="/docx-viewer" element={<DocxViewer />} />
-                  <Route path="/*" element={<ProtectedRoutes />} />
-                </Routes>
+                <NavigationProvider>
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/excel-viewer" element={<ExcelViewer />} />
+                    <Route path="/docx-viewer" element={<DocxViewer />} />
+                    <Route path="/*" element={<ProtectedRoutes />} />
+                  </Routes>
+                </NavigationProvider>
               </LanguageProvider>
             </TenderProvider>
           </AuthProvider>

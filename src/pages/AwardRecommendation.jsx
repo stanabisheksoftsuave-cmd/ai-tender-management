@@ -7,6 +7,7 @@ import TenderSelectList from '../components/ui/TenderSelectList'
 import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+import { useNavigation } from '../context/NavigationContext'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -30,7 +31,8 @@ const Download       = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 
 const Bot            = p => <Svg {...p}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></Svg>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const combined = b => Math.round((b.techScore ?? 75) * 0.6 + (b.commScore ?? 70) * 0.4)
+// Combined score = simple average of the technical and commercial results, out of 100.
+const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
 
 const scoreBar = (val, max = 100) => (
   <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -43,6 +45,7 @@ const scoreBar = (val, max = 100) => (
 export default function AwardRecommendation() {
   const { tenderId } = useParams()
   const navigate     = useNavigate()
+  const { goBack }   = useNavigation()
   const { user }     = useAuth()
   const { tenders, advanceTender, updateTender } = useTenders()
 
@@ -128,9 +131,9 @@ export default function AwardRecommendation() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <button onClick={() => navigate('/dashboard')}
+              <button onClick={goBack}
                 className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                <ArrowLeft size={12} /> Dashboard
+                <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
@@ -177,9 +180,9 @@ export default function AwardRecommendation() {
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Bidder</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500">Compliance</th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-blue-500">Technical Score<br/><span className="font-normal text-slate-400">60% weight</span></th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-violet-500">Commercial Score<br/><span className="font-normal text-slate-400">40% weight</span></th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-slate-600">Combined</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-blue-500">Technical Score<br/><span className="font-normal text-slate-400">out of 100</span></th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-violet-500">Commercial Score<br/><span className="font-normal text-slate-400">out of 100</span></th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-slate-600">Combined<br/><span className="font-normal text-slate-400">average</span></th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500">Decision</th>
               </tr>
             </thead>

@@ -4,14 +4,17 @@ import { tenders as initialTenders } from '../data/mockData'
 const TenderContext = createContext()
 
 const NEXT_STATUS = {
-  draft:            { status: 'upload',           stage: 'Awaiting Ingestion' },
-  upload:           { status: 'tech_eval',         stage: 'Technical Evaluation',   evalProgress: 'not_started' },
-  tech_eval:        { status: 'tech_eval_export',  stage: 'Awaiting Contract Engineer Upload', evalProgress: 'not_started' },
-  tech_eval_export: { status: 'comm_eval',         stage: 'Commercial Evaluation',  evalProgress: 'not_started' },
-  comm_eval:        { status: 'comm_eval_export',  stage: 'Awaiting Contract Engineer Upload', evalProgress: 'not_started' },
-  comm_eval_export: { status: 'mgmt_review',       stage: 'Management Review',      evalProgress: 'not_started' },
-  mgmt_review:      { status: 'award',             stage: 'Award Recommended' },
-  award:            { status: 'legal_review',      stage: 'Legal Review' },
+  draft:            { status: 'upload',      stage: 'Awaiting Ingestion' },
+  upload:           { status: 'tech_eval',   stage: 'Technical Evaluation',  evalProgress: 'not_started' },
+  // Bidder documents are uploaded up-front at ingestion, so evaluations advance
+  // straight to the next stage — there is no post-evaluation report-upload step.
+  tech_eval:        { status: 'comm_eval',   stage: 'Commercial Evaluation', evalProgress: 'not_started' },
+  comm_eval:        { status: 'mgmt_review',  stage: 'Management Review',     evalProgress: 'not_started' },
+  mgmt_review:      { status: 'award',        stage: 'Award Recommended' },
+  // The procurement flow ends once the contract is created — it does not
+  // continue to legal review / execution.
+  award:            { status: 'active',       stage: 'Contract Active' },
+  // Retained for any seed tenders already in these later contract stages.
   legal_review:     { status: 'contract_execution',stage: 'Contract Execution' },
   contract_execution:{ status: 'active',           stage: 'Contract Active' },
   active:           { status: 'contract_closure',  stage: 'Closure In Progress' },
@@ -29,6 +32,18 @@ const DEFAULT_DROPDOWN_CONFIG = {
     'Call-Off Contract',
   ],
   tenderTypes: ['Goods', 'Services', 'Works', 'Consultancy'],
+  departments: [
+    'IT',
+    'Supply Chain',
+    'Operations',
+    'Engineering',
+    'Finance',
+    'Human Resources',
+    'HSSE',
+    'Legal',
+    'Maintenance',
+    'Projects',
+  ],
   contractRisks: ['Low', 'Medium', 'High', 'Critical'],
   currencies: [
     { code: 'USD', symbol: '$', label: 'USD — US Dollar' },
@@ -39,8 +54,47 @@ const DEFAULT_DROPDOWN_CONFIG = {
   ],
 }
 
+// Tenders are persisted to localStorage so multi-role handoffs survive the
+// logout/login used to switch roles (e.g. the Contract Holder generates an ITT,
+// then the Contract Engineer / HSE / ICV log in to fill their sections). Bump
+// TENDERS_VERSION to force every client back to the seed data.
+const TENDERS_KEY = 'atm_tenders'
+const TENDERS_VERSION_KEY = 'atm_tenders_v'
+const TENDERS_VERSION = '2'
+
+function loadTenders() {
+  try {
+    if (localStorage.getItem(TENDERS_VERSION_KEY) !== TENDERS_VERSION) {
+      localStorage.setItem(TENDERS_VERSION_KEY, TENDERS_VERSION)
+      localStorage.removeItem(TENDERS_KEY)
+      return initialTenders
+    }
+    const saved = localStorage.getItem(TENDERS_KEY)
+    if (!saved) return initialTenders
+    const parsed = JSON.parse(saved)
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialTenders
+    // Keep any brand-new seed tenders that aren't in the saved set yet.
+    const ids = new Set(parsed.map(t => t.id))
+    const missingSeeds = initialTenders.filter(t => !ids.has(t.id))
+    return [...parsed, ...missingSeeds]
+  } catch {
+    return initialTenders
+  }
+}
+
 export function TenderProvider({ children }) {
-  const [tenders, setTenders] = useState(initialTenders)
+  const [tenders, setTenders] = useState(loadTenders)
+
+  // Persist on every change. File/Blob fields (uploaded documents) serialise to
+  // {} — acceptable for the demo, since the workflow-critical fields (status,
+  // sectionsGenerated, sectionAnswers, psfCompleted, bidderList) are plain data.
+  useEffect(() => {
+    try {
+      localStorage.setItem(TENDERS_KEY, JSON.stringify(tenders))
+    } catch {
+      /* quota or non-serialisable value — ignore, keep in-memory state */
+    }
+  }, [tenders])
 
   // ── Admin-configurable dropdown options (persisted to localStorage) ──
   const [dropdownConfig, setDropdownConfig] = useState(() => {
@@ -72,12 +126,17 @@ export function TenderProvider({ children }) {
   }
 
   // ── Parallel evaluation ──
-  // An evaluator submits their side (tech/comm) of a parallel tender. The side
-  // moves to 'awaiting_report' so the Contract Engineer can upload its report.
+  // An evaluator submits their side (tech/comm) of a parallel tender. The side is
+  // marked done immediately (no post-evaluation report upload); once both sides
+  // are done the tender converges to Management Review.
   const submitParallelEval = (tenderId, side) => {
     setTenders(prev => prev.map(t => {
       if (t.id !== tenderId) return t
-      return { ...t, [side === 'tech' ? 'techSide' : 'commSide']: 'awaiting_report' }
+      const updated = { ...t, [side === 'tech' ? 'techSide' : 'commSide']: 'done' }
+      if (updated.techSide === 'done' && updated.commSide === 'done') {
+        return { ...updated, status: 'mgmt_review', stage: 'Management Review', evalProgress: 'not_started' }
+      }
+      return updated
     }))
   }
 

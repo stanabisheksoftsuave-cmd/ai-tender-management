@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { ExcelRenderer, OutTable } from 'react-excel-renderer'
 import * as XLSX from 'xlsx'
-import { FileSpreadsheet, Download, AlertTriangle, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileSpreadsheet, Download, AlertTriangle, Loader2 } from 'lucide-react'
 
 /**
  * Standalone, public full-screen viewer that renders spreadsheet data as an HTML
@@ -30,6 +30,7 @@ function colsFor(rows) {
 
 export default function ExcelViewer() {
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const dataKey = params.get('data')
   const fileUrl = params.get('file')
   const name = params.get('name') || 'Spreadsheet'
@@ -89,6 +90,17 @@ export default function ExcelViewer() {
     return () => { cancelled = true }
   }, [dataKey, fileUrl])
 
+  // This viewer is usually opened in a new tab, where there is nothing to go back
+  // to — window.close() only works for script-opened tabs, hence the fallback.
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    window.close()
+    setTimeout(() => { if (!window.closed) navigate('/dashboard') }, 150)
+  }
+
   const handleDownload = () => {
     // Filled data → export a real .xlsx built from the values.
     if (aoa) {
@@ -140,6 +152,18 @@ export default function ExcelViewer() {
         background: '#fff', borderBottom: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <button
+            onClick={handleBack}
+            aria-label="Back"
+            title="Back"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10,
+              background: '#f1f5f9', color: '#475569', fontSize: 13, fontWeight: 600,
+              border: '1px solid #e2e8f0', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16,185,129,0.12)', flexShrink: 0 }}>
             <FileSpreadsheet size={18} style={{ color: '#10b981' }} />
           </div>

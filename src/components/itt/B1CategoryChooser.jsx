@@ -22,9 +22,6 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
     setPreviewState({ model: null, loading: false, error: null })
   }, [key])
 
-  const goPrev = () => setIndex(i => (i - 1 + CATEGORY_KEYS.length) % CATEGORY_KEYS.length)
-  const goNext = () => setIndex(i => (i + 1) % CATEGORY_KEYS.length)
-
   const togglePreview = () => {
     if (previewOpen) { setPreviewOpen(false); return }
     setPreviewOpen(true)
@@ -128,102 +125,78 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
         </button>
       </div>
 
-      <div className="flex items-stretch gap-3">
-        <button
-          onClick={goPrev}
-          aria-label="Previous category"
-          className="shrink-0 self-center w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105"
-          style={{
-            background: 'rgba(0,137,207,0.06)',
-            border: '1px solid rgba(0,137,207,0.15)',
-            color: '#0089cf'
-          }}>
-          <ChevronLeft size={16} />
-        </button>
-
-        <div className="flex-1 min-w-0 rounded-xl p-4 transition-all" style={{
-          background: 'linear-gradient(135deg, rgba(0,137,207,0.05), rgba(236,244,252,0.6))',
-          border: '2px solid rgba(0,137,207,0.25)',
-          boxShadow: '0 0 0 4px rgba(0,137,207,0.06), 0 4px 16px rgba(0,137,207,0.08)'
-        }}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold" style={{ color: '#1b4c6f' }}>{cat.label}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">{cat.sub}</p>
-            </div>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0089cf, #00b4d8)' }}>
-              <CheckCircle size={14} className="text-white" />
-            </div>
-          </div>
-
-          {cat.isStandIn && (
-            <div className="mt-3 flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[10px]" style={{
-              background: 'rgba(230,156,0,0.06)',
-              border: '1px solid rgba(230,156,0,0.2)',
-              color: '#b07600'
-            }}>
-              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-              Dedicated template not yet available — uses the nearest {cat.nearestTier} template as a stand-in.
-            </div>
-          )}
-
-          <button
-            onClick={togglePreview}
-            className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 transition-colors"
-            style={{ color: '#0089cf' }}>
-            {previewOpen ? <EyeOff size={12} /> : <Eye size={12} />}
-            {previewOpen ? 'Hide preview' : 'Preview template'}
-          </button>
-
-          {previewOpen && (
-            <div className="mt-3 rounded-lg bg-white max-h-72 overflow-y-auto px-4 py-4 text-[12px] leading-5 text-slate-700" style={{ border: '1px solid #cce6f8' }}>
-              {previewState.loading && (
-                <div className="flex items-center justify-center gap-2 py-10 text-xs" style={{ color: '#0089cf' }}>
-                  <Loader2 size={14} className="animate-spin" /> Loading preview…
-                </div>
-              )}
-              {previewState.error && (
-                <div className="text-center py-10 text-xs text-red-500">{previewState.error}</div>
-              )}
-              {previewState.model && (
-                <>
-                  <div className="flex items-center gap-1.5 mb-3 text-slate-400">
-                    <FileText size={12} />
-                    <span className="text-[10px]">Read-only preview · highlighted fields will be filled in the next step</span>
-                  </div>
-                  {renderBlocks(previewState.model.blocks)}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={goNext}
-          aria-label="Next category"
-          className="shrink-0 self-center w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-105"
-          style={{
-            background: 'rgba(0,137,207,0.06)',
-            border: '1px solid rgba(0,137,207,0.15)',
-            color: '#0089cf'
-          }}>
-          <ChevronRight size={16} />
-        </button>
+      {/* Category dropdown — the user picks the tier that applies to this contract */}
+      <div className="mb-4">
+        <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>
+          Select the value / risk tier that applies to this contract
+        </label>
+        <select
+          value={key}
+          onChange={e => setIndex(CATEGORY_KEYS.indexOf(e.target.value))}
+          className="w-full px-3.5 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0089cf]/30"
+          style={{ border: '1px solid rgba(0,137,207,0.25)', background: '#fff', color: '#1b4c6f' }}
+        >
+          {CATEGORY_KEYS.map(k => (
+            <option key={k} value={k}>{B1_CATEGORY_MAP[k].label} — {B1_CATEGORY_MAP[k].sub}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="flex items-center justify-center gap-1.5 mt-4">
-        {CATEGORY_KEYS.map((k, i) => (
-          <button
-            key={k}
-            onClick={() => setIndex(i)}
-            aria-label={`Go to ${B1_CATEGORY_MAP[k].label}`}
-            className="rounded-full transition-all"
-            style={i === index
-              ? { width: '20px', height: '6px', background: 'linear-gradient(90deg, #1b4c6f, #0089cf)' }
-              : { width: '6px', height: '6px', background: '#cce6f8' }
-            }
-          />
-        ))}
+      <div className="rounded-xl p-4 transition-all" style={{
+        background: 'linear-gradient(135deg, rgba(0,137,207,0.05), rgba(236,244,252,0.6))',
+        border: '2px solid rgba(0,137,207,0.25)',
+        boxShadow: '0 0 0 4px rgba(0,137,207,0.06), 0 4px 16px rgba(0,137,207,0.08)'
+      }}>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-bold" style={{ color: '#1b4c6f' }}>{cat.label}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{cat.sub}</p>
+          </div>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0089cf, #00b4d8)' }}>
+            <CheckCircle size={14} className="text-white" />
+          </div>
+        </div>
+
+        {cat.isStandIn && (
+          <div className="mt-3 flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[10px]" style={{
+            background: 'rgba(230,156,0,0.06)',
+            border: '1px solid rgba(230,156,0,0.2)',
+            color: '#b07600'
+          }}>
+            <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+            Dedicated template not yet available — uses the nearest {cat.nearestTier} template as a stand-in.
+          </div>
+        )}
+
+        <button
+          onClick={togglePreview}
+          className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 transition-colors"
+          style={{ color: '#0089cf' }}>
+          {previewOpen ? <EyeOff size={12} /> : <Eye size={12} />}
+          {previewOpen ? 'Hide preview' : 'Preview template'}
+        </button>
+
+        {previewOpen && (
+          <div className="mt-3 rounded-lg bg-white max-h-72 overflow-y-auto px-4 py-4 text-[12px] leading-5 text-slate-700" style={{ border: '1px solid #cce6f8' }}>
+            {previewState.loading && (
+              <div className="flex items-center justify-center gap-2 py-10 text-xs" style={{ color: '#0089cf' }}>
+                <Loader2 size={14} className="animate-spin" /> Loading preview…
+              </div>
+            )}
+            {previewState.error && (
+              <div className="text-center py-10 text-xs text-red-500">{previewState.error}</div>
+            )}
+            {previewState.model && (
+              <>
+                <div className="flex items-center gap-1.5 mb-3 text-slate-400">
+                  <FileText size={12} />
+                  <span className="text-[10px]">Read-only preview · highlighted fields will be filled in the next step</span>
+                </div>
+                {renderBlocks(previewState.model.blocks)}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center mt-5 pt-4" style={{ borderTop: '1px solid rgba(0,137,207,0.1)' }}>

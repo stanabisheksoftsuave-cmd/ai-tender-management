@@ -84,7 +84,8 @@ export default function Login() {
     if (result === 'inactive')          { setError(t('login.error.inactive')); return }
     if (result === 'must_set_password') { setNeedsSetPassword(true); setPassword(''); setError(''); return }
     if (result === 'invalid')           { setError(t('login.error.invalid')); return }
-    navigate('/dashboard')
+    // replace, so Back from the dashboard never lands on the login screen
+    navigate('/dashboard', { replace: true })
   }
 
   const handleSetPassword = () => {
@@ -95,7 +96,7 @@ export default function Login() {
     const result = setFirstPassword(username.trim(), newPassword)
     if (result === 'not_found')  { setError(t('login.error.notFound')); return }
     if (result === 'inactive')   { setError(t('login.error.inactive')); return }
-    navigate('/dashboard')
+    navigate('/dashboard', { replace: true })
   }
 
   const fillCredentials = (u) => {

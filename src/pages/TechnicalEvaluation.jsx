@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
-import { bidders as seedBidders, technicalCriteria as defaultTechCriteria } from '../data/mockData'
+import { bidders as seedBidders, technicalCriteria as defaultTechCriteria, technicalEvalParts, TECHNICAL_OVERALL_PASS } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+import { useBackHandler, useDismissable, useNavigation } from '../context/NavigationContext'
+import { openHtmlDoc, scoreRationaleDoc, failReasonDoc, scoreNarrative, scoreEvidence } from '../utils/docGen'
 
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -34,7 +36,6 @@ const Zap            = p => <Svg {...p}><polygon points="13 2 3 14 12 14 11 22 2
 const Users          = p => <Svg {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>
 const Shield         = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Svg>
 const ScanSearch     = p => <Svg {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M18.5 18.5l2.5 2.5"/></Svg>
-const BarChart3      = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></Svg>
 const Download       = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
 const Clock          = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
 const Upload         = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
@@ -243,6 +244,7 @@ function MetricRow({ metric, present, kind, onViewProof }) {
 export default function TechnicalEvaluation() {
   const { tenderId } = useParams()
   const navigate   = useNavigate()
+  const { goBack } = useNavigation()
   const { user }   = useAuth()
   const { tenders, advanceTender, updateTender, submitParallelEval } = useTenders()
 
@@ -265,10 +267,13 @@ export default function TechnicalEvaluation() {
   const [activeTab,        setActiveTab]        = useState('compliance') // 'compliance' | 'scoring'
   const [techScores,       setTechScores]       = useState({})
   const [techCriteria]                          = useState(defaultTechCriteria)
+  const [overallPass,      setOverallPass]      = useState(TECHNICAL_OVERALL_PASS)
   const [aiScored,    setAiScored]    = useState(false)
   const [aiScoring,   setAiScoring]   = useState(false)
   const [aiScoreStep, setAiScoreStep] = useState(0)
   const [aiModified,  setAiModified]  = useState({})
+  // In-UI justification modal: { kind: 'score' | 'fail', ...context }
+  const [rationaleModal, setRationaleModal] = useState(null)
   const eligibleBiddersRef            = useRef([])
 
   const AI_STEPS = [
@@ -298,6 +303,16 @@ export default function TechnicalEvaluation() {
   ]
 
   const tender = tenders.find(t => t.id === tenderId)
+
+  useDismissable(!!proofModal, () => setProofModal(null))
+  useDismissable(!!rationaleModal, () => setRationaleModal(null))
+
+  // Shared Back unwinds the submit view, then the tab, before it unwinds the route
+  useBackHandler(() => {
+    if (showSubmit) { setShowSubmit(false); return true }
+    if (activeTab === 'scoring') { setActiveTab('compliance'); return true }
+    return false
+  }, [showSubmit, activeTab])
 
   // Derived values needed before hooks (avoids temporal dead zone with allFinalized)
   const tenderBidders   = Array.isArray(tender?.bidderList)
@@ -426,9 +441,11 @@ export default function TechnicalEvaluation() {
     if (aiScoreStep >= techCriteria.length + 2) {
       const result = {}
       eligibleBiddersRef.current.forEach(bidder => {
-        techCriteria.forEach(c => {
+        // Criterion ids are strings now ('p1m1'…), so seed off the index, not
+        // Number(c.id) which would be NaN and blank every score.
+        techCriteria.forEach((c, ci) => {
           const base = ((bidder.techScore ?? 75) / 100) * 3
-          const seed = (Number(bidder.id) * 17 + Number(c.id) * 7) % 10
+          const seed = (Number(bidder.id) * 17 + ci * 7) % 10
           const variation = (seed - 5) * 0.12
           result[`${bidder.id}-${c.id}`] = Math.min(3, Math.max(0, Math.round(base + variation)))
         })
@@ -443,8 +460,8 @@ export default function TechnicalEvaluation() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiScoring, aiScoreStep])
 
-  // ── Role gate ──
-  if (user?.role?.id !== 'tech_eval') {
+  // ── Role gate — technical evaluation is owned by the Contract Holder ──
+  if (user?.role?.id !== 'contract_holder') {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -452,7 +469,7 @@ export default function TechnicalEvaluation() {
         </div>
         <div className="text-center">
           <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
-          <p className="text-xs text-slate-400 mt-1">Technical Evaluation is only accessible to Technical Evaluators.</p>
+          <p className="text-xs text-slate-400 mt-1">Technical Evaluation is only accessible to the Contract Holder.</p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
           <ArrowLeft size={13} /> Back to Dashboard
@@ -589,9 +606,9 @@ export default function TechnicalEvaluation() {
     return (
       <div className="space-y-5">
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/dashboard')}
+          <button onClick={goBack}
             className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-            <ArrowLeft size={12} /> Dashboard
+            <ArrowLeft size={12} /> Back
           </button>
           <span className="text-slate-300">/</span>
           <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
@@ -660,12 +677,20 @@ export default function TechnicalEvaluation() {
     const num = value === '' ? '' : Math.min(3, Math.max(0, Number(value)))
     setTechScores(prev => ({ ...prev, [`${bidderId}-${criterionId}`]: num }))
   }
+  const rawScore = (bidderId, cId) => {
+    const s = techScores[`${bidderId}-${cId}`]
+    return s === '' || s === undefined ? 0 : Number(s)
+  }
+  // Excel formula: weighted contribution = (score / maxScore) × weight, so a
+  // full 3 earns the whole weight and every criterion sums to 100.
+  const techWeighted = (bidderId, c) => (rawScore(bidderId, c.id) / (c.maxScore || 3)) * c.weight
   const techTotalFor = bidderId =>
-    techCriteria.reduce((sum, c) => {
-      const s = techScores[`${bidderId}-${c.id}`]
-      return sum + ((s === '' || s === undefined ? 0 : Number(s)) * c.weight / 100)
-    }, 0)
+    techCriteria.reduce((sum, c) => sum + techWeighted(bidderId, c), 0)
+  const techPartTotal = (bidderId, partId) =>
+    techCriteria.filter(c => c.part === partId).reduce((sum, c) => sum + techWeighted(bidderId, c), 0)
+
   const hasTechScores = bidderId => techCriteria.some(c => techScores[`${bidderId}-${c.id}`] !== undefined)
+  const techFullyScored = bidderId => techCriteria.every(c => { const v = techScores[`${bidderId}-${c.id}`]; return v !== undefined && v !== '' })
   const eligibleBidders = displayBidders.filter(b =>
     getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT) !== 'non_compliant'
   )
@@ -673,11 +698,23 @@ export default function TechnicalEvaluation() {
   const allTechScored = eligibleBidders.length > 0 && eligibleBidders.every(b =>
     techCriteria.every(c => { const v = techScores[`${b.id}-${c.id}`]; return v !== undefined && v !== '' })
   )
+
+  // Per-criterion 0–3 band, used for the cell badge.
   const getScoreCompliance = score => {
-    if (score >= 2) return { variant: 'compliant',         label: 'Compliant' }
-    if (score >= 1) return { variant: 'partial_compliant', label: 'Partial' }
-    return             { variant: 'non_compliant',     label: 'Non-Compliant' }
+    if (score >= 2) return { variant: 'compliant',         label: 'Acceptable' }
+    if (score >= 1) return { variant: 'partial_compliant', label: 'Marginal' }
+    return             { variant: 'non_compliant',     label: 'Unacceptable' }
   }
+  const HSE_BANDS = ['—', 'Red', 'Amber', 'Green']
+  const hseCriterion = techCriteria.find(c => c.isHse)
+  const hseBanding = bidderId => HSE_BANDS[rawScore(bidderId, hseCriterion?.id)] || '—'
+
+  // Musts that a bidder scored below their minimum — these fail the bidder
+  // regardless of the weighted total.
+  const mustFailures = bidderId =>
+    techCriteria.filter(c => c.type === 'Must' && c.minScore != null && rawScore(bidderId, c.id) < c.minScore)
+  const techPassFail = bidderId =>
+    mustFailures(bidderId).length === 0 && techTotalFor(bidderId) >= overallPass ? 'PASS' : 'FAIL'
 
   const handleNotifyPOF = (bidder) => {
     if (notifications.some(n => n.bidder.id === bidder.id)) return
@@ -925,6 +962,10 @@ export default function TechnicalEvaluation() {
           <button
             disabled={!canSubmit}
             onClick={() => {
+              // Persist each bidder's technical result so it can be combined with
+              // the commercial score at Management Review / Contract Creation.
+              const scoredBidders = tenderBidders.map(b => ({ ...b, techScore: Math.round(techTotalFor(b.id)) }))
+              updateTender(tenderId, { bidderList: scoredBidders })
               if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'tech')
               else advanceTender(tenderId)
               navigate('/dashboard')
@@ -952,14 +993,115 @@ export default function TechnicalEvaluation() {
         />
       )}
 
+      {/* ── AI justification / fail-reasoning modal (in-UI) ── */}
+      {rationaleModal && (() => {
+        const m = rationaleModal
+        const belowMin = m.kind === 'score' && m.criterionType === 'Must' && m.minScore != null && m.score < m.minScore
+        const scoreCls = belowMin ? 'bg-red-100 text-red-700'
+          : m.score >= 3 ? 'bg-emerald-100 text-emerald-700'
+          : m.score >= 2 ? 'bg-blue-100 text-blue-700'
+          : m.score >= 1 ? 'bg-amber-100 text-amber-700'
+          : 'bg-red-100 text-red-700'
+        const openDoc = () => {
+          const d = m.kind === 'score'
+            ? scoreRationaleDoc({ tenderId: tender.id, tenderTitle: tender.title, evaluatorName: user?.name, ...m })
+            : failReasonDoc({ tenderId: tender.id, tenderTitle: tender.title, evaluatorName: user?.name, ...m })
+          openHtmlDoc(d.title, d.content)
+        }
+        return (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setRationaleModal(null)}>
+            <Card className="w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Bot size={16} className="text-[var(--color-primary)]" />
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {m.kind === 'score' ? 'AI Score Justification' : 'AI Fail Reasoning'}
+                  </h3>
+                </div>
+                <button onClick={() => setRationaleModal(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400"><X size={15} /></button>
+              </div>
+
+              <div className="px-5 py-4 space-y-4 overflow-y-auto">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{m.bidderName}</p>
+                  {m.kind === 'score' && <p className="text-xs text-slate-500">{m.criterion}</p>}
+                </div>
+
+                {m.kind === 'score' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <div className="text-slate-500">Type: <span className="font-semibold text-slate-700">{m.criterionType || '—'}</span></div>
+                      <div className="text-slate-500">Weight: <span className="font-semibold text-slate-700">{m.weight != null ? `${m.weight}%` : '—'}</span></div>
+                      <div className="text-slate-500 flex items-center gap-1.5">Awarded: <span className={`font-bold px-2 py-0.5 rounded-full ${scoreCls}`}>{m.score} / 3</span></div>
+                      {m.minScore != null && (
+                        <div className="text-slate-500">Min required: <span className="font-semibold text-slate-700">{m.minScore}</span>{belowMin && <span className="ml-1 text-[10px] font-bold text-red-600">below min</span>}</div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Scoring Band</p>
+                      <p className="text-sm text-slate-700 bg-blue-50/60 border-l-2 border-[var(--color-primary)] px-3 py-2 rounded">{m.band || 'Band description not available for this score.'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">AI Justification</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">{scoreNarrative(m.score)}</p>
+                      {belowMin && <p className="text-xs text-red-600 mt-2">This is a <b>Must</b> criterion scored below the minimum threshold — on its own, sufficient to fail the bidder at the technical stage.</p>}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Evidence Reviewed</p>
+                      <ul className="text-xs text-slate-600 list-disc pl-4 space-y-1">
+                        {scoreEvidence(m.bidderName, m.criterion).map((e, i) => <li key={i}>{e}</li>)}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <div className="text-slate-500 flex items-center gap-1.5">Result: <span className="font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">FAIL</span></div>
+                      <div className="text-slate-500">Pass mark: <span className="font-semibold text-slate-700">{m.overallPass}</span></div>
+                      <div className="text-slate-500 col-span-2">Weighted total: <span className="font-semibold text-slate-700">{Number(m.total).toFixed(1)} / 100</span></div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Why this bidder did not pass</p>
+                      {m.fails.length > 0 ? (
+                        <ul className="text-sm text-slate-700 space-y-1.5">
+                          {m.fails.map((f, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <XCircle size={13} className="text-red-500 mt-0.5 shrink-0" />
+                              <span><b>{f.criterion}</b> — scored {f.score} / 3, minimum required {f.minScore}.{f.band ? ` ${f.band}` : ''}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-slate-700">All mandatory (Must) criteria met their minimum, but the overall weighted score of <b>{Number(m.total).toFixed(1)}</b> is below the required pass mark of <b>{m.overallPass}</b>.</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">AI Summary</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        Based on the recorded scores, {m.bidderName} does not satisfy the technical qualification criteria for this tender and is not carried forward to the commercial stage.{m.fails.length > 0 ? ' The mandatory shortfalls listed above are decisive.' : ''}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100 shrink-0">
+                <Button variant="secondary" size="sm" onClick={openDoc}><FileText size={13} /> Open as document</Button>
+                <Button size="sm" onClick={() => setRationaleModal(null)}>Close</Button>
+              </div>
+            </Card>
+          </div>
+        )
+      })()}
+
       {/* ── Page Header ── */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <button onClick={() => navigate('/dashboard')}
+              <button onClick={goBack}
                 className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                <ArrowLeft size={12} /> Dashboard
+                <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
@@ -1407,23 +1549,29 @@ export default function TechnicalEvaluation() {
             </button>
           </div>
         )}
-        {/* Technical Scoring Table */}
+        {/* Technical Scoring Matrix — Appendix I model */}
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <div className="flex items-center justify-between gap-4 flex-wrap px-4 py-3 border-b border-slate-100">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Technical Evaluation Criteria</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Score 0–3 per criterion · 0 Unacceptable · 1 Marginal · 2 Acceptable · 3 Excellent</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Technical Evaluation Model</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Score 0–3 per criterion (0 No info · 1 · 2 · 3 Best). Weighted contribution = (score ÷ 3) × weight; weights total 100.</p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              <BarChart3 size={12} /> Weighted scoring
-            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              Overall pass ≥
+              <input type="number" min={0} max={100} value={overallPass}
+                onChange={e => setOverallPass(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                className="w-14 text-center font-semibold border border-slate-200 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30" />
+              %
+            </label>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 min-w-52">Criterion</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 w-16">Weight</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 min-w-56">Criterion</th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-slate-500 w-16">Type</th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-slate-500 w-14">Weight</th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-slate-500 w-12">Min</th>
                   {displayBidders.map(b => {
                     const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
                     return (
@@ -1438,80 +1586,174 @@ export default function TechnicalEvaluation() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {techCriteria.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3 text-sm font-medium text-slate-700">{c.criterion}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{c.weight}%</span>
-                    </td>
-                    {displayBidders.map(b => {
-                      const scoreKey = `${b.id}-${c.id}`
-                      const val = techScores[scoreKey]
-                      const hasVal = val !== undefined && val !== ''
-                      const scoreComp = hasVal ? getScoreCompliance(Number(val)) : null
-                      const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
-                      return (
-                        <td key={b.id} className="px-3 py-3 text-center">
-                          {bStatus === 'non_compliant' ? (
-                            <span className="text-xs text-slate-200">—</span>
-                          ) : (
-                            <div className="flex flex-col items-center gap-1.5">
-                              <div className="relative">
-                                <input
-                                  type="number" min={0} max={3} step={1}
-                                  value={val ?? ''}
-                                  placeholder="—"
-                                  onChange={e => {
-                                    setTechScore(b.id, c.id, e.target.value)
-                                    if (aiScored) setAiModified(prev => ({ ...prev, [scoreKey]: true }))
-                                  }}
-                                  className={`w-16 text-center text-sm font-semibold rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300 ${
-                                    aiScored && !aiModified[scoreKey] && hasVal
-                                      ? 'border-2 border-blue-300 bg-blue-50/40'
-                                      : 'border border-slate-200'
-                                  }`}
-                                />
-                                {aiScored && !aiModified[scoreKey] && hasVal && (
-                                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                                    <Bot size={8} />
-                                  </div>
-                                )}
-                              </div>
-                              {aiScored && aiModified[scoreKey] && (
-                                <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">Modified</span>
-                              )}
-                              {hasVal && scoreComp && (
-                                <Badge variant={scoreComp.variant} className="text-[9px] px-1.5 py-0">{scoreComp.label}</Badge>
-                              )}
-                            </div>
-                          )}
+                {technicalEvalParts.map(part => (
+                  <Fragment key={part.id}>
+                    <tr className="bg-slate-100/70">
+                      <td colSpan={4 + displayBidders.length} className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        {part.title} <span className="text-slate-400 font-semibold">· section weight {part.sectionWeight}%</span>
+                      </td>
+                    </tr>
+                    {part.criteria.map(c => (
+                      <tr key={c.id} className="hover:bg-slate-50/50 align-top">
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-slate-700">{c.criterion}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 max-w-xs whitespace-normal">{c.detail}</p>
                         </td>
-                      )
-                    })}
-                  </tr>
+                        <td className="px-2 py-3 text-center">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${c.type === 'Must' ? 'text-indigo-700 bg-indigo-50 border border-indigo-200' : 'text-slate-500 bg-slate-100 border border-slate-200'}`}>{c.type}</span>
+                        </td>
+                        <td className="px-2 py-3 text-center">
+                          <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{c.weight}%</span>
+                        </td>
+                        <td className="px-2 py-3 text-center text-xs text-slate-500">{c.minScore ?? '—'}</td>
+                        {displayBidders.map(b => {
+                          const scoreKey = `${b.id}-${c.id}`
+                          const val = techScores[scoreKey]
+                          const hasVal = val !== undefined && val !== ''
+                          const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                          const belowMin = c.type === 'Must' && c.minScore != null && hasVal && Number(val) < c.minScore
+                          return (
+                            <td key={b.id} className="px-3 py-3 text-center">
+                              {bStatus === 'non_compliant' ? (
+                                <span className="text-xs text-slate-200">—</span>
+                              ) : (
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="relative">
+                                    <input
+                                      type="number" min={0} max={3} step={1}
+                                      value={val ?? ''}
+                                      placeholder="—"
+                                      title={hasVal ? c.bands?.[Number(val)] : undefined}
+                                      onChange={e => {
+                                        setTechScore(b.id, c.id, e.target.value)
+                                        if (aiScored) setAiModified(prev => ({ ...prev, [scoreKey]: true }))
+                                      }}
+                                      className={`w-14 text-center text-sm font-semibold rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300 ${
+                                        belowMin ? 'border-2 border-red-300 bg-red-50'
+                                        : aiScored && !aiModified[scoreKey] && hasVal ? 'border-2 border-blue-300 bg-blue-50/40'
+                                        : 'border border-slate-200'
+                                      }`}
+                                    />
+                                    {aiScored && !aiModified[scoreKey] && hasVal && !belowMin && (
+                                      <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                                        <Bot size={8} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  {hasVal && (
+                                    <span className="text-[10px] font-semibold text-slate-500">{techWeighted(b.id, c).toFixed(1)}<span className="text-slate-300">/{c.weight}</span></span>
+                                  )}
+                                  {belowMin && <span className="text-[9px] font-bold text-red-600">below min</span>}
+                                  {hasVal && (
+                                    <button
+                                      type="button"
+                                      title="Show the AI justification for this score"
+                                      onClick={() => setRationaleModal({
+                                        kind: 'score',
+                                        bidderName: b.name, criterion: c.criterion, criterionType: c.type,
+                                        score: Number(val), weight: c.weight,
+                                        band: c.bands?.[Number(val)], minScore: c.minScore,
+                                      })}
+                                      className="flex items-center gap-0.5 text-[9px] font-semibold hover:underline underline-offset-2"
+                                      style={{ color: 'var(--color-primary)' }}
+                                    >
+                                      <FileText size={9} /> AI rationale
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                    {/* Part subtotal */}
+                    <tr className="bg-slate-50 border-t border-slate-100">
+                      <td colSpan={4} className="px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase">{part.title} subtotal <span className="text-slate-400">/ {part.sectionWeight}</span></td>
+                      {displayBidders.map(b => {
+                        const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                        return (
+                          <td key={b.id} className="px-3 py-2 text-center text-sm font-semibold text-slate-700">
+                            {bStatus === 'non_compliant' ? <span className="text-slate-300">—</span> : techPartTotal(b.id, part.id).toFixed(1)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot>
+                {/* HSE banding */}
+                <tr className="border-t border-slate-100">
+                  <td colSpan={4} className="px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase">Contractor QHSE Banding</td>
+                  {displayBidders.map(b => {
+                    const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                    const band = hseBanding(b.id)
+                    const cls = band === 'Green' ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                      : band === 'Amber' ? 'text-amber-700 bg-amber-50 border-amber-200'
+                      : band === 'Red' ? 'text-red-700 bg-red-50 border-red-200'
+                      : 'text-slate-400 bg-slate-50 border-slate-200'
+                    return (
+                      <td key={b.id} className="px-3 py-2 text-center">
+                        {bStatus === 'non_compliant' ? <span className="text-slate-300 text-xs">—</span>
+                          : <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cls}`}>{band}</span>}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* Grand total /100 */}
                 <tr className="bg-slate-50 border-t-2 border-slate-200">
-                  <td colSpan={2} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Weighted Total</td>
+                  <td colSpan={4} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Total Weighted Score <span className="text-slate-400">/ 100</span></td>
                   {displayBidders.map(b => {
                     const scored = hasTechScores(b.id)
-                    const score = techTotalFor(b.id)
-                    const scoreComp = getScoreCompliance(score)
+                    const total = techTotalFor(b.id)
                     const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
                     return (
                       <td key={b.id} className="px-3 py-3 text-center">
-                        {bStatus === 'non_compliant' ? (
-                          <span className="text-xs text-slate-400 italic">Eliminated</span>
-                        ) : scored ? (
-                          <>
-                            <span className={`text-base font-bold block mb-1 ${score >= 2 ? 'text-green-600' : score >= 1 ? 'text-amber-600' : 'text-red-500'}`}>
-                              {score.toFixed(2)}
-                            </span>
-                            <Badge variant={scoreComp.variant}>{scoreComp.label}</Badge>
-                          </>
-                        ) : (
-                          <span className="text-xs text-slate-300">—</span>
+                        {bStatus === 'non_compliant' ? <span className="text-xs text-slate-400 italic">Eliminated</span>
+                          : scored ? <span className={`text-lg font-bold ${total >= overallPass ? 'text-green-600' : 'text-amber-600'}`}>{total.toFixed(1)}</span>
+                          : <span className="text-xs text-slate-300">—</span>}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* Pass / Fail */}
+                <tr className="bg-slate-50">
+                  <td colSpan={4} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Result <span className="text-slate-400 normal-case font-medium">(all Musts ≥ min · total ≥ {overallPass})</span></td>
+                  {displayBidders.map(b => {
+                    const scored = techFullyScored(b.id)
+                    const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                    if (bStatus === 'non_compliant') return <td key={b.id} className="px-3 py-3 text-center"><span className="text-xs text-slate-400 italic">Eliminated</span></td>
+                    if (!scored) return <td key={b.id} className="px-3 py-3 text-center"><span className="text-xs text-slate-300">—</span></td>
+                    const result = techPassFail(b.id)
+                    const fails = mustFailures(b.id)
+                    return (
+                      <td key={b.id} className="px-3 py-3 text-center">
+                        {result === 'PASS'
+                          ? <Badge variant="compliant"><CheckCircle size={10} /> Pass</Badge>
+                          : <Badge variant="non_compliant"><XCircle size={10} /> Fail</Badge>}
+                        {result === 'FAIL' && fails.length > 0 && (
+                          <p className="text-[9px] text-red-500 mt-1">Must below min: {fails.length}</p>
+                        )}
+                        {result === 'FAIL' && (
+                          <button
+                            type="button"
+                            title="Show why this bidder failed"
+                            onClick={() => setRationaleModal({
+                              kind: 'fail',
+                              bidderName: b.name,
+                              total: techTotalFor(b.id), overallPass,
+                              fails: fails.map(fc => ({
+                                criterion: fc.criterion,
+                                score: rawScore(b.id, fc.id),
+                                minScore: fc.minScore,
+                                band: fc.bands?.[rawScore(b.id, fc.id)],
+                              })),
+                            })}
+                            className="mt-1 mx-auto flex items-center gap-0.5 text-[9px] font-semibold text-red-600 hover:underline underline-offset-2"
+                          >
+                            <FileText size={9} /> Fail reasoning
+                          </button>
                         )}
                       </td>
                     )
@@ -1565,22 +1807,23 @@ export default function TechnicalEvaluation() {
               const win = window.open('', '_blank')
               if (!win) return
               const rows = eligibleBidders.map(b => {
-                const total = techTotalFor(b)
-                const sc = getScoreCompliance(total)
+                const total = techTotalFor(b.id)
+                const result = techPassFail(b.id)
                 const cols = techCriteria.map(c => {
                   const v = techScores[`${b.id}-${c.id}`]
-                  return `<td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9">${v ?? '—'}</td>`
+                  return `<td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9">${v ?? '—'}<br><span style="font-size:9px;color:#94a3b8">${techWeighted(b.id, c).toFixed(1)}</span></td>`
                 }).join('')
                 return `<tr>
                   <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-weight:600">${b.name}</td>
                   <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:11px">${b.country}</td>
+                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:11px">${hseBanding(b.id)}</td>
                   ${cols}
-                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;color:${total>=2?'#059669':total>=1?'#d97706':'#dc2626'}">${total.toFixed(2)}</td>
-                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:600;font-size:11px;color:${sc.variant==='compliant'?'#059669':sc.variant==='partial_compliant'?'#d97706':'#dc2626'}">${sc.label}</td>
+                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;color:${total>=overallPass?'#059669':'#d97706'}">${total.toFixed(1)}/100</td>
+                  <td style="text-align:center;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;font-size:11px;color:${result==='PASS'?'#059669':'#dc2626'}">${result}</td>
                 </tr>`
               }).join('')
               const criterionHeaders = techCriteria.map(c =>
-                `<th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">${c.criterion}<br><span style="font-size:9px;color:#94a3b8">${c.weight}%</span></th>`
+                `<th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">${c.criterion}<br><span style="font-size:9px;color:#94a3b8">${c.type} · ${c.weight}%</span></th>`
               ).join('')
               win.document.write(`<!DOCTYPE html>
 <html lang="en"><head>
@@ -1607,8 +1850,9 @@ export default function TechnicalEvaluation() {
           <thead><tr>
             <th style="text-align:left;padding:8px 12px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Bidder</th>
             <th style="text-align:left;padding:8px 12px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Country</th>
+            <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">QHSE Band</th>
             ${criterionHeaders}
-            <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Weighted Total</th>
+            <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Total / 100</th>
             <th style="text-align:center;padding:8px 10px;background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0">Result</th>
           </tr></thead>
           <tbody>${rows}</tbody>

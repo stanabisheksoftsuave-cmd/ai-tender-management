@@ -1,4 +1,5 @@
 import { Bell, Palette, Search, ChevronDown } from 'lucide-react'
+import BackButton from '../ui/BackButton'
 import { useTheme, themes } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
@@ -11,6 +12,8 @@ const roleColors = {
   tech_eval:   '#059669',
   comm_eval:   '#D97706',
   mgmt_review: '#0F766E',
+  hse:         '#0EA5E9',
+  icv:         '#DB2777',
 }
 
 export default function Header({ title, subtitle }) {
@@ -55,10 +58,13 @@ export default function Header({ title, subtitle }) {
         boxShadow: isDark ? 'none' : '0 1px 6px rgba(0,0,0,0.05)',
       }}>
 
-      {/* Page title */}
-      <div>
-        <h1 className="font-bold text-[15px] leading-tight tracking-tight" style={{ color: title_ }}>{title}</h1>
-        {subtitle && <p className="text-[11px] mt-0.5" style={{ color: sub_ }}>{subtitle}</p>}
+      {/* Back + page title */}
+      <div className="flex items-center gap-3 min-w-0">
+        <BackButton />
+        <div className="min-w-0">
+          <h1 className="font-bold text-[15px] leading-tight tracking-tight truncate" style={{ color: title_ }}>{title}</h1>
+          {subtitle && <p className="text-[11px] mt-0.5 truncate" style={{ color: sub_ }}>{subtitle}</p>}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Target, Building2, ShieldOff, ArrowRight, FileText, AlertCircle,
@@ -11,6 +11,8 @@ import Button from '../components/ui/Button'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useBackHandler, useDismissable } from '../context/NavigationContext'
+import { applyAiInstruction } from '../utils/aiTextEdit'
 
 // Dropdown options are now read from TenderContext (admin-configurable)
 
@@ -21,7 +23,7 @@ const SOW_GEN_TASKS = [
   'Defining performance & acceptance criteria',
   'Structuring work breakdown & responsibilities',
   'Drafting contract terms & conditions alignment',
-  'Generating Scope of Work document',
+  'Generating Statement of Work document',
   'Finalising SOW for review',
 ]
 
@@ -31,20 +33,20 @@ function generateSowContent(form, tenderId) {
   const riskColor = { Low: '#059669', Medium: '#d97706', High: '#dc2626', Critical: '#7c2d12' }[form.contractRisk] || '#64748b'
 
   return {
-    title: `Scope of Work — ${form.title}`,
+    title: `Statement of Work — ${form.title}`,
     reference: tenderId || 'TBD',
     generatedDate: today,
     sections: [
       {
         heading: '1. Introduction & Background',
-        content: `This Scope of Work (SOW) document defines the requirements, deliverables, and responsibilities for "${form.title}" under the ${form.department || 'requesting department'}. The contract has an estimated value of ${form.budget}.`,
+        content: `This Statement of Work (SOW) document defines the requirements, deliverables, and responsibilities for "${form.title}" under the ${form.department || 'requesting department'}. The contract has an estimated value of ${form.budget}.`,
       },
       {
         heading: '2. Objective',
         content: form.description || 'The objective of this contract is to deliver the specified goods/services/works in accordance with Oman LNG standards, safety requirements, and applicable regulations.',
       },
       {
-        heading: '3. Scope of Work',
+        heading: '3. Statement of Work',
         content: `The Contractor shall provide all necessary resources, materials, equipment, and personnel required to execute the following scope:\n\n• Mobilisation and establishment of required facilities\n• Execution of all works/services as described in the project scope overview\n• Compliance with all Oman LNG QHSSE requirements and standards\n• Provision of regular progress reports and documentation\n• Demobilisation and site restoration upon completion`,
       },
       {
@@ -93,6 +95,7 @@ function readSowPath(doc, path) {
   if (!section) return ''
   if (kind === 'content') return section.content || ''
   if (kind === 'item') return section.items?.[b]?.value || ''
+  if (kind === 'subtitle') return section.subsections?.[b]?.title || ''
   if (kind === 'sub') return section.subsections?.[b]?.items?.[c] || ''
   return ''
 }
@@ -106,6 +109,10 @@ function writeSowPath(doc, path, text) {
       if (si !== a) return section
       if (kind === 'content') return { ...section, content: text }
       if (kind === 'item') return { ...section, items: section.items.map((it, ii) => ii === b ? { ...it, value: text } : it) }
+      if (kind === 'subtitle') return {
+        ...section,
+        subsections: section.subsections.map((sub, bi) => bi === b ? { ...sub, title: text } : sub),
+      }
       if (kind === 'sub') return {
         ...section,
         subsections: section.subsections.map((sub, bi) => bi !== b ? sub : {
@@ -117,89 +124,8 @@ function writeSowPath(doc, path, text) {
   }
 }
 
-const FORMAL_SWAPS = [
-  [/\bget\b/gi, 'obtain'], [/\bfix\b/gi, 'rectify'], [/\bmake sure\b/gi, 'ensure'],
-  [/\bhelp\b/gi, 'assist'], [/\bneed to\b/gi, 'shall'], [/\bmust\b/gi, 'shall'],
-  [/\bwill\b/gi, 'shall'], [/\bstart\b/gi, 'commence'], [/\bend\b/gi, 'conclude'],
-  [/\buse\b/gi, 'utilise'], [/\bshow\b/gi, 'demonstrate'], [/\babout\b/gi, 'regarding'],
-]
-
-const sentenceCase = s => s.charAt(0).toUpperCase() + s.slice(1)
-
-/**
- * Mock "AI" rewrite engine — interprets a natural-language instruction and
- * transforms the selected SOW text accordingly. Swap this for a real LLM call.
- */
-function applyAiInstruction(selected, instruction) {
-  const ins = instruction.trim()
-  const q = ins.toLowerCase()
-  const lines = selected.split('\n')
-  const bulletLines = lines.filter(l => /^\s*[•\-*]/.test(l))
-  const isBulleted = bulletLines.length > 0
-
-  // "replace X with Y" / "change X to Y"
-  const swap = q.match(/(?:replace|change|swap)\s+["“']?(.+?)["”']?\s+(?:with|to|by)\s+["“']?(.+?)["”']?\s*$/i)
-  if (swap) {
-    const [, from, to] = ins.match(/(?:replace|change|swap)\s+["“']?(.+?)["”']?\s+(?:with|to|by)\s+["“']?(.+?)["”']?\s*$/i)
-    const rx = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
-    return selected.replace(rx, to)
-  }
-
-  if (/\b(remove|delete|drop|strike)\b/.test(q)) {
-    // "remove the last two bullets" / "remove milestone 3"
-    const target = q.match(/\b(?:remove|delete|drop)\b\s+(?:the\s+)?(.+)/)?.[1]
-    if (isBulleted && target) {
-      const kept = lines.filter(l => !(/^\s*[•\-*]/.test(l) && target.split(/\s+/).some(w => w.length > 3 && l.toLowerCase().includes(w))))
-      if (kept.length !== lines.length) return kept.join('\n')
-    }
-    return ''
-  }
-
-  if (/\b(shorten|concise|brief|summari[sz]e|trim|tighten)\b/.test(q)) {
-    if (isBulleted) {
-      return lines.map(l => {
-        if (!/^\s*[•\-*]/.test(l)) return l
-        const [head, ...rest] = l.split(/[:—-]\s+/)
-        return rest.length ? `${head.trim()}${rest[0] ? `: ${rest[0].split(/(?<=\.)\s/)[0].trim()}` : ''}` : l
-      }).join('\n')
-    }
-    const sentences = selected.split(/(?<=\.)\s+/)
-    return sentences.slice(0, Math.max(1, Math.ceil(sentences.length / 2))).join(' ').trim()
-  }
-
-  if (/\b(expand|elaborate|more detail|detailed|add detail)\b/.test(q)) {
-    if (isBulleted) {
-      return lines.map(l => /^\s*[•\-*]/.test(l) && !/\.$/.test(l.trim())
-        ? `${l.trimEnd()}, subject to Contract Holder review and written acceptance.`
-        : l).join('\n')
-    }
-    return `${selected.trimEnd()} All such activities shall be planned, documented and executed in accordance with Oman LNG procedures, and evidence of compliance shall be made available for audit on request.`
-  }
-
-  if (/\b(formal|professional|contractual|legal)\b/.test(q)) {
-    return FORMAL_SWAPS.reduce((acc, [rx, to]) => acc.replace(rx, to), selected)
-  }
-
-  if (/\b(number|numbered|ordered)\b/.test(q) && isBulleted) {
-    let n = 0
-    return lines.map(l => /^\s*[•\-*]/.test(l) ? `${++n}. ${l.replace(/^\s*[•\-*]\s*/, '')}` : l).join('\n')
-  }
-
-  if (/\bbullet|list\b/.test(q) && !isBulleted) {
-    return selected.split(/(?<=\.)\s+/).filter(Boolean).map(s => `• ${s.trim().replace(/\.$/, '')}`).join('\n')
-  }
-
-  if (/\b(upper ?case|capital)\b/.test(q)) return selected.toUpperCase()
-  if (/\b(lower ?case)\b/.test(q)) return selected.toLowerCase()
-
-  // "add …" / fallback: fold the instruction in as an additional clause
-  const addition = ins.replace(/^\s*(please\s+)?(add|include|insert|append|mention|state)\s+(a\s+|an\s+|the\s+)?/i, '').replace(/\.$/, '')
-  if (isBulleted) {
-    const marker = lines.find(l => /^\s*[•\-*]/.test(l)).match(/^\s*([•\-*])/)[1]
-    return `${selected.trimEnd()}\n${marker} ${sentenceCase(addition)}`
-  }
-  return `${selected.trimEnd()} ${sentenceCase(addition)}.`
-}
+// applyAiInstruction now lives in src/utils/aiTextEdit.js so every select-to-edit
+// surface shares one engine.
 
 export default function ContractStrategy() {
   const { tenderId } = useParams()
@@ -213,6 +139,7 @@ export default function ContractStrategy() {
   const CONTRACT_MODES = dropdownConfig.contractModes
   const CONTRACT_RISKS = dropdownConfig.contractRisks
   const CURRENCIES = dropdownConfig.currencies
+  const CONFIGURED_DEPARTMENTS = dropdownConfig.departments || []
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
 
@@ -248,12 +175,32 @@ export default function ContractStrategy() {
   const [aiBusy, setAiBusy] = useState(false)
   const [sowUndo, setSowUndo] = useState(null) // previous sowContent, for one-step revert
 
+  const closeSowSel = useCallback(() => setSowSel(null), [])
+
   useEffect(() => {
     if (!sowSel) return
-    const onKey = e => { if (e.key === 'Escape') setSowSel(null) }
+    const onKey = e => { if (e.key === 'Escape') closeSowSel() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [sowSel])
+  }, [sowSel, closeSowSel])
+
+  // Overlays unwind before the step handler below, newest-first: the selection
+  // popover sits above the edit panel, so it must register last.
+  useDismissable(sowEditing, () => setSowEditing(false))
+  useDismissable(sowSel, closeSowSel)
+
+  // Step 1 is a transient animation, so both it and the SOW review unwind to the
+  // form — stepping 2 -> 1 would just re-run generation.
+  const backToForm = () => {
+    setGenStep(0)
+    setStep(0)
+  }
+
+  useBackHandler(() => {
+    if (step === 0) return false
+    backToForm()
+    return true
+  }, [step])
 
   if (user?.role?.id !== 'contract_holder') return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
@@ -366,22 +313,35 @@ export default function ContractStrategy() {
     const range = selection.getRangeAt(0)
     const startEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer
     const host = startEl?.closest?.('[data-sow-path]')
-    if (!host || !sowBodyRef.current?.contains(host) || !host.contains(range.endContainer)) { setSowSel(null); return }
+    if (!host || !sowBodyRef.current?.contains(host)) { setSowSel(null); return }
 
-    const text = range.toString()
-    if (!text.trim()) { setSowSel(null); return }
-
-    // Offset of the selection within the section's raw text
+    // Offset of the selection start within the host's text
     const pre = document.createRange()
     pre.selectNodeContents(host)
     pre.setEnd(range.startContainer, range.startOffset)
     const start = pre.toString().length
 
+    // Clamp the end to this node. A drag that runs past it — into the next
+    // bullet, or starting on a subsection title — still edits the node it began
+    // in, instead of silently doing nothing (the old cross-node guard bug).
+    const hostText = host.textContent || ''
+    let end
+    if (host.contains(range.endContainer)) {
+      const preEnd = document.createRange()
+      preEnd.selectNodeContents(host)
+      preEnd.setEnd(range.endContainer, range.endOffset)
+      end = preEnd.toString().length
+    } else {
+      end = hostText.length
+    }
+    const text = hostText.slice(start, end)
+    if (!text.trim()) { setSowSel(null); return }
+
     const rect = range.getBoundingClientRect()
     const bodyRect = sowBodyRef.current.getBoundingClientRect()
     setSowSel({
       path: host.dataset.sowPath,
-      start, end: start + text.length, text,
+      start, end, text,
       top: rect.bottom - bodyRect.top + 10,
       left: Math.max(0, Math.min(rect.left - bodyRect.left, bodyRect.width - 400)),
     })
@@ -477,7 +437,7 @@ export default function ContractStrategy() {
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Define the contract details for this tender. AI will generate a Scope of Work document
+              Define the contract details for this tender. AI will generate a Statement of Work document
               from your inputs before proceeding to Pre-Qualification.
             </p>
           </Card>
@@ -530,12 +490,19 @@ export default function ContractStrategy() {
                   <Building2 size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldDept')}
                 </label>
-                <input
+                <select
                   value={form.department}
                   onChange={e => setField('department', e.target.value)}
-                  placeholder="e.g. Supply Chain"
                   className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input"
-                />
+                >
+                  <option value="">Select department…</option>
+                  {/* An existing tender may carry a department predating this list —
+                      keep it as an option so editing doesn't silently blank it. */}
+                  {(form.department && !CONFIGURED_DEPARTMENTS.includes(form.department)
+                    ? [form.department, ...CONFIGURED_DEPARTMENTS]
+                    : CONFIGURED_DEPARTMENTS
+                  ).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
 
               {/* Anticipated Value */}
@@ -661,7 +628,7 @@ export default function ContractStrategy() {
 
           {!showErrors && (
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              AI will generate a detailed Scope of Work document based on your contract details.
+              AI will generate a detailed Statement of Work document based on your contract details.
             </p>
           )}
         </>
@@ -680,7 +647,7 @@ export default function ContractStrategy() {
                 <Bot size={36} style={{ color: '#0089cf' }} />
               </div>
               <h3 className="text-lg font-bold mb-1" style={{ color: '#1b4c6f' }}>AI is Generating Your SOW</h3>
-              <p className="text-sm text-slate-400">Building the Scope of Work document from your contract details and compliance standards</p>
+              <p className="text-sm text-slate-400">Building the Statement of Work document from your contract details and compliance standards</p>
             </div>
 
             <div className="max-w-sm mx-auto space-y-3 mb-10">
@@ -732,7 +699,7 @@ export default function ContractStrategy() {
                 <FileText size={20} style={{ color: '#0089cf' }} />
               </div>
               <div>
-                <h2 className="font-bold" style={{ color: '#1b4c6f' }}>Scope of Work — Generated</h2>
+                <h2 className="font-bold" style={{ color: '#1b4c6f' }}>Statement of Work — Generated</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {sowContent.reference} · Generated {sowContent.generatedDate}
                 </p>
@@ -831,7 +798,7 @@ export default function ContractStrategy() {
                     <div className="pl-4 space-y-3 mt-2">
                       {section.subsections.map((sub, si2) => (
                         <div key={si2}>
-                          <p className="text-[12px] font-semibold mb-1" style={{ color: '#1b4c6f' }}>{sub.title}</p>
+                          <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1b4c6f' }}>{sub.title}</p>
                           <ul className="space-y-1">
                             {sub.items.map((item, ii) => (
                               <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
@@ -983,7 +950,7 @@ export default function ContractStrategy() {
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
-            <Button variant="secondary" onClick={() => setStep(0)} className="flex items-center gap-2">
+            <Button variant="secondary" onClick={backToForm} className="flex items-center gap-2">
               <Edit3 size={14} /> Back to Contract Initiating Form
             </Button>
             <Button variant="brand" onClick={handleProceedToTemplates} className="flex items-center gap-2 py-3 px-6 text-[15px]">

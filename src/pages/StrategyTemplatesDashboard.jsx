@@ -4,13 +4,15 @@ import {
   FileText, ShieldAlert, DollarSign, BarChart2, CheckSquare,
   ArrowRight, ArrowLeft, Layout, CheckCircle, X, Plus, Trash2,
   ChevronRight, AlertTriangle, Users, Download, Bot, RefreshCw,
-  Sparkles, Circle, Edit3, ChevronDown, FileSpreadsheet, ExternalLink
+  Sparkles, Circle, Edit3, ChevronDown, FileSpreadsheet, ExternalLink, ClipboardList
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import AiEditableTextarea from '../components/ui/AiEditableTextarea'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
+import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
 
 /* ─── Form field definitions for each template ─── */
 
@@ -42,17 +44,59 @@ const CONTRACT_RISK_FIELDS = [
   { id: 'owner', label: 'Risk Owner', type: 'text', placeholder: 'e.g. Contract Holder' },
 ]
 
-const BENCHMARKING_OEM_FIELDS = [
-  { id: 'roleTitle', label: 'Role / Position Title', type: 'text', required: true, placeholder: 'e.g. Senior Technician' },
-  { id: 'category', label: 'Category', type: 'select', options: ['OEM Personnel', 'OEM Representative', 'Sub-Contractor', 'Third Party'], required: true },
-  { id: 'dailyRate', label: 'Daily Rate', type: 'number', required: true, placeholder: 'e.g. 450' },
-  { id: 'monthlyRate', label: 'Monthly Rate', type: 'number', placeholder: 'e.g. 9000' },
-  { id: 'benchmarkRate', label: 'Benchmark Rate (Market)', type: 'number', placeholder: 'e.g. 500' },
-  { id: 'variance', label: 'Variance %', type: 'computed', compute: (row) => {
-    if (!row.dailyRate || !row.benchmarkRate) return '—'
-    return (((row.dailyRate - row.benchmarkRate) / row.benchmarkRate) * 100).toFixed(1) + '%'
+// Categories follow Section H — In Country Value Requirements, part B.3
+// ("Instructions to prepare ICV Plan").
+const ICV_FIELDS = [
+  { id: 'icvCategory', label: 'ICV Category', type: 'select', required: true, options: [
+    'Investment in Fixed Assets in Oman',
+    'Omanisation in the Workforce',
+    'Local Sourcing of Goods',
+    'Local Sourcing of Subcontracted Services',
+  ]},
+  { id: 'description', label: 'Description / Commitment', type: 'text', required: true, placeholder: 'e.g. Local fabrication of spool pieces at Sohar facility', span: 2 },
+  { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', required: true, placeholder: 'e.g. 500000' },
+  { id: 'icvSpend', label: 'In-Country Spend', type: 'number', required: true, placeholder: 'e.g. 350000' },
+  { id: 'icvPercent', label: 'ICV %', type: 'computed', compute: (row) => {
+    if (!row.plannedSpend || !row.icvSpend) return '—'
+    return ((row.icvSpend / row.plannedSpend) * 100).toFixed(1) + '%'
   }},
-  { id: 'justification', label: 'Justification / Notes', type: 'text', placeholder: 'Reason for rate variance', span: 2 },
+  { id: 'targetPercent', label: 'Target ICV %', type: 'number', placeholder: 'e.g. 40' },
+  { id: 'icvStatus', label: 'Against Target', type: 'computed', compute: (row) => {
+    if (!row.plannedSpend || !row.icvSpend || !row.targetPercent) return '—'
+    const actual = (row.icvSpend / row.plannedSpend) * 100
+    const diff = actual - Number(row.targetPercent)
+    if (diff >= 0) return `Meets target (+${diff.toFixed(1)}%)`
+    return `Below target (${diff.toFixed(1)}%)`
+  }},
+  { id: 'omaniHeadcount', label: 'Omani Headcount Committed', type: 'number', placeholder: 'e.g. 12' },
+  { id: 'evidence', label: 'Evidence / Verification Basis', type: 'text', placeholder: 'e.g. Certificate of Omani origin, MOL records', span: 2 },
+]
+
+// Mirrors "Appendix I — Technical Evaluation Model Template": criteria grouped
+// into three parts, each a Must or a Want, weighted, with a 0–3 scoring band.
+// Musts carry a minimum score; Wants do not.
+const TECHNICAL_EVAL_MATRIX_FIELDS = [
+  { id: 'part', label: 'Part', type: 'select', required: true, options: [
+    'Part 1: QHSE',
+    'Part 2: Contract-Specific',
+    'Part 3: Contract-Generic',
+  ]},
+  { id: 'criteriaType', label: 'Must / Want', type: 'select', options: ['Must', 'Want'], required: true },
+  { id: 'criterion', label: 'Criterion', type: 'text', required: true, placeholder: 'e.g. Methodology Statement — manner and sequence of executing the Work', span: 2 },
+  { id: 'weight', label: 'Weight', type: 'number', required: true, placeholder: 'e.g. 10' },
+  { id: 'minScore', label: 'Min. Score (Musts only)', type: 'number', placeholder: 'e.g. 2' },
+  { id: 'band1', label: 'Score 1 — Description', type: 'text', placeholder: 'e.g. Submission shows lack of understanding of Work', span: 2 },
+  { id: 'band2', label: 'Score 2 — Description', type: 'text', placeholder: 'e.g. Submission shows a competent understanding of Work', span: 2 },
+  { id: 'band3', label: 'Score 3 — Description', type: 'text', placeholder: 'e.g. Submission shows a detailed understanding of Work', span: 2 },
+  { id: 'maxWeighted', label: 'Max Weighted Score', type: 'computed', compute: (row) => {
+    if (!row.weight) return '—'
+    return (Number(row.weight) * 3).toString()
+  }},
+  { id: 'gate', label: 'Gate', type: 'computed', compute: (row) => {
+    if (row.criteriaType === 'Must') return row.minScore ? `Must — min ${row.minScore}` : 'Must — set min score'
+    if (row.criteriaType === 'Want') return 'Want — no minimum'
+    return '—'
+  }},
 ]
 
 const HSE_RISK_FIELDS = [
@@ -85,7 +129,7 @@ const NEGOTIATION_STRATEGY_FIELDS = [
 
 /* ─── Template definitions ─── */
 
-const TEMPLATE_DEFS = [
+export const TEMPLATE_DEFS = [
   {
     id: 'company-estimate',
     title: 'Company Estimate',
@@ -111,15 +155,26 @@ const TEMPLATE_DEFS = [
     fileType: 'excel',
   },
   {
-    id: 'benchmarking-oem',
-    title: 'Benchmarking OEM',
-    description: 'Benchmark OEM personnel rates against market rates.',
+    id: 'icv',
+    title: 'ICV',
+    description: 'Plan In-Country Value: local sourcing, Omanisation and in-Oman investment.',
     icon: BarChart2,
     color: '#3b82f6',
-    fields: BENCHMARKING_OEM_FIELDS,
-    dataKey: 'benchmarkingOem',
-    rowLabel: 'Role',
-    fileUrl: '/templates/Benchmarking OEM_OEM Rep Personnel Rates.xlsx',
+    fields: ICV_FIELDS,
+    dataKey: 'icvPlan',
+    rowLabel: 'ICV Commitment',
+    fileType: 'excel',
+  },
+  {
+    id: 'technical-eval-matrix',
+    title: 'Technical Evaluation Matrix',
+    description: 'Define weighted Must/Want criteria and scoring bands for technical evaluation.',
+    icon: ClipboardList,
+    color: '#0891b2',
+    fields: TECHNICAL_EVAL_MATRIX_FIELDS,
+    dataKey: 'technicalEvalMatrix',
+    rowLabel: 'Criterion',
+    fileUrl: '/templates/Appendix I - Technical Evaluation Model Template.xls',
     fileType: 'excel',
   },
   {
@@ -218,31 +273,78 @@ function generateAiPrefill(templateId, tender) {
         },
       ]
 
-    case 'benchmarking-oem':
+    case 'icv':
       return [
         {
-          roleTitle: 'Senior Project Engineer',
-          category: 'OEM Personnel',
-          dailyRate: '520',
-          monthlyRate: '10400',
-          benchmarkRate: '480',
-          justification: 'AI Suggested — Rate is 8.3% above market benchmark; justified by OEM-specific technical expertise required',
+          icvCategory: 'Local Sourcing of Goods',
+          description: 'AI Suggested — Procure consumables and spares from Omani-registered suppliers holding Certificates of Omani Origin',
+          plannedSpend: '450000',
+          icvSpend: '288000',
+          targetPercent: '60',
+          omaniHeadcount: '',
+          evidence: 'Certificate of Omani Origin per purchase order; supplier CR verification',
         },
         {
-          roleTitle: 'Field Service Technician',
-          category: 'OEM Representative',
-          dailyRate: '380',
-          monthlyRate: '7600',
-          benchmarkRate: '400',
-          justification: 'AI Suggested — Rate is 5% below market benchmark; competitive positioning by OEM',
+          icvCategory: 'Omanisation in the Workforce',
+          description: 'AI Suggested — Omani nationals in supervisory and technical positions per Appendix G position list',
+          plannedSpend: '320000',
+          icvSpend: '208000',
+          targetPercent: '55',
+          omaniHeadcount: '14',
+          evidence: 'Ministry of Labour records and monthly payroll returns',
         },
         {
-          roleTitle: 'Quality Inspector',
-          category: 'Sub-Contractor',
-          dailyRate: '290',
-          monthlyRate: '5800',
-          benchmarkRate: '310',
-          justification: 'AI Suggested — Sub-contracted role at market-competitive rate',
+          icvCategory: 'Local Sourcing of Subcontracted Services',
+          description: 'AI Suggested — Subcontract inspection and calibration scope to Oman-based service providers',
+          plannedSpend: '180000',
+          icvSpend: '90000',
+          targetPercent: '50',
+          omaniHeadcount: '',
+          evidence: 'Subcontract award records; quarterly ICV reporting template (Appendix D)',
+        },
+      ]
+
+    case 'technical-eval-matrix':
+      return [
+        {
+          part: 'Part 1: QHSE',
+          criteriaType: 'Must',
+          criterion: 'AI Suggested — Contractor HSE Capability Assessment: response to the HSE Capability Questionnaire',
+          weight: '20',
+          minScore: '2',
+          band1: 'Red banded',
+          band2: 'Amber banded',
+          band3: 'Green banded',
+        },
+        {
+          part: 'Part 2: Contract-Specific',
+          criteriaType: 'Must',
+          criterion: 'AI Suggested — Methodology Statement: manner and sequence of carrying out the required Work/Services',
+          weight: '10',
+          minScore: '2',
+          band1: 'Submission shows lack of understanding of Work',
+          band2: 'Submission shows a competent understanding of Work',
+          band3: 'Submission shows a detailed understanding of Work',
+        },
+        {
+          part: 'Part 2: Contract-Specific',
+          criteriaType: 'Must',
+          criterion: 'AI Suggested — Omanisation Plan: compliance with Labour Law and contract requirements, including staff development and training',
+          weight: '15',
+          minScore: '2',
+          band1: 'Submission complies with Labour Law',
+          band2: 'Submission proposes an alternate equivalent plan',
+          band3: 'Submission meets or exceeds requirements',
+        },
+        {
+          part: 'Part 3: Contract-Generic',
+          criteriaType: 'Want',
+          criterion: 'AI Suggested — Proposed Organisational Structure: decision-making process, roles and responsibilities, management competency',
+          weight: '2',
+          minScore: '',
+          band1: 'Submission includes simple outline',
+          band2: 'Submission meets requirements',
+          band3: 'Submission includes clear, concise and detailed information',
         },
       ]
 
@@ -678,7 +780,7 @@ function SowPreviewer({ sowDocument, onSave }) {
             <FileText size={18} style={{ color: '#0089cf' }} />
           </div>
           <div>
-            <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>Scope of Work — {doc.title}</h3>
+            <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>Statement of Work — {doc.title}</h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Reference: {doc.reference} · Generated {doc.date}</p>
           </div>
         </div>
@@ -720,11 +822,11 @@ function SowPreviewer({ sowDocument, onSave }) {
               
               {section.content && (
                 isEditing ? (
-                  <textarea
+                  <AiEditableTextarea
                     className="w-full pl-4 py-2 text-[12.5px] border border-slate-200 rounded-lg focus:outline-none focus:border-[#0089cf] mb-2 text-slate-600 leading-6 resize-y"
                     rows={4}
                     value={section.content}
-                    onChange={(e) => handleChange(si, e.target.value)}
+                    onChange={val => handleChange(si, val)}
                   />
                 ) : (
                   <div className="pl-4 text-[12.5px] whitespace-pre-line text-slate-600 leading-6">
@@ -831,7 +933,7 @@ export default function StrategyTemplatesDashboard() {
     navigate(`/strategy-templates/${tenderId}?form=${templateId}`)
   }
 
-  // All 5 cards: 4 templates + Pre-Qualification
+  // Every form template plus the non-form Pre-Qualification card
   const allCards = [
     ...TEMPLATE_DEFS.map(t => ({
       id: t.id,
@@ -881,8 +983,16 @@ export default function StrategyTemplatesDashboard() {
     return existingTender?.[dataKey]?.length > 0
   }
 
+  // Templates hand off to the PSF Strategy (Procurement Submission Form), which
+  // is what releases the tender to the Contract Engineer for ITT creation.
   const handleProceed = () => {
-    navigate(`/create-itt/${tenderId}`)
+    navigate(`/psf-strategy/${tenderId}`)
+  }
+
+  const handleDownloadTemplateExcel = (card) => {
+    const templateDef = TEMPLATE_DEFS.find(t => t.id === card.id)
+    if (!templateDef) return
+    exportTemplateExcel(templateDef, existingTender?.[card.dataKey] || [], existingTender)
   }
 
   const handleOpenDocument = (card) => {
@@ -1122,7 +1232,7 @@ export default function StrategyTemplatesDashboard() {
                   <FileText size={14} style={{ color: '#0089cf' }} />
                 </div>
                 <h4 className="font-bold text-[13px]" style={{ color: '#1b4c6f' }}>Submitted Documents</h4>
-                <span className="text-[11px] text-slate-400">— click to open in a new tab</span>
+                <span className="text-[11px] text-slate-400">— open in a new tab, or download as Excel</span>
               </div>
               <div className="space-y-2">
                 {submittedDocs.map(card => {
@@ -1132,23 +1242,60 @@ export default function StrategyTemplatesDashboard() {
                   const accent = isExcel ? '#10b981' : isWord ? '#2563eb' : '#0089cf'
                   const typeLabel = isExcel ? 'Excel Spreadsheet (.xlsx)' : isWord ? 'Word Document (.docx)' : 'Document preview'
                   return (
-                    <button
+                    <div
                       key={card.id}
-                      onClick={() => handleOpenDocument(card)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:shadow-sm group"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:shadow-sm group"
                       style={{ background: 'rgba(236,244,252,0.5)', border: '1px solid rgba(0,137,207,0.1)' }}
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}15` }}>
-                        <FileIcon size={15} style={{ color: accent }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>{card.title}</p>
-                        <p className="text-[10px] text-slate-400">{typeLabel}</p>
-                      </div>
-                      <ExternalLink size={15} className="text-slate-300 group-hover:text-[#0089cf] transition-colors shrink-0" />
-                    </button>
+                      <button onClick={() => handleOpenDocument(card)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}15` }}>
+                          <FileIcon size={15} style={{ color: accent }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>{card.title}</p>
+                          <p className="text-[10px] text-slate-400">{typeLabel}</p>
+                        </div>
+                        <ExternalLink size={15} className="text-slate-300 group-hover:text-[#0089cf] transition-colors shrink-0" />
+                      </button>
+                      <button
+                        onClick={() => handleDownloadTemplateExcel(card)}
+                        title={`Download ${card.title} as Excel`}
+                        aria-label={`Download ${card.title} as Excel`}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
+                        style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
+                      >
+                        <Download size={12} /> Excel
+                      </button>
+                    </div>
                   )
                 })}
+
+                {/* Pre-Qualification summary — downloadable alongside the templates */}
+                {existingTender?.prequalBidders?.length > 0 && (
+                  <div
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                    style={{ background: 'rgba(236,244,252,0.5)', border: '1px solid rgba(0,137,207,0.1)' }}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(16,185,129,0.09)' }}>
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>Pre-Qualification Summary</p>
+                      <p className="text-[10px] text-slate-400">Excel Spreadsheet (.xlsx) — bidders, outcomes and financial results</p>
+                    </div>
+                    <button
+                      onClick={() => exportPreQualSummaryExcel(
+                        existingTender,
+                        (existingTender.prequalBidders || []).filter(b => !b.droppedAt)
+                      )}
+                      title="Download Pre-Qualification Summary as Excel"
+                      className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
+                      style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
+                    >
+                      <Download size={12} /> Excel
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -1191,7 +1338,7 @@ export default function StrategyTemplatesDashboard() {
               className="flex items-center gap-2 py-3 px-6 text-[15px]"
               disabled={visibleCards.filter(c => c.dataKey ? isCompleted(c.dataKey) : (existingTender?.status === 'draft')).length !== visibleCards.length || visibleCards.length === 0}
             >
-              Submit <ArrowRight size={16} />
+              Move Forward to PSF Strategy <ArrowRight size={16} />
             </Button>
           </div>
         </>

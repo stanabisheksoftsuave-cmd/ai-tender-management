@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Button from '../components/ui/Button'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useTheme } from '../context/ThemeContext'
+import { useDismissable, useBackHandler } from '../context/NavigationContext'
 
 // ── SVG primitive ────────────────────────────────────────────────────────────
 const Svg = ({ size = 16, sw = 1.6, style, className = '', children }) => (
@@ -78,13 +80,18 @@ const ModSvg = {
 // ── Data ─────────────────────────────────────────────────────────────────────
 const ROLE_COLORS = ['#0089cf','#1b4c6f','#059669','#D97706','#7C3AED','#DC2626','#0891B2','#92400E','#BE185D','#1D4ED8']
 
+// Role ids that were removed — technical/commercial evaluation is now owned by
+// the Contract Holder / Contract Engineer. Filtered out of any persisted role list.
+const REMOVED_ROLE_IDS = new Set(['tech_eval', 'comm_eval'])
+
 const DEFAULT_ROLES = [
   { id: 'it_admin',    label: 'IT Admin',            color: '#7C3AED' },
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#0089cf' },
-  { id: 'tech_eval',   label: 'Technical Evaluator',  color: '#059669' },
-  { id: 'comm_eval',   label: 'Commercial Evaluator', color: '#D97706' },
+  { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
   { id: 'mgmt_review', label: 'Management Reviewer',  color: '#0F766E' },
+  { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
+  { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
 ]
 
 const MODULES = [
@@ -103,10 +110,12 @@ const MODULES = [
 const DEFAULT_MATRIX = {
   it_admin:    { user_management:'CRUD', task_assignment:'CRUD', audit_log:'CRUD', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
   biz_admin:   { user_management:'NONE', task_assignment:'CRUD', audit_log:'READ', itt_creation:'READ', tender_export:'READ', ingestion:'READ', tech_eval:'READ', comm_eval:'READ', mgmt_review:'READ', contract_creation:'READ' },
-  pof:         { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'READ', comm_eval:'READ', mgmt_review:'READ', contract_creation:'CRUD' },
-  tech_eval:   { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
-  comm_eval:   { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'CRUD', mgmt_review:'NONE', contract_creation:'NONE' },
+  // Contract Engineer owns commercial evaluation; Contract Holder owns technical.
+  pof:         { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'READ', comm_eval:'CRUD', mgmt_review:'READ', contract_creation:'CRUD' },
+  contract_holder: { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'READ', mgmt_review:'NONE', contract_creation:'NONE' },
   mgmt_review: { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'READ', comm_eval:'READ', mgmt_review:'ACTION', contract_creation:'NONE' },
+  hse:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
+  icv:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
 }
 
 const emptyModule   = () => Object.fromEntries(MODULES.map(m => [m.key, 'NONE']))
@@ -148,7 +157,9 @@ export default function UserManagement() {
   const { tenders, updateTender, dropdownConfig, updateDropdownConfig } = useTenders()
   const { isDark } = useTheme()
 
-  const [tab,           setTab]           = useState(isItAdmin ? 'users' : 'dropdowns')
+  const defaultTab = isItAdmin ? 'users' : 'dropdowns'
+
+  const [tab,           setTab]           = useState(defaultTab)
   const [search,        setSearch]        = useState('')
   const [filterRole,    setFilterRole]    = useState('all')
   const [menuOpen,      setMenuOpen]      = useState(null)
@@ -165,7 +176,8 @@ export default function UserManagement() {
     try {
       const s = localStorage.getItem('atm_roles')
       if (!s) return DEFAULT_ROLES
-      const parsed = JSON.parse(s)
+      // Drop removed roles (tech_eval / comm_eval) from any persisted list.
+      const parsed = JSON.parse(s).filter(r => !REMOVED_ROLE_IDS.has(r.id))
       // Merge: ensure all DEFAULT_ROLES exist (remove superAdmin flag if stale)
       const ids = new Set(parsed.map(r => r.id))
       const missing = DEFAULT_ROLES.filter(r => !ids.has(r.id))
@@ -199,6 +211,31 @@ export default function UserManagement() {
   const [newDropdownItem, setNewDropdownItem] = useState({})
   const [dropdownSaved, setDropdownSaved] = useState(null)
 
+  // ── Back wiring ────────────────────────────────────────────────────────────
+  useDismissable(showUserModal,  () => setShowUserModal(false))
+  useDismissable(showRoleModal,  () => setShowRoleModal(false))
+  useDismissable(!!(showReassign && reassignSource), () => setShowReassign(false))
+  useDismissable(!!deleteConfirm, () => setDeleteConfirm(null))
+
+  // Tabs are whole panes, so Back retraces them. Only a user-initiated switch
+  // pushes — deriving the trail from `tab` changes instead would re-push the
+  // tab Back just popped and trap the user on this page forever.
+  const tabTrail = useRef([])
+  const selectTab = next => {
+    if (next === tab) return
+    // Drop any earlier visit to the tab being opened, so toggling between two
+    // tabs a dozen times doesn't leave a dozen Back presses to escape the page.
+    tabTrail.current = tabTrail.current.filter(x => x !== next)
+    tabTrail.current.push(tab)
+    setTab(next)
+  }
+
+  useBackHandler(() => {
+    if (!tabTrail.current.length) return false
+    setTab(tabTrail.current.pop())
+    return true
+  })
+
   // ── Theme palette ──────────────────────────────────────────────────────────
   const surface = isDark ? '#111827' : 'var(--color-surface)'
   const surfBg  = isDark ? 'rgba(255,255,255,0.04)' : 'var(--color-surface-2)'
@@ -209,6 +246,8 @@ export default function UserManagement() {
   const shadow  = isDark
     ? '0 1px 4px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.2)'
     : 'var(--color-shadow,0 1px 4px rgba(27,76,111,0.07),0 4px 16px rgba(27,76,111,0.10))'
+
+  const selectTheme = { inputBg, surface, border, text, sub, hoverBg: surfBg }
 
   useEffect(() => { localStorage.setItem('atm_roles',  JSON.stringify(roles))  }, [roles])
   useEffect(() => { localStorage.setItem('atm_matrix', JSON.stringify(matrix)) }, [matrix])
@@ -233,7 +272,11 @@ export default function UserManagement() {
     if (!user) return []
     if (user.roleId === 'tech_eval')   return tenders.filter(t => t.status === 'tech_eval'   && t.assignedTechEval?.id === user.id)
     if (user.roleId === 'comm_eval')   return tenders.filter(t => t.status === 'comm_eval'   && t.assignedCommEval?.id === user.id)
-    if (user.roleId === 'pof')         return tenders.filter(t => ['draft','upload','award'].includes(t.status))
+    // A tender is a specific Contract Engineer's only once PSF assigned it;
+    // unassigned ones belong to the whole role, so they move too.
+    if (user.roleId === 'pof')         return tenders.filter(t =>
+      ['draft','upload','award'].includes(t.status) &&
+      (!t.assignedContractEngineer || t.assignedContractEngineer.id === user.id))
     if (user.roleId === 'mgmt_review') return tenders.filter(t => t.status === 'mgmt_review')
     return []
   }
@@ -319,7 +362,12 @@ export default function UserManagement() {
       else if (reassignSource.roleId === 'comm_eval')
         updateTender(t.id, { assignedCommEval: { id: target.id, name: target.name } })
       else if (reassignSource.roleId === 'pof')
-        updateTender(t.id, { assignedPof: { id: target.id, name: target.name } })
+        // assignedContractEngineer is what Create ITT filters on; assignedPof is
+        // kept for the existing display code.
+        updateTender(t.id, {
+          assignedPof: { id: target.id, name: target.name },
+          assignedContractEngineer: { id: target.id, name: target.name },
+        })
       else if (reassignSource.roleId === 'mgmt_review')
         updateTender(t.id, { assignedMgmt: { id: target.id, name: target.name } })
     })
@@ -373,7 +421,7 @@ export default function UserManagement() {
          {[{ id: 'users', label: 'Users' }, { id: 'access', label: 'Access Control' }, { id: 'dropdowns', label: 'Dropdowns' }]
           .filter(t => isItAdmin || t.id === 'dropdowns')
           .map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          <button key={t.id} onClick={() => selectTab(t.id)}
             className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
             style={tab === t.id
               ? { background: 'var(--color-primary)', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
@@ -660,6 +708,7 @@ export default function UserManagement() {
           {[
             { key: 'contractModes', label: 'Contract Mode', icon: IcoShield, description: 'Options for the Contract Mode dropdown in Contract Strategy' },
             { key: 'tenderTypes', label: 'Tender Type', icon: IcoKey, description: 'Options for the Tender Type dropdown in Contract Strategy' },
+            { key: 'departments', label: 'Department / Entity', icon: IcoUsers, description: 'Options for the Department / Entity dropdown in Contract Strategy and ITT Creation' },
             { key: 'contractRisks', label: 'Contract Risk', icon: IcoEdit, description: 'Risk level options for Overall Contract Risk' },
           ].map(section => {
             const items = dropdownConfig[section.key] || []
@@ -887,11 +936,22 @@ export default function UserManagement() {
               {sameRoleUsers.length === 0
                 ? <div className="mt-1.5 px-3 py-3 rounded-xl text-xs text-center"
                     style={{ background: '#FEF2F2', color: '#DC2626' }}>No other active users with same role.</div>
-                : <select value={reassignTarget} onChange={e => setReassignTarget(e.target.value)}
-                    style={{ ...inp(), marginTop: 6 }}>
-                    <option value="">Select user...</option>
-                    {sameRoleUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>}
+                : <SearchableSelect
+                    value={reassignTarget}
+                    onChange={v => setReassignTarget(v === '' ? '' : String(v))}
+                    options={sameRoleUsers}
+                    getValue={u => u.id}
+                    getLabel={u => u.name}
+                    getSubLabel={u => u.email || u.username || ''}
+                    placeholder="Select user..."
+                    searchPlaceholder="Search users…"
+                    emptyText="No matching users"
+                    ariaLabel="Transfer to"
+                    clearable
+                    className="mt-1.5"
+                    theme={selectTheme}
+                    style={{ padding: '9px 12px', borderRadius: 10 }}
+                  />}
             </div>
           </div>
           <MFoot onCancel={() => setShowReassign(false)} onConfirm={doReassign}

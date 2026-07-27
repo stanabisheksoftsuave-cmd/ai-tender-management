@@ -8,6 +8,7 @@ import StageTimeline from '../components/ui/StageTimeline'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useDismissable, useBackHandler } from '../context/NavigationContext'
 import { exportTenderPDF } from '../utils/exportPDF'
 
 const REASSIGN_OPTIONS = [
@@ -18,7 +19,7 @@ const REASSIGN_OPTIONS = [
 ]
 
 const getTenderRoute = (t) => {
-  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_rejected'].includes(t.status)) return `/pre-qualification/${t.id}`
+  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review','prequal_rejected'].includes(t.status)) return `/pre-qualification/${t.id}`
   if (t.status === 'draft')        return `/create-itt/${t.id}`
   if (t.status === 'upload')       return `/upload/${t.id}`
   if (t.status === 'tech_eval')    return `/technical-eval/${t.id}`
@@ -33,7 +34,7 @@ const getTenderRoute = (t) => {
 }
 
 const getTimelineStage = (t) => {
-  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_rejected'].includes(t.status)) return 'prequal'
+  if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review','prequal_rejected'].includes(t.status)) return 'prequal'
   if (t.status === 'draft')        return 'approval'
   if (t.status === 'upload')       return 'upload'
   if (t.status === 'tech_eval')    return 'tech_eval'
@@ -52,6 +53,7 @@ const statusVariant = {
   prequal_stage2:   'prequal_stage2',
   prequal_stage3:   'prequal_stage3',
   prequal_stage4:   'prequal_stage4',
+  prequal_final_review: 'prequal_final_review',
   prequal_rejected: 'prequal_rejected',
   draft:        'draft',
   upload:       'upload',
@@ -71,6 +73,7 @@ const statusLabelsEn = {
   prequal_stage2:   'Pre-Qual — Questionnaire',
   prequal_stage3:   'Pre-Qual — Response Review',
   prequal_stage4:   'Pre-Qual — Financial Assessment',
+  prequal_final_review: 'Pre-Qual — Final Review',
   prequal_rejected: 'Pre-Qualification Rejected',
   draft:        'Draft — Pending Export',
   upload:       'Awaiting Ingestion',
@@ -90,6 +93,7 @@ const statusLabelsAr = {
   prequal_stage2:   'التأهيل المسبق - الاستبيان',
   prequal_stage3:   'التأهيل المسبق - مراجعة الردود',
   prequal_stage4:   'التأهيل المسبق - التقييم المالي',
+  prequal_final_review: 'التأهيل المسبق - المراجعة النهائية',
   prequal_rejected: 'تم رفض التأهيل المسبق',
   draft:        'في انتظار الموافقة',
   upload:       'في انتظار الاستيعاب',
@@ -115,14 +119,25 @@ export default function TenderList() {
   const [reassignModal, setReassignModal] = useState(null)       // pof: stage reassign
   const [evalModal, setEvalModal] = useState(null)               // biz_admin: evaluator reassign
   const [selectedEvaluator, setSelectedEvaluator] = useState('')
+  const [evalSearch, setEvalSearch] = useState('')
+
+  useDismissable(!!reassignModal, () => setReassignModal(null))
+  useDismissable(!!evalModal, () => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') })
+
+  useBackHandler(() => {
+    if (!expanded) return false
+    setExpanded(null)
+    return true
+  })
 
   const roleId = user?.role?.id
   const isBizAdmin = roleId === 'biz_admin'
   const isPof = roleId === 'pof'
   const isContractHolder = roleId === 'contract_holder'
 
-  // Map tender status → the role that evaluates it
-  const stageRoleMap = { tech_eval: 'tech_eval', comm_eval: 'comm_eval', mgmt_review: 'mgmt_review' }
+  // Map tender status → the role that evaluates it. Technical evaluation is owned
+  // by the Contract Holder, commercial by the Contract Engineer.
+  const stageRoleMap = { tech_eval: 'contract_holder', comm_eval: 'pof', mgmt_review: 'mgmt_review' }
 
   const getEvaluatorsForTender = td => {
     const roleNeeded = stageRoleMap[td.status]
@@ -145,7 +160,7 @@ export default function TenderList() {
 
   const tabs = [
     { key: 'all',      label: lang === 'ar' ? 'جميع المناقصات' : 'All Tenders', fn: () => true },
-    { key: 'prequal',  label: lang === 'ar' ? 'التأهيل المسبق' : 'Pre-Qual',    fn: td => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(td.status) },
+    { key: 'prequal',  label: lang === 'ar' ? 'التأهيل المسبق' : 'Pre-Qual',    fn: td => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review'].includes(td.status) },
     { key: 'progress', label: lang === 'ar' ? 'قيد التقدم'     : 'In Progress',  fn: td => ['draft', 'upload'].includes(td.status) },
     { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' },
     { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' },
@@ -214,7 +229,12 @@ export default function TenderList() {
 
       {/* Business Admin: Reassign Evaluator Modal */}
       {evalModal && (() => {
-        const evaluators = getEvaluatorsForTender(evalModal)
+        const allEvaluators = getEvaluatorsForTender(evalModal)
+        const q = evalSearch.trim().toLowerCase()
+        const evaluators = q
+          ? allEvaluators.filter(u => [u.name, u.email, u.username]
+              .some(v => (v || '').toLowerCase().includes(q)))
+          : allEvaluators
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -223,7 +243,7 @@ export default function TenderList() {
                   <h3 className="font-bold text-slate-800 text-base">Reassign Evaluator</h3>
                   <p className="text-xs text-slate-500 mt-0.5">{evalModal.id} — {evalModal.title}</p>
                 </div>
-                <button onClick={() => { setEvalModal(null); setSelectedEvaluator('') }}
+                <button onClick={() => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
                   <X size={15} className="text-slate-400" />
                 </button>
@@ -231,10 +251,24 @@ export default function TenderList() {
               <p className="text-xs text-slate-500 mb-4">
                 Stage: <span className="font-semibold text-slate-700">{statusLabels[evalModal.status] || evalModal.stage}</span>
               </p>
-              {evaluators.length === 0 ? (
+              {allEvaluators.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">No available evaluators for this stage.</p>
               ) : (
                 <div className="space-y-2">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={evalSearch}
+                      onChange={e => setEvalSearch(e.target.value)}
+                      placeholder={lang === 'ar' ? 'البحث عن مقيّم...' : 'Search evaluators...'}
+                      aria-label={lang === 'ar' ? 'البحث عن مقيّم' : 'Search evaluators'}
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                    />
+                  </div>
+                  {evaluators.length === 0 && (
+                    <p className="text-sm text-slate-400 py-4 text-center">No matching evaluators.</p>
+                  )}
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
                   {evaluators.map(u => (
                     <button key={u.id}
                       onClick={() => setSelectedEvaluator(String(u.id))}
@@ -253,10 +287,11 @@ export default function TenderList() {
                       </div>
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
               <div className="flex gap-2 mt-5">
-                <button onClick={() => { setEvalModal(null); setSelectedEvaluator('') }}
+                <button onClick={() => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') }}
                   className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   Cancel
                 </button>
@@ -374,7 +409,7 @@ export default function TenderList() {
                               <Eye size={13} /> View Detail
                             </Button>
                             {/* Contract Holder actions */}
-                            {isContractHolder && ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4'].includes(td.status) && (
+                            {isContractHolder && ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review'].includes(td.status) && (
                               <Button size="sm" onClick={() => navigate(`/pre-qualification/${td.id}`)}>
                                 Continue Pre-Qualification
                               </Button>
@@ -414,6 +449,16 @@ export default function TenderList() {
                                 <Upload size={13} /> Ingestion
                               </Button>
                             )}
+                            {isContractHolder && td.status === 'tech_eval' && (
+                              <Button size="sm" onClick={() => navigate(`/technical-eval/${td.id}`)}>
+                                <FileText size={13} /> Technical Evaluation
+                              </Button>
+                            )}
+                            {isPof && td.status === 'comm_eval' && (
+                              <Button size="sm" onClick={() => navigate(`/commercial-eval/${td.id}`)}>
+                                <FileText size={13} /> Commercial Evaluation
+                              </Button>
+                            )}
                             {roleId === 'mgmt_review' && td.status === 'mgmt_review' && (
                               <Button size="sm" onClick={() => navigate(`/mgmt-review/${td.id}`)}>
                                 Management Review
@@ -434,7 +479,7 @@ export default function TenderList() {
                             {/* Business Admin: Reassign Evaluator */}
                             {isBizAdmin && ['tech_eval','comm_eval','mgmt_review'].includes(td.status) && (
                               <Button size="sm" variant="secondary"
-                                onClick={e => { e.stopPropagation(); setEvalModal(td); setSelectedEvaluator('') }}>
+                                onClick={e => { e.stopPropagation(); setEvalModal(td); setSelectedEvaluator(''); setEvalSearch('') }}>
                                 <RefreshCw size={13} /> Reassign
                               </Button>
                             )}

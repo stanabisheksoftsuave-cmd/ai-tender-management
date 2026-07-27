@@ -12,8 +12,8 @@ export const tenders = [
     deadline: '2025-04-15',
     bidders: 4,
     aiScore: 96,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-007',
@@ -27,8 +27,8 @@ export const tenders = [
     deadline: '2025-05-10',
     bidders: 3,
     aiScore: 89,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-008',
@@ -42,8 +42,8 @@ export const tenders = [
     deadline: '2025-05-20',
     bidders: 4,
     aiScore: 94,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
 
   // ── Commercial Evaluation ─────────────────────────────────────────────────
@@ -59,8 +59,8 @@ export const tenders = [
     deadline: '2025-04-01',
     bidders: 3,
     aiScore: 91,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-009',
@@ -74,8 +74,8 @@ export const tenders = [
     deadline: '2025-04-25',
     bidders: 3,
     aiScore: 87,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-010',
@@ -89,8 +89,8 @@ export const tenders = [
     deadline: '2025-05-15',
     bidders: 4,
     aiScore: 92,
-    assignedTechEval: { id: 3, name: 'Sarah Chen' },
-    assignedCommEval: { id: 4, name: 'Mark Davis' },
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
 
   // ── Management Review ─────────────────────────────────────────────────────
@@ -146,32 +146,6 @@ export const tenders = [
     deadline: '2025-03-20',
     bidders: 4,
     aiScore: 88,
-  },
-  {
-    id: 'ITT-2025-004',
-    title: 'Government WAN & Core Network Infrastructure Upgrade',
-    department: 'Information Technology Authority (ITA)',
-    budget: 'OMR 365,000',
-    status: 'draft',
-    stage: 'Pending Approval',
-    description: 'Complete overhaul of the government-wide area network infrastructure including replacement of legacy switches, implementation of SD-WAN across all ministries, and upgrade to 10 Gbps backbone connectivity for all government entities in the Muscat Governorate.',
-    duration: '18 months',
-    created: '2025-03-18',
-    deadline: '2025-05-01',
-    bidders: 0,
-    aiScore: null,
-  },
-  {
-    id: 'ITT-2025-005',
-    title: 'e-Nafid HR & Payroll Digital Transformation',
-    department: 'Ministry of Labour',
-    budget: 'OMR 277,000',
-    status: 'upload',
-    stage: 'Awaiting Ingestion',
-    created: '2025-03-05',
-    deadline: '2025-04-20',
-    bidders: 4,
-    aiScore: null,
   },
 
   // ── Post-Award Phases ──────────────────────────────────────────────────────
@@ -242,6 +216,32 @@ export const tenders = [
     kpiTracking: true,
     deliveryProgress: 100,
   },
+  // A generated ITT (sectionsGenerated) — appears in the ITT Draft picker for the
+  // Contract Engineer / HSE / ICV so they can open and fill their own sections
+  // straight from the sidebar, not only via a dashboard/Tender Tracking link.
+  {
+    id: 'ITT-2025-011',
+    title: 'Sur Port Cargo Terminal — Crane & Handling Equipment',
+    tenderType: 'Goods',
+    department: 'Ministry of Transport, Communications & IT',
+    status: 'draft',
+    stage: 'Draft — Pending Export',
+    psfCompleted: true,
+    psfCompletedAt: '2026-07-01',
+    sectionsGenerated: true,
+    b1Category: 'medium-value',
+    sectionAnswers: {},
+    sectionApproved: {},
+    selectedTemplates: ['company-estimate', 'contract-risk', 'icv', 'technical-eval-matrix', 'hse-risk', 'negotiation-strategy'],
+    created: '2025-04-05',
+    deadline: '2025-07-30',
+    budget: 'OMR 640,000',
+    bidders: 0,
+    aiScore: null,
+    description: 'Supply, delivery and commissioning of quayside cargo-handling cranes and associated equipment for the Sur Port cargo terminal.',
+    assignedContractEngineers: [{ id: 2, name: 'John Smith' }],
+    assignedContractEngineer: { id: 2, name: 'John Smith' },
+  },
   {
     id: 'ITT-2025-020',
     title: 'Buraimi Border Crossing Security Systems Upgrade',
@@ -249,6 +249,9 @@ export const tenders = [
     department: 'Royal Oman Police',
     status: 'draft',
     stage: 'Draft — Pending Export',
+    psfCompleted: true,
+    psfCompletedAt: '2026-06-20',
+    selectedTemplates: ['company-estimate', 'contract-risk', 'icv', 'technical-eval-matrix', 'hse-risk', 'negotiation-strategy'],
     created: '2025-04-01',
     deadline: '2025-06-15',
     budget: 'OMR 1,245,000',
@@ -262,7 +265,7 @@ export const tenders = [
       { id: 107, name: 'Al Amana Fire & Safety', country: 'Oman' },
     ],
     handoffDocuments: {
-      benchmarking: 'OEM-Benchmarking-Rates.xlsx',
+      icv: 'ICV-Plan.xlsx',
       companyEstimate: 'Internal-Company-Estimate.xlsx',
       riskAssessment: 'Contract-Risk-Assessment.xlsx',
     },
@@ -335,11 +338,15 @@ export const erpBidders = [
   { id: 106, name: 'Meridian Contracting',    country: 'Qatar',        isLocal: false, category: 'Marine & Civil Works',          regNo: 'CR-118820',  jsrsNo: null,         molCardNo: null,        yearEstablished: 2005, natureOfBusiness: 'Marine & civil construction',                 contactName: 'Youssef Nassar',  contactEmail: 'y.nassar@meridian.qa' },
   { id: 107, name: 'Al Amana Fire & Safety',  country: 'Oman',         isLocal: true,  category: 'Fire & Safety Systems',         regNo: 'CR-664519',  jsrsNo: 'JSRS-4470', molCardNo: 'MOL-91002', yearEstablished: 2009, natureOfBusiness: 'Fire detection, suppression & HSE systems',   contactName: 'Mariam Al-Rawahi', contactEmail: 'm.rawahi@alamana.om' },
   { id: 108, name: 'Barka Marine Works',      country: 'Oman',         isLocal: true,  category: 'Marine & Civil Works',          regNo: 'CR-227741',  jsrsNo: 'JSRS-2005', molCardNo: 'MOL-40218', yearEstablished: 1998, natureOfBusiness: 'Marine construction & dredging',              contactName: 'Khalid Al-Maskari', contactEmail: 'k.maskari@barkamarine.om' },
+  { id: 109, name: 'Sohar Piping Industries', country: 'Oman',         isLocal: true,  category: 'Mechanical & Piping Works',     regNo: 'CR-813365',  jsrsNo: 'JSRS-5118', molCardNo: 'MOL-67440', yearEstablished: 2006, natureOfBusiness: 'Pipe fabrication, spooling & mechanical erection', contactName: 'Nasser Al-Hinai',  contactEmail: 'n.hinai@soharpiping.om' },
+  { id: 110, name: 'Muscat Power Systems',    country: 'Oman',         isLocal: true,  category: 'Electrical & Instrumentation',  regNo: 'CR-451208',  jsrsNo: 'JSRS-6023', molCardNo: 'MOL-73115', yearEstablished: 2012, natureOfBusiness: 'LV/HV electrical works & instrumentation loop testing', contactName: 'Huda Al-Kindi',   contactEmail: 'h.kindi@muscatpower.om' },
+  { id: 111, name: 'Falcon Safety Equipment', country: 'UAE',          isLocal: false, category: 'Fire & Safety Systems',         regNo: 'CR-905613',  jsrsNo: null,        molCardNo: null,        yearEstablished: 2010, natureOfBusiness: 'Fire suppression equipment supply & maintenance', contactName: 'Omar Sheikh',      contactEmail: 'o.sheikh@falconsafety.ae' },
+  { id: 112, name: 'Nizwa Tech Networks',     country: 'Oman',         isLocal: true,  category: 'IT & Communications',           regNo: 'CR-378904',  jsrsNo: 'JSRS-7742', molCardNo: 'MOL-51996', yearEstablished: 2016, natureOfBusiness: 'Industrial networking & telecom infrastructure', contactName: 'Zahra Al-Saadi',   contactEmail: 'z.saadi@nizwatech.om' },
 ]
 
 // ── Stage 4 handoff documents — tender-level internal company documents
 export const HANDOFF_DOCS = [
-  { key: 'benchmarking',    label: 'OEM Benchmarking Rates' },
+  { key: 'icv',             label: 'ICV Plan' },
   { key: 'companyEstimate', label: 'Company Estimate' },
   { key: 'riskAssessment',  label: 'Contract Risk Assessment' },
 ]
@@ -359,7 +366,7 @@ export const TECHNICAL_CRITERIA_PQ = [
   { id: 't2', item: 'Compliance to Technical Specifications', detail: 'Any deviation or qualification against the required manpower/materials/systems specification.' },
   { id: 't3', item: 'Equipment & Facilities', detail: 'Adequacy of the list of equipment and facilities proposed for the work.' },
   { id: 't4', item: 'Professional/Trade Certification', detail: 'Availability of any applicable trade certification required for the work.' },
-  { id: 't5', item: 'Quality Management System', detail: 'Valid ISO 9001 (or equivalent) certification covering the scope of work.' },
+  { id: 't5', item: 'Quality Management System', detail: 'Valid ISO 9001 (or equivalent) certification covering the statement of work.' },
 ]
 
 export const ADMINISTRATIVE_CRITERIA = [
@@ -368,6 +375,15 @@ export const ADMINISTRATIVE_CRITERIA = [
   { id: 'a3', item: 'Commercial Registration Certificate', detail: "Valid Commercial Registration Certificate." },
   { id: 'a4', item: 'MOL Omanisation / Green Card', detail: 'Local suppliers only — Not Applicable for foreign companies.', localOnly: true },
   { id: 'a5', item: 'JSRS Registration Certificate', detail: 'Valid JSRS registration certificate.' },
+]
+
+// Stage 4 financial-assessment criteria, derived from the three factors of the
+// original assessment (statement submitted, audit opinion, Z-score zone) so the
+// Contract Engineer marks them Pass/Fail per bidder, just like Stage 3.
+export const FINANCIAL_CRITERIA = [
+  { id: 'f1', item: 'Audited Financial Statement', detail: 'Audited financial statements for the most recent financial year have been submitted.' },
+  { id: 'f2', item: 'Acceptable Audit Opinion', detail: 'External audit opinion is Unqualified or Qualified — not Adverse or Disclaimer.' },
+  { id: 'f3', item: 'Solvency (Z-Score Zone)', detail: 'Altman Z-Score places the bidder in the Green or Amber solvency zone, not Red.' },
 ]
 
 // ── Stage 4 — simplified financial assessment rule, directionally matching
@@ -410,14 +426,69 @@ export const auditLogs = [
   { id: 15, user: 'John Smith',  role: 'Contract Engineer',  action: 'Created Contract for Awarded Bidder',             tender: 'ITT-2025-001', timestamp: '2025-04-07 09:15:00', ip: '10.1.0.10', status: 'success' },
 ]
 
-export const technicalCriteria = [
-  { id: 1, criterion: 'Technical Approach & Methodology',   weight: 25, maxScore: 3 },
-  { id: 2, criterion: 'Team Qualifications & Experience',   weight: 20, maxScore: 3 },
-  { id: 3, criterion: 'Implementation Timeline',            weight: 15, maxScore: 3 },
-  { id: 4, criterion: 'Technology Stack & Innovation',      weight: 20, maxScore: 3 },
-  { id: 5, criterion: 'Risk Management Plan',               weight: 10, maxScore: 3 },
-  { id: 6, criterion: 'After-Sales Support & SLA',          weight: 10, maxScore: 3 },
+// Technical Evaluation Model — mirrors "Appendix I — Technical Evaluation Model
+// Template". Each criterion is scored 0–3 against its scoring bands; its weighted
+// contribution is (score / 3) × weight. Weights sum to 100 (Part 1 = 25, Part 2
+// = 60, Part 3 = 15), so a straight-3 across the board totals 100. Musts carry a
+// minimum raw score that must be met; Wants do not. A bidder passes when every
+// Must clears its minimum AND the weighted total meets the overall passing score.
+export const TECHNICAL_OVERALL_PASS = 70 // % — Contract-Holder-set minimum passing weighted score
+
+export const technicalEvalParts = [
+  {
+    id: 'part1', title: 'Part 1 — QHSE', sectionWeight: 25,
+    criteria: [
+      { id: 'p1m1', type: 'Must', criterion: 'Contractor HSE Capability Assessment', detail: 'Response to the HSE Capability Assessment questionnaire; overall result taken from the detailed questionnaire.', weight: 20, maxScore: 3, minScore: 2, isHse: true,
+        bands: ['No information provided', 'Red Banded', 'Amber Banded', 'Green Banded'] },
+      { id: 'p1w1', type: 'Want', criterion: 'ISO Certification', detail: 'Or other appropriate / equivalent certification.', weight: 5, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Working on system', 'Non-certified system in place', 'Valid certification in operation'] },
+    ],
+  },
+  {
+    id: 'part2', title: 'Part 2 — Contract-Specific', sectionWeight: 60,
+    criteria: [
+      { id: 'p2m1', type: 'Must', criterion: 'Methodology Statement', detail: 'Manner and sequence of carrying out the required Work / Services.', weight: 10, maxScore: 3, minScore: 2,
+        bands: ['No information provided', 'Shows lack of understanding of Work', 'Shows a competent understanding of Work', 'Shows a detailed understanding of Work'] },
+      { id: 'p2m2', type: 'Must', criterion: 'Omanisation Plan', detail: 'Compliance with Labour Law and contract requirements; targets and staff development / training plan.', weight: 15, maxScore: 3, minScore: 2,
+        bands: ['No information provided', 'Complies with Labour Law', 'Proposed an alternate equivalent plan', 'Meets or exceeds requirements'] },
+      { id: 'p2w1', type: 'Want', criterion: 'Compliance to Technical Specifications', detail: 'Any deviation or qualification submitted in relation to the Work.', weight: 5, maxScore: 3, minScore: null,
+        bands: ['No information / non-compliant specification', 'Proposes an unknown alternate', 'Proposed an acceptable alternate equivalent', 'Meets or exceeds requirements'] },
+      { id: 'p2w2', type: 'Want', criterion: 'Professional / Trade Certification', detail: 'Any applicable certification required (e.g. MOH certificate for catering staff).', weight: 10, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Includes outdated certification', 'Includes up-to-date related certification', 'Includes up-to-date specific certification'] },
+      { id: 'p2w3', type: 'Want', criterion: 'Contract Programme / Work Plan', detail: 'How the Contractor plans to execute the work with available resources and meet the deadline.', weight: 5, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Optimistic for identified resources', 'Reasonable for identified resources', 'Detailed with back-up plans'] },
+      { id: 'p2w4', type: 'Want', criterion: 'Additional Criterion (CH-defined)', detail: 'To be identified by the Contract Holder.', weight: 5, maxScore: 3, minScore: null,
+        bands: ['No Info', 'Basic', 'Satisfactory', 'Comprehensive'] },
+      { id: 'p2w5', type: 'Want', criterion: 'Additional Criterion (CH-defined)', detail: 'To be identified by the Contract Holder.', weight: 10, maxScore: 3, minScore: null,
+        bands: ['No Info', 'Basic', 'Satisfactory', 'Comprehensive'] },
+    ],
+  },
+  {
+    id: 'part3', title: 'Part 3 — Contract-Generic', sectionWeight: 15,
+    criteria: [
+      { id: 'p3m1', type: 'Must', criterion: 'Work Procedures and Instructions', detail: 'Adequacy of information detailing the standards to be maintained.', weight: 2, maxScore: 3, minScore: 2,
+        bands: ['No information provided', 'Shows lack of understanding of Work', 'Shows a competent understanding of Work', 'Shows a detailed understanding of Work'] },
+      { id: 'p3m2', type: 'Must', criterion: 'Equipment and Facilities', detail: 'Adequacy of equipment list, maintenance facilities, backup resources, evidence of ownership / hire.', weight: 3, maxScore: 3, minScore: 2,
+        bands: ['No information provided', 'Includes sub-standard equipment', 'Meets requirements', 'Provides in excess of anticipated needs'] },
+      { id: 'p3w1', type: 'Want', criterion: 'Proposed Organisational Structure', detail: 'Decision-making process, roles & responsibilities, management competency.', weight: 2, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Simple outline', 'Meets requirements', 'Clear, concise and detailed'] },
+      { id: 'p3w2', type: 'Want', criterion: 'Suitability of Personnel Nominated', detail: 'Adequacy and number of staff, qualifications and relevant experience of key personnel.', weight: 3, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Minimum requirement personnel', 'Competent personnel', 'Excellent / highly qualified personnel'] },
+      { id: 'p3w3', type: 'Want', criterion: 'Suitability of Project / Contract Manager', detail: 'Qualification and relevant experience to manage and execute the job effectively.', weight: 1, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Minimum requirement personnel', 'Competent personnel', 'Excellent / highly qualified personnel'] },
+      { id: 'p3w4', type: 'Want', criterion: 'Proposed Subcontractors', detail: 'Elements of work carried out by others, and evidence of subcontractor ability.', weight: 2, maxScore: 3, minScore: null,
+        bands: ['No information provided', 'Name only', 'Name and previous projects', 'Name, projects and references'] },
+      { id: 'p3w5', type: 'Want', criterion: 'Additional Criterion (CH-defined)', detail: 'To be identified by the Contract Holder.', weight: 1, maxScore: 3, minScore: null,
+        bands: ['No Info', 'Basic', 'Satisfactory', 'Comprehensive'] },
+      { id: 'p3w6', type: 'Want', criterion: 'Additional Criterion (CH-defined)', detail: 'To be identified by the Contract Holder.', weight: 1, maxScore: 3, minScore: null,
+        bands: ['No Info', 'Basic', 'Satisfactory', 'Comprehensive'] },
+    ],
+  },
 ]
+
+// Flat list (with part + partTitle) for score-map keying and iteration.
+export const technicalCriteria = technicalEvalParts.flatMap(p =>
+  p.criteria.map(c => ({ ...c, part: p.id, partTitle: p.title })))
 
 export const commercialCriteria = [
   { id: 1, criterion: 'Total Bid Price',               weight: 40, maxScore: 3 },
@@ -460,7 +531,7 @@ export const contractTemplates = [
 export const ittSections = [
   {
     id: 'scope',
-    title: '1. Scope of Work',
+    title: '1. Statement of Work',
     content: `The Contractor shall provide a comprehensive Cloud Infrastructure Upgrade for the Government National Data Centre, encompassing the design, procurement, installation, configuration, testing, commissioning, and maintenance of cloud infrastructure components as detailed in this Invitation to Tender.
 
 The scope includes, but is not limited to:

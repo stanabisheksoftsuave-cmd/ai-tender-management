@@ -4,9 +4,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
+import { useBackHandler, useDismissable } from '../context/NavigationContext'
 
 
 const stageColor = {
@@ -39,8 +41,10 @@ export default function BidderUpload() {
   const { users } = useAuth()
   const uploadTenders = tenders.filter(t => t.status === 'upload')
 
-  const techEvaluators = users.filter(u => u.roleId === 'tech_eval' && u.status === 'active')
-  const commEvaluators = users.filter(u => u.roleId === 'comm_eval' && u.status === 'active')
+  // Technical evaluation is owned by the Contract Holder; commercial by the
+  // Contract Engineer. Evaluator pools are drawn from those roles.
+  const techEvaluators = users.filter(u => u.roleId === 'contract_holder' && u.status === 'active')
+  const commEvaluators = users.filter(u => u.roleId === 'pof' && u.status === 'active')
 
   const paramTender = tenderId ? tenders.find(t => t.id === tenderId) : null
   const [selectedTender, setSelectedTender] = useState(paramTender || null)
@@ -49,6 +53,12 @@ export default function BidderUpload() {
   const [extracting, setExtracting] = useState(false)
   const [showTracker, setShowTracker] = useState(false)
   const [logEntries, setLogEntries] = useState([])
+
+  // Ingestion document-collection mode:
+  //   linear   → only the Technical document is collected now; the Commercial
+  //              document arrives later at the commercial evaluation stage.
+  //   parallel → both Technical and Commercial documents are collected now.
+  const [evalMode, setEvalMode] = useState('linear')
 
   // Add Bidder modal
   const [showAddBidder, setShowAddBidder] = useState(false)
@@ -159,12 +169,39 @@ export default function BidderUpload() {
 
   // ── Handlers ──
 
+  const closeCorrectionPortal = () => {
+    setCorrectionTender(null); setCorrectionUploads({}); setCorrectionSubmitted({})
+    setCorrectionExtracting({}); setCorrectionExtracted({}); setCorrectionExtractPct({}); setCorrectionGeneral({})
+  }
+
+  const exitTenderDetail = () => tenderId ? navigate('/tenders') : setSelectedTender(null)
+
+  // Modals sit above the page — Back closes the topmost one before any in-page
+  // or route unwinding. Each mirrors its own X / Cancel reset.
+  // reassignTender renders inside the list branch below an early return, so this
+  // must stay at top level to be a valid hook call.
+  useDismissable(reassignTender, () => setReassignTender(null))
+  useDismissable(showTracker, () => setShowTracker(false))
+  useDismissable(showAssignModal, () => setShowAssignModal(false))
+  useDismissable(showAddBidder, () => setShowAddBidder(false))
+  useDismissable(pendingFile, () => setPendingFile(null))
+
+  // Shared Back unwinds in-page state first. With a :tenderId param the detail
+  // IS the route, so we decline and let route-level back run.
+  useBackHandler(() => {
+    if (correctionTender) { closeCorrectionPortal(); return true }
+    if (selectedTender && !tenderId) { setSelectedTender(null); return true }
+    return false
+  }, [correctionTender, selectedTender, tenderId])
+
   const fmtSize = (bytes) => bytes > 1024 * 1024
     ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     : `${(bytes / 1024).toFixed(0)} KB`
 
-  // A bidder is ready for extraction once BOTH documents are attached.
-  const docsComplete = (b) => !!(b.techDoc && b.commDoc)
+  // Parallel collects both documents at ingestion. Linear collects only the
+  // Technical document now — the Commercial document is uploaded later, once
+  // technical evaluation completes, at the commercial evaluation stage.
+  const docsComplete = (b) => evalMode === 'parallel' ? !!(b.techDoc && b.commDoc) : !!b.techDoc
 
   // Recompute a bidder's status after a document change: queued once both docs
   // are present (unless already processing/completed/opted-out).
@@ -174,13 +211,26 @@ export default function BidderUpload() {
     return { ...b, status: docsComplete(b) ? 'queued' : 'no_document' }
   }
 
+  // Switching the flow changes what "complete" means at ingestion (linear needs
+  // only the Technical document), so re-derive each bidder's status.
+  const changeEvalMode = (mode) => {
+    setEvalMode(mode)
+    setBidders(prev => prev.map(b => {
+      if (b.status === 'not_participating') return b
+      if (['processing', 'completed'].includes(b.status)) return b
+      const complete = mode === 'parallel' ? !!(b.techDoc && b.commDoc) : !!b.techDoc
+      return { ...b, status: complete ? 'queued' : 'no_document' }
+    }))
+  }
+
   const openAssignModal = (incoming) => {
     const file = Array.from(incoming)[0]
     if (!file) return
     setPendingFile({ name: file.name, size: fmtSize(file.size) })
     const unassigned = bidders.find(b => b.status !== 'not_participating' && !docsComplete(b))
     setAssignTo(unassigned ? String(unassigned.id) : 'new')
-    setAssignDocType(unassigned && unassigned.techDoc && !unassigned.commDoc ? 'commercial' : 'technical')
+    // Linear collects only the Technical document at ingestion.
+    setAssignDocType(evalMode === 'parallel' && unassigned && unassigned.techDoc && !unassigned.commDoc ? 'commercial' : 'technical')
     setNewBidderForm({ company: '', contact: '', phone: '' })
     setAssignErrors({})
   }
@@ -273,6 +323,12 @@ export default function BidderUpload() {
     uploadedBidders.length > 0
   const hasQueued = bidders.some(b => b.status === 'queued')
 
+  // Pre-qualified bidder companies carried over from the tender (Pre-Qual / PSF).
+  // Offered as dropdown suggestions when registering bidders / assigning documents.
+  const qualifiedCompanies = (Array.isArray(selectedTender?.bidderList) ? selectedTender.bidderList : [])
+    .map(b => b.name)
+    .filter(Boolean)
+
   // Tenders awaiting POF upload of evaluation reports
   // Pending evaluation-report uploads. Linear tenders expose one report at a time
   // (via their export status); parallel tenders can expose both sides at once.
@@ -359,7 +415,8 @@ export default function BidderUpload() {
     }))
     const techUser = users.find(u => u.id === Number(assignments.techEval))
     const commUser = users.find(u => u.id === Number(assignments.commEval))
-    const isParallel = assignments.mode === 'parallel'
+    // Evaluation flow is decided at ingestion (evalMode), not in this modal.
+    const isParallel = evalMode === 'parallel'
     updateTender(selectedTender.id, {
       bidderList,
       bidders: bidderList.length,
@@ -383,7 +440,7 @@ export default function BidderUpload() {
     return (
       <div className="space-y-5">
         <button
-          onClick={() => { setCorrectionTender(null); setCorrectionUploads({}); setCorrectionSubmitted({}); setCorrectionExtracting({}); setCorrectionExtracted({}); setCorrectionExtractPct({}); setCorrectionGeneral({}) }}
+          onClick={closeCorrectionPortal}
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors"
         >
           <ArrowLeft size={14} /> Back
@@ -661,15 +718,19 @@ export default function BidderUpload() {
             <div className="px-5 py-4 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Technical Evaluator</label>
-                <select
+                <SearchableSelect
                   value={reassignForm.techEval}
-                  onChange={e => setReassignForm(f => ({ ...f, techEval: e.target.value }))}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 text-slate-700">
-                  <option value="">— Select Technical Evaluator —</option>
-                  {techEvaluators.map(u => (
-                    <option key={u.id} value={String(u.id)}>{u.name}</option>
-                  ))}
-                </select>
+                  onChange={v => setReassignForm(f => ({ ...f, techEval: v === '' ? '' : String(v) }))}
+                  options={techEvaluators}
+                  getValue={u => u.id}
+                  getLabel={u => u.name}
+                  getSubLabel={u => u.email || u.username || ''}
+                  placeholder="— Select Technical Evaluator —"
+                  searchPlaceholder="Search evaluators…"
+                  emptyText="No matching evaluators"
+                  ariaLabel="Technical Evaluator"
+                  clearable
+                />
                 {reassignErrors.techEval && <p className="text-[11px] text-red-500 mt-1">{reassignErrors.techEval}</p>}
                 {reassignTender.assignedTechEval && (
                   <p className="text-[11px] text-slate-400 mt-1">Current: {reassignTender.assignedTechEval.name}</p>
@@ -677,15 +738,19 @@ export default function BidderUpload() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Commercial Evaluator</label>
-                <select
+                <SearchableSelect
                   value={reassignForm.commEval}
-                  onChange={e => setReassignForm(f => ({ ...f, commEval: e.target.value }))}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 text-slate-700">
-                  <option value="">— Select Commercial Evaluator —</option>
-                  {commEvaluators.map(u => (
-                    <option key={u.id} value={String(u.id)}>{u.name}</option>
-                  ))}
-                </select>
+                  onChange={v => setReassignForm(f => ({ ...f, commEval: v === '' ? '' : String(v) }))}
+                  options={commEvaluators}
+                  getValue={u => u.id}
+                  getLabel={u => u.name}
+                  getSubLabel={u => u.email || u.username || ''}
+                  placeholder="— Select Commercial Evaluator —"
+                  searchPlaceholder="Search evaluators…"
+                  emptyText="No matching evaluators"
+                  ariaLabel="Commercial Evaluator"
+                  clearable
+                />
                 {reassignErrors.commEval && <p className="text-[11px] text-red-500 mt-1">{reassignErrors.commEval}</p>}
                 {reassignTender.assignedCommEval && (
                   <p className="text-[11px] text-slate-400 mt-1">Current: {reassignTender.assignedCommEval.name}</p>
@@ -952,7 +1017,7 @@ export default function BidderUpload() {
   if (selectedTender && selectedTender.status !== 'upload') {
     return (
       <div className="space-y-5">
-        <button onClick={() => tenderId ? navigate('/tenders') : setSelectedTender(null)} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+        <button onClick={exitTenderDetail} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
           <ArrowLeft size={14} /> Back
         </button>
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
@@ -971,7 +1036,7 @@ export default function BidderUpload() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={() => tenderId ? navigate('/tenders') : setSelectedTender(null)} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+        <button onClick={exitTenderDetail} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
           <ArrowLeft size={14} /> {tenderId ? t('common.backToList') : t('common.backToList2')}
         </button>
         <span className="text-slate-200">|</span>
@@ -995,6 +1060,35 @@ export default function BidderUpload() {
         </div>
       </Card>
 
+      {/* ── Document collection flow (linear / parallel) ── */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <GitBranch size={14} className="text-[var(--color-primary)] shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Evaluation Flow</p>
+              <p className="text-[11px] text-slate-400">
+                {evalMode === 'parallel'
+                  ? 'Parallel — Technical and Commercial evaluated together. Upload both documents now.'
+                  : 'Linear — Technical first. Upload the Technical document now; the Commercial document is uploaded after technical evaluation.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-1 p-0.5 rounded-lg bg-slate-100 shrink-0">
+            {[
+              { key: 'linear',   Icon: GitBranch,      label: 'Linear' },
+              { key: 'parallel', Icon: ArrowRightLeft, label: 'Parallel' },
+            ].map(({ key, Icon, label }) => (
+              <button key={key} type="button" onClick={() => changeEvalMode(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
+                  ${evalMode === key ? 'bg-white text-[var(--color-primary)] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <Icon size={12} /> {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: Upload zone + AI info */}
         <div className="lg:col-span-1 space-y-4">
@@ -1009,7 +1103,7 @@ export default function BidderUpload() {
                 <Upload size={24} className={dragging ? 'text-white' : 'text-slate-400'} />
               </div>
               <p className="text-sm font-medium text-slate-700 mb-1">Drop a bidder document here</p>
-              <p className="text-xs text-slate-400 mb-4">Technical or Commercial · PDF, DOCX, XLSX, ZIP</p>
+              <p className="text-xs text-slate-400 mb-4">{evalMode === 'parallel' ? 'Technical or Commercial' : 'Technical'} · PDF, DOCX, XLSX, ZIP</p>
               <label className="cursor-pointer">
                 <span className="px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">{t('ing.browseFiles')}</span>
                 <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" className="hidden" onChange={e => { openAssignModal(e.target.files); e.target.value = '' }} />
@@ -1119,11 +1213,13 @@ export default function BidderUpload() {
                     </div>
                   ) : (
                     <>
-                      {/* Two required document slots */}
+                      {/* Document slots — both in parallel; Technical only in linear (Commercial comes after tech eval) */}
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {[
                           { type: 'technical',  doc: b.techDoc, Icon: Wrench, label: 'Technical',  color: 'text-blue-500',   bg: 'bg-blue-50' },
-                          { type: 'commercial', doc: b.commDoc, Icon: Wallet, label: 'Commercial', color: 'text-violet-500', bg: 'bg-violet-50' },
+                          ...(evalMode === 'parallel'
+                            ? [{ type: 'commercial', doc: b.commDoc, Icon: Wallet, label: 'Commercial', color: 'text-violet-500', bg: 'bg-violet-50' }]
+                            : []),
                         ].map(({ type, doc, Icon, label, color, bg }) => (
                           <div key={type} className={`rounded-lg border px-2.5 py-2 ${doc ? 'border-emerald-200 bg-emerald-50/50' : 'border-dashed border-slate-200 bg-slate-50/60'}`}>
                             <div className="flex items-center gap-1.5 mb-1">
@@ -1151,6 +1247,13 @@ export default function BidderUpload() {
                           </div>
                         ))}
                       </div>
+
+                      {evalMode === 'linear' && (
+                        <p className="mt-1.5 text-[10px] text-slate-400 flex items-center gap-1">
+                          <Wallet size={10} className="text-violet-400 shrink-0" />
+                          Commercial document is uploaded after technical evaluation, at the commercial evaluation stage.
+                        </p>
+                      )}
 
                       {/* Processing progress */}
                       {b.status === 'processing' && (
@@ -1219,8 +1322,17 @@ export default function BidderUpload() {
                   value={bidderForm.company}
                   onChange={e => { setBidderForm(f => ({ ...f, company: e.target.value })); setBidderErrors(er => ({ ...er, company: '' })) }}
                   placeholder={t('ing.companyPlaceholder')}
+                  list={qualifiedCompanies.length ? 'qualified-bidder-companies' : undefined}
                   className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 ${bidderErrors.company ? 'border-red-300' : 'border-slate-200'}`}
                 />
+                {qualifiedCompanies.length > 0 && (
+                  <datalist id="qualified-bidder-companies">
+                    {qualifiedCompanies.map(name => <option key={name} value={name} />)}
+                  </datalist>
+                )}
+                {qualifiedCompanies.length > 0 && (
+                  <p className="text-[10px] text-slate-400 mt-1">Choose a pre-qualified bidder or type a new company name.</p>
+                )}
                 {bidderErrors.company && <p className="text-[10px] text-red-500 mt-0.5">{bidderErrors.company}</p>}
               </div>
               <div>
@@ -1275,13 +1387,13 @@ export default function BidderUpload() {
                 </div>
               </div>
 
-              {/* Document type */}
+              {/* Document type — Commercial only offered in parallel (linear uploads it later) */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">Document type</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { key: 'technical',  Icon: Wrench, label: 'Technical' },
-                    { key: 'commercial', Icon: Wallet, label: 'Commercial' },
+                    ...(evalMode === 'parallel' ? [{ key: 'commercial', Icon: Wallet, label: 'Commercial' }] : []),
                   ].map(({ key, Icon, label }) => (
                     <button key={key} type="button" onClick={() => setAssignDocType(key)}
                       className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors
@@ -1292,30 +1404,26 @@ export default function BidderUpload() {
                 </div>
               </div>
 
-              {/* Bidder selector */}
+              {/* Bidder selector — searchable dropdown of eligible bidders + add-company */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">{t('ing.assignTo')}</label>
-                <div className="space-y-1.5">
-                  {bidders.filter(b => b.status !== 'not_participating' && !docsComplete(b)).map(b => {
-                    const slotFilled = assignDocType === 'commercial' ? !!b.commDoc : !!b.techDoc
-                    return (
-                    <label key={b.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
-                      ${assignTo === String(b.id) ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
-                      <input type="radio" name="assignTo" value={String(b.id)} checked={assignTo === String(b.id)} onChange={e => setAssignTo(e.target.value)} className="text-[var(--color-primary)]" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-700 truncate">{b.company}</p>
-                        <p className="text-xs text-slate-400 truncate">{b.contact}</p>
-                      </div>
-                      {slotFilled && <span className="text-[10px] text-amber-600 shrink-0">replaces {assignDocType}</span>}
-                    </label>
-                    )
-                  })}
-                  <label className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
-                    ${assignTo === 'new' ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <input type="radio" name="assignTo" value="new" checked={assignTo === 'new'} onChange={() => setAssignTo('new')} className="text-[var(--color-primary)]" />
-                    <p className="text-sm font-medium text-slate-500">{t('ing.newBidder')}</p>
-                  </label>
-                </div>
+                <SearchableSelect
+                  value={assignTo}
+                  onChange={v => setAssignTo(v === '' ? '' : String(v))}
+                  options={[
+                    ...bidders
+                      .filter(b => b.status !== 'not_participating' && !docsComplete(b))
+                      .map(b => ({ id: String(b.id), name: b.company, sub: b.contact })),
+                    { id: 'new', name: t('ing.newBidder'), sub: 'Create a new company entry' },
+                  ]}
+                  getValue={o => o.id}
+                  getLabel={o => o.name}
+                  getSubLabel={o => o.sub}
+                  placeholder="— Select bidder —"
+                  searchPlaceholder="Search bidders…"
+                  emptyText="No bidders yet — register a new company"
+                  ariaLabel="Assign to bidder"
+                />
               </div>
 
               {/* New bidder inline form */}
@@ -1326,8 +1434,14 @@ export default function BidderUpload() {
                       value={newBidderForm.company}
                       onChange={e => { setNewBidderForm(f => ({ ...f, company: e.target.value })); setAssignErrors(er => ({ ...er, company: '' })) }}
                       placeholder="Company name *"
+                      list={qualifiedCompanies.length ? 'qualified-bidder-companies' : undefined}
                       className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 ${assignErrors.company ? 'border-red-300' : 'border-slate-200'}`}
                     />
+                    {qualifiedCompanies.length > 0 && (
+                      <datalist id="qualified-bidder-companies">
+                        {qualifiedCompanies.map(name => <option key={name} value={name} />)}
+                      </datalist>
+                    )}
                     {assignErrors.company && <p className="text-[10px] text-red-500 mt-0.5">{assignErrors.company}</p>}
                   </div>
                   <div>
@@ -1381,61 +1495,56 @@ export default function BidderUpload() {
             </div>
 
             <div className="px-5 py-4 space-y-4">
-              {/* Evaluation mode */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Evaluation Flow</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'linear',   Icon: GitBranch,      title: 'Linear',   sub: 'Technical first, then Commercial' },
-                    { key: 'parallel', Icon: ArrowRightLeft, title: 'Parallel', sub: 'Both evaluate at the same time' },
-                  ].map(({ key, Icon, title, sub }) => (
-                    <button key={key} type="button" onClick={() => setAssignments(a => ({ ...a, mode: key }))}
-                      className={`text-left px-3 py-2.5 rounded-lg border transition-colors
-                        ${assignments.mode === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-slate-300'}`}>
-                      <div className={`flex items-center gap-1.5 text-xs font-semibold ${assignments.mode === key ? 'text-[var(--color-primary)]' : 'text-slate-600'}`}>
-                        <Icon size={13} /> {title}
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>
-                    </button>
-                  ))}
-                </div>
+              {/* Evaluation flow — chosen at ingestion, shown read-only here */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-xs font-medium text-slate-600">Evaluation Flow</span>
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary)]">
+                  {evalMode === 'parallel' ? <ArrowRightLeft size={13} /> : <GitBranch size={13} />}
+                  {evalMode === 'parallel' ? 'Parallel' : 'Linear'}
+                </span>
               </div>
 
-              {/* Technical Evaluator */}
+              {/* Technical Evaluator — Contract Holder */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Technical Evaluator <span className="text-red-400">*</span>
+                  Technical Evaluator <span className="text-slate-400 font-medium">(Contract Holder)</span> <span className="text-red-400">*</span>
                 </label>
-                <select
+                <SearchableSelect
                   value={assignments.techEval}
-                  onChange={e => { setAssignments(a => ({ ...a, techEval: e.target.value })); setAssignModalErrors(er => ({ ...er, techEval: '' })) }}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 bg-white
-                    ${assignModalErrors.techEval ? 'border-red-300' : 'border-slate-200'}`}
-                >
-                  <option value="">— Select Technical Evaluator —</option>
-                  {techEvaluators.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+                  onChange={v => { setAssignments(a => ({ ...a, techEval: v === '' ? '' : String(v) })); setAssignModalErrors(er => ({ ...er, techEval: '' })) }}
+                  options={techEvaluators}
+                  getValue={u => u.id}
+                  getLabel={u => u.name}
+                  getSubLabel={u => u.email || u.username || ''}
+                  placeholder="— Select Contract Holder —"
+                  searchPlaceholder="Search contract holders…"
+                  emptyText="No matching contract holders"
+                  ariaLabel="Technical Evaluator"
+                  error={!!assignModalErrors.techEval}
+                  clearable
+                />
                 {assignModalErrors.techEval && <p className="text-[10px] text-red-500 mt-0.5">{assignModalErrors.techEval}</p>}
               </div>
 
-              {/* Commercial Evaluator */}
+              {/* Commercial Evaluator — Contract Engineer */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Commercial Evaluator <span className="text-red-400">*</span>
+                  Commercial Evaluator <span className="text-slate-400 font-medium">(Contract Engineer)</span> <span className="text-red-400">*</span>
                 </label>
-                <select
+                <SearchableSelect
                   value={assignments.commEval}
-                  onChange={e => { setAssignments(a => ({ ...a, commEval: e.target.value })); setAssignModalErrors(er => ({ ...er, commEval: '' })) }}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 bg-white
-                    ${assignModalErrors.commEval ? 'border-red-300' : 'border-slate-200'}`}
-                >
-                  <option value="">— Select Commercial Evaluator —</option>
-                  {commEvaluators.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+                  onChange={v => { setAssignments(a => ({ ...a, commEval: v === '' ? '' : String(v) })); setAssignModalErrors(er => ({ ...er, commEval: '' })) }}
+                  options={commEvaluators}
+                  getValue={u => u.id}
+                  getLabel={u => u.name}
+                  getSubLabel={u => u.email || u.username || ''}
+                  placeholder="— Select Contract Engineer —"
+                  searchPlaceholder="Search contract engineers…"
+                  emptyText="No matching contract engineers"
+                  ariaLabel="Commercial Evaluator"
+                  error={!!assignModalErrors.commEval}
+                  clearable
+                />
                 {assignModalErrors.commEval && <p className="text-[10px] text-red-500 mt-0.5">{assignModalErrors.commEval}</p>}
               </div>
 

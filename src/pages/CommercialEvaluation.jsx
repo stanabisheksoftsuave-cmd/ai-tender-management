@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -18,7 +18,8 @@ const AlertTriangle = p => <Svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.
 const ArrowLeft     = p => <Svg {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Svg>
 const ShieldOff     = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></Svg>
 const Download      = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
-const Clock         = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
+const Bot           = p => <Svg {...p}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></Svg>
+const UploadCloud   = p => <Svg {...p}><path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -26,11 +27,20 @@ import TenderSelectList from '../components/ui/TenderSelectList'
 import { commercialCriteria as defaultCriteria, bidders, tenders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
+import { useNavigation, useDismissable, useBackHandler } from '../context/NavigationContext'
 
+// Per-criterion 0–3 band (cell badge).
 const getCompliance = (score) => {
   if (score >= 2) return { variant: 'compliant',        label: 'Compliant' }
   if (score >= 1) return { variant: 'partial_compliant', label: 'Partially Compliant' }
   return                  { variant: 'non_compliant',    label: 'Non-Compliant' }
+}
+
+// Weighted total is now a percentage out of 100, so it needs its own band.
+const getTotalCompliance = (pct) => {
+  if (pct >= 70) return { variant: 'compliant',        label: 'Compliant' }
+  if (pct >= 50) return { variant: 'partial_compliant', label: 'Partially Compliant' }
+  return                 { variant: 'non_compliant',    label: 'Non-Compliant' }
 }
 
 const bidTotals = {
@@ -40,11 +50,21 @@ const bidTotals = {
   4: 712000,
 }
 
+// Steps shown while the AI auto-scores the commercial submissions.
+const COMM_AI_STEPS = [
+  'Reading bidder commercial submissions…',
+  'Extracting priced schedules & unit rates…',
+  'Normalising bid totals across bidders…',
+  'Scoring against commercial criteria…',
+  'Compiling AI recommendation…',
+]
+
 export default function CommercialEvaluation() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
+  const { goBack } = useNavigation()
   const { user } = useAuth()
-  const { tenders, advanceTender, submitParallelEval } = useTenders()
+  const { tenders, advanceTender, submitParallelEval, updateTender } = useTenders()
 
   // All hooks must be called before any conditional returns
   const [criteria, setCriteria] = useState(defaultCriteria)
@@ -54,13 +74,61 @@ export default function CommercialEvaluation() {
   const [activeTab, setActiveTab] = useState('scoring')
   const [showEditor, setShowEditor] = useState(false)
   const [draft, setDraft] = useState([])
+  // AI auto-scoring
+  const [aiScored,    setAiScored]    = useState(false)
+  const [aiScoring,   setAiScoring]   = useState(false)
+  const [aiScoreStep, setAiScoreStep] = useState(0)
+  const [aiModified,  setAiModified]  = useState({})
+
+  useDismissable(showEditor, () => setShowEditor(false))
+
+  useBackHandler(() => {
+    if (activeTab !== 'scoring') { setActiveTab('scoring'); return true }
+    return false
+  })
 
   const tender = tenders.find(t => t.id === tenderId)
   const tenderBidders = Array.isArray(tender?.bidderList)
     ? tender.bidderList
     : (tender?.bidders > 0 ? bidders.slice(0, tender.bidders) : bidders)
 
-  if (user?.role?.id !== 'comm_eval') {
+  // Linear tenders collect the commercial documents here (after technical
+  // evaluation), so scoring is gated until they're uploaded. Parallel tenders
+  // already collected them at ingestion.
+  const commercialDocsReady = tender?.evaluationMode !== 'linear' || tender?.commercialDocsUploaded === true
+
+  // Auto-start AI scoring when the scoring tab opens (and docs are ready).
+  useEffect(() => {
+    if (activeTab !== 'scoring' || aiScored || aiScoring || !tender || !commercialDocsReady) return
+    const t = setTimeout(() => { setAiScoreStep(0); setAiScoring(true) }, 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, tender, commercialDocsReady])
+
+  // Step through the animation, then apply AI-generated commercial scores.
+  useEffect(() => {
+    if (!aiScoring) return
+    if (aiScoreStep >= COMM_AI_STEPS.length) {
+      const result = {}
+      tenderBidders.forEach(b => {
+        criteria.forEach((c, ci) => {
+          const base = ((b.commScore ?? 70) / 100) * 3
+          const seed = (Number(b.id) * 13 + ci * 5) % 10
+          const variation = (seed - 5) * 0.12
+          result[`${b.id}-${c.id}`] = Math.min(3, Math.max(0, Math.round(base + variation)))
+        })
+      })
+      setScores(result)
+      setAiScoring(false)
+      setAiScored(true)
+      return
+    }
+    const t = setTimeout(() => setAiScoreStep(s => s + 1), 380)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiScoring, aiScoreStep])
+
+  if (user?.role?.id !== 'pof') {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4 text-slate-500">
         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
@@ -68,7 +136,7 @@ export default function CommercialEvaluation() {
         </div>
         <div className="text-center">
           <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
-          <p className="text-xs text-slate-400 mt-1">Commercial Evaluation is only accessible to Commercial Evaluators.</p>
+          <p className="text-xs text-slate-400 mt-1">Commercial Evaluation is only accessible to the Contract Engineer.</p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
           <ArrowLeft size={13} /> Back to Dashboard
@@ -139,10 +207,12 @@ export default function CommercialEvaluation() {
     setScores(prev => ({ ...prev, [`${bidderId}-${criterionId}`]: num }))
   }
 
+  // Excel formula: weighted contribution = (score ÷ maxScore) × weight, so the
+  // total is a percentage out of 100 (weights sum to 100).
   const totalFor = (bidderId) => {
     return criteria.reduce((sum, c) => {
       const s = scores[`${bidderId}-${c.id}`]
-      return sum + ((s === '' || s === undefined ? 0 : Number(s)) * c.weight / 100)
+      return sum + ((s === '' || s === undefined ? 0 : Number(s)) / (c.maxScore || 3)) * c.weight
     }, 0)
   }
 
@@ -164,8 +234,8 @@ export default function CommercialEvaluation() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
-                <ArrowLeft size={12} /> Dashboard
+              <button onClick={goBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
@@ -247,12 +317,12 @@ export default function CommercialEvaluation() {
                   {tenderBidders.map(b => {
                     const scored = hasScores(b.id)
                     const total = totalFor(b.id)
-                    const compliance = getCompliance(total)
+                    const compliance = getTotalCompliance(total)
                     return (
                       <td key={b.id} className="px-3 py-3 text-center">
                         {scored ? (
                           <>
-                            <span className="text-base font-bold block mb-1 text-slate-700">{total.toFixed(1)}</span>
+                            <span className="text-base font-bold block mb-1 text-slate-700">{total.toFixed(1)}<span className="text-slate-400 text-xs font-medium">/100</span></span>
                             <Badge variant={compliance.variant}>{compliance.label}</Badge>
                           </>
                         ) : (
@@ -268,7 +338,65 @@ export default function CommercialEvaluation() {
         </Card>
       )}
 
-      {activeTab === 'scoring' && (<>
+      {/* ── Linear: upload commercial documents (after technical evaluation) ── */}
+      {activeTab === 'scoring' && !commercialDocsReady && (
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <UploadCloud size={16} className="text-[var(--color-primary)]" />
+            <h3 className="text-sm font-semibold text-slate-800">Upload Commercial Documents</h3>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">
+            Technical evaluation is complete. Upload the bidders' commercial submissions to begin commercial evaluation.
+          </p>
+          <div className="rounded-xl border-2 border-dashed border-slate-200 hover:border-[var(--color-primary)]/50 transition-colors flex flex-col items-center justify-center gap-2.5 py-10">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+              <UploadCloud size={22} className="text-slate-400" />
+            </div>
+            <p className="text-xs text-slate-500">Drop commercial documents or</p>
+            <label className="cursor-pointer">
+              <span className="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity">Browse Files</span>
+              <input type="file" multiple className="hidden"
+                onChange={e => { if (e.target.files?.length) { updateTender(tenderId, { commercialDocsUploaded: true }); e.target.value = '' } }} />
+            </label>
+            <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX · ZIP</p>
+          </div>
+        </Card>
+      )}
+
+      {activeTab === 'scoring' && commercialDocsReady && (<>
+
+      {/* ── AI scoring status ── */}
+      {aiScoring && (
+        <Card className="overflow-hidden border border-blue-100">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center gap-2">
+            <Bot size={14} className="text-white" />
+            <p className="text-xs font-semibold text-white">AI Commercial Scoring in Progress…</p>
+            <div className="ml-auto w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          </div>
+          <div className="p-4 space-y-2">
+            {COMM_AI_STEPS.map((step, i) => (
+              <div key={i} className={`flex items-center gap-2.5 py-0.5 transition-all ${i > aiScoreStep ? 'opacity-20' : 'opacity-100'}`}>
+                {i < aiScoreStep
+                  ? <CheckCircle size={13} className="text-emerald-500 shrink-0" />
+                  : i === aiScoreStep
+                    ? <div className="w-3.5 h-3.5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
+                    : <div className="w-3.5 h-3.5 rounded-full border border-slate-200 shrink-0" />}
+                <span className={`text-xs ${i < aiScoreStep ? 'text-slate-400 line-through' : i === aiScoreStep ? 'text-slate-800 font-semibold' : 'text-slate-300'}`}>{step}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+      {aiScored && (
+        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+          <Bot size={14} className="text-blue-600 shrink-0" />
+          <span className="text-xs text-blue-800"><strong>AI-generated scores applied.</strong> Review and adjust individual scores below if needed before submitting.</span>
+          <button onClick={() => { setAiScored(false); setAiModified({}); setScores({}) }}
+            className="ml-auto shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline whitespace-nowrap">
+            Re-analyse
+          </button>
+        </div>
+      )}
 
       {/* Price comparison */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -290,9 +418,9 @@ export default function CommercialEvaluation() {
               </div>
               {scored ? (
                 <>
-                  <div className="mt-2 text-lg font-bold text-[var(--color-primary)]">{totalFor(b.id).toFixed(1)}</div>
+                  <div className="mt-2 text-lg font-bold text-[var(--color-primary)]">{totalFor(b.id).toFixed(1)}<span className="text-slate-400 text-xs font-medium">/100</span></div>
                   <div className="mt-1.5">
-                    <Badge variant={getCompliance(totalFor(b.id)).variant}>{getCompliance(totalFor(b.id)).label}</Badge>
+                    <Badge variant={getTotalCompliance(totalFor(b.id)).variant}>{getTotalCompliance(totalFor(b.id)).label}</Badge>
                   </div>
                 </>
               ) : (
@@ -339,19 +467,32 @@ export default function CommercialEvaluation() {
                     const val = scores[key]
                     const hasVal = val !== undefined && val !== ''
                     const compliance = hasVal ? getCompliance(Number(val)) : null
+                    const aiFilled = aiScored && !aiModified[key] && hasVal
                     return (
                       <td key={b.id} className="px-3 py-3 text-center">
                         <div className="flex flex-col items-center gap-1.5">
-                          <input
-                            type="number"
-                            min={0}
-                            max={3}
-                            step={1}
-                            value={val ?? ''}
-                            placeholder="—"
-                            onChange={e => setScore(b.id, c.id, e.target.value)}
-                            className="w-16 text-center text-sm font-semibold rounded-lg border border-slate-200 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300"
-                          />
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              max={3}
+                              step={1}
+                              value={val ?? ''}
+                              placeholder="—"
+                              onChange={e => {
+                                setScore(b.id, c.id, e.target.value)
+                                if (aiScored) setAiModified(prev => ({ ...prev, [key]: true }))
+                              }}
+                              className={`w-16 text-center text-sm font-semibold rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300 ${
+                                aiFilled ? 'border-2 border-blue-300 bg-blue-50/40' : 'border border-slate-200'
+                              }`}
+                            />
+                            {aiFilled && (
+                              <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                                <Bot size={8} />
+                              </div>
+                            )}
+                          </div>
                           {hasVal && compliance && (
                             <Badge variant={compliance.variant} className="text-[9px] px-1.5 py-0">{compliance.label}</Badge>
                           )}
@@ -368,13 +509,13 @@ export default function CommercialEvaluation() {
                 {tenderBidders.map(b => {
                   const scored = hasScores(b.id)
                   const score = totalFor(b.id)
-                  const compliance = getCompliance(score)
+                  const compliance = getTotalCompliance(score)
                   return (
                     <td key={b.id} className="px-3 py-3 text-center">
                       {scored ? (
                         <>
-                          <span className={`text-base font-bold block mb-1 ${score >= 2 ? 'text-green-600' : score >= 1 ? 'text-amber-600' : 'text-red-500'}`}>
-                            {score.toFixed(1)}
+                          <span className={`text-base font-bold block mb-1 ${score >= 70 ? 'text-green-600' : score >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {score.toFixed(1)}<span className="text-slate-400 text-xs font-medium">/100</span>
                           </span>
                           <Badge variant={compliance.variant}>{compliance.label}</Badge>
                         </>
@@ -397,6 +538,10 @@ export default function CommercialEvaluation() {
             <Button size="sm" onClick={() => {
               if (!allScored) { setSubmitError(`${missingScoresCount} score${missingScoresCount > 1 ? 's' : ''} missing — all criteria must be scored before submitting.`); return }
               setSubmitError('')
+              // Persist each bidder's commercial result so Management Review /
+              // Contract Creation can combine it with the technical score.
+              const scoredBidders = tenderBidders.map(b => ({ ...b, commScore: Math.round(totalFor(b.id)) }))
+              updateTender(tenderId, { bidderList: scoredBidders })
               if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'comm')
               else advanceTender(tenderId)
               setSubmitted(true)
@@ -415,13 +560,9 @@ export default function CommercialEvaluation() {
             <div>
               <p className="text-sm font-semibold text-emerald-800">Commercial Evaluation Submitted</p>
               <p className="text-xs text-emerald-700 mt-0.5">
-                Download the evaluation report and hand it to the <strong>Contract Engineer</strong> for upload to unlock Management Review.
+                The tender has advanced to <strong>Management Review</strong>. You can download a copy of the evaluation report for your records.
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-            <Clock size={13} className="shrink-0" />
-            <span>Tender is now <strong className="mx-1">Awaiting Contract Engineer Upload</strong> — the Contract Engineer must upload this report to advance to Management Review.</span>
           </div>
           <Button className="w-full justify-center" onClick={() => {
             const a = document.createElement('a')

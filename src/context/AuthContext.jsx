@@ -2,15 +2,17 @@ import { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext()
 
+// Technical evaluation is owned by the Contract Holder and commercial by the
+// Contract Engineer, so there are no standalone evaluator roles.
 export const roles = [
   { id: 'it_admin',    label: 'IT Admin',            color: '#7C3AED' },
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#1B4F8A' },
   { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
-  { id: 'tech_eval',   label: 'Technical Evaluator',  color: '#059669' },
-  { id: 'comm_eval',   label: 'Commercial Evaluator', color: '#D97706' },
   { id: 'mgmt_review', label: 'Management Reviewer',  color: '#0F766E' },
   { id: 'legal_review',label: 'Legal Reviewer',       color: '#B45309' },
+  { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
+  { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
 ]
 
 // Single source of truth — credentials + profile + status
@@ -18,11 +20,11 @@ export const INITIAL_USERS = [
   { id: 1, username: 'admin@corp.com',       password: 'Admin@123',  name: 'Admin User',    roleId: 'it_admin',    status: 'active', avatar: 'AU', lastLogin: '2025-04-06 15:00', superAdmin: true },
   { id: 6, username: 'bizadmin@corp.com',    password: 'Biz@123',    name: 'Sara Mitchell', roleId: 'biz_admin',   status: 'active', avatar: 'SM', lastLogin: '2025-04-06 12:00' },
   { id: 2, username: 'john.smith@corp.com',  password: 'John@123',   name: 'John Smith',    roleId: 'pof',         status: 'active', avatar: 'JS', lastLogin: '2025-04-06 09:14' },
-  { id: 3, username: 'sarah.chen@corp.com',  password: 'Sarah@123',  name: 'Sarah Chen',    roleId: 'tech_eval',   status: 'active', avatar: 'SC', lastLogin: '2025-04-05 16:30' },
-  { id: 4, username: 'mark.davis@corp.com',  password: 'Mark@123',   name: 'Mark Davis',    roleId: 'comm_eval',   status: 'active', avatar: 'MD', lastLogin: '2025-04-04 11:22' },
   { id: 5, username: 'robert.lee@corp.com',  password: 'Robert@123', name: 'Robert Lee',    roleId: 'mgmt_review', status: 'active', avatar: 'RL', lastLogin: '2025-04-06 14:30' },
   { id: 7, username: 'amina.saleh@corp.com', password: 'Amina@123',  name: 'Amina Saleh',   roleId: 'legal_review',status: 'active', avatar: 'AS', lastLogin: '2025-04-06 13:10' },
   { id: 8, username: 'fatima.ali@corp.com',  password: 'Fatima@123', name: 'Fatima Al-Ali', roleId: 'contract_holder', status: 'active', avatar: 'FA', lastLogin: '2025-04-06 08:45' },
+  { id: 9, username: 'hse.officer@corp.com', password: 'Hse@123',    name: 'Layla Nasser',  roleId: 'hse',         status: 'active', avatar: 'LN', lastLogin: '2025-04-06 09:14' },
+  { id: 10, username: 'icv.lead@corp.com',   password: 'Icv@123',    name: 'Omar Habib',    roleId: 'icv',         status: 'active', avatar: 'OH', lastLogin: '2025-04-06 09:14' },
 ]
 
 // Keep for backward compat with Login demo panel
@@ -31,7 +33,7 @@ export const DEMO_USERS = INITIAL_USERS
 const STORAGE_KEY = 'atm_user'
 const USERS_STORAGE_KEY = 'atm_users'
 const USERS_VERSION_KEY = 'atm_users_v'
-const CURRENT_VERSION = '5' // bump whenever INITIAL_USERS structure changes
+const CURRENT_VERSION = '7' // bump whenever INITIAL_USERS structure changes
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -57,7 +59,10 @@ export function AuthProvider({ children }) {
         // Version mismatch — reset to latest INITIAL_USERS, keep any custom users (id > 100)
         const existing = localStorage.getItem(USERS_STORAGE_KEY)
         const parsed = existing ? JSON.parse(existing) : []
-        const customUsers = parsed.filter(u => !INITIAL_USERS.find(i => i.id === u.id))
+        // Keep custom users, but drop any whose role no longer exists (e.g. the
+        // removed tech_eval / comm_eval evaluators).
+        const validRoleIds = new Set(roles.map(r => r.id))
+        const customUsers = parsed.filter(u => !INITIAL_USERS.find(i => i.id === u.id) && validRoleIds.has(u.roleId))
         const merged = [...INITIAL_USERS, ...customUsers]
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(merged))
         localStorage.setItem(USERS_VERSION_KEY, CURRENT_VERSION)
@@ -113,14 +118,23 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null)
-    const usersData  = localStorage.getItem(USERS_STORAGE_KEY)
-    const rolesData  = localStorage.getItem('atm_roles')
-    const matrixData = localStorage.getItem('atm_matrix')
+    const usersData    = localStorage.getItem(USERS_STORAGE_KEY)
+    const rolesData    = localStorage.getItem('atm_roles')
+    const matrixData   = localStorage.getItem('atm_matrix')
+    // Tenders + their version and the dropdown config must survive a logout, so
+    // work done under one role (e.g. an ITT the Contract Holder generated) is
+    // still there when the next role logs in.
+    const tendersData  = localStorage.getItem('atm_tenders')
+    const tendersVer   = localStorage.getItem('atm_tenders_v')
+    const dropdownData = localStorage.getItem('atm_dropdown_config')
     localStorage.clear()
 
-    if (usersData)  localStorage.setItem(USERS_STORAGE_KEY, usersData)
-    if (rolesData)  localStorage.setItem('atm_roles',  rolesData)
-    if (matrixData) localStorage.setItem('atm_matrix', matrixData)
+    if (usersData)    localStorage.setItem(USERS_STORAGE_KEY, usersData)
+    if (rolesData)    localStorage.setItem('atm_roles',  rolesData)
+    if (matrixData)   localStorage.setItem('atm_matrix', matrixData)
+    if (tendersData)  localStorage.setItem('atm_tenders', tendersData)
+    if (tendersVer)   localStorage.setItem('atm_tenders_v', tendersVer)
+    if (dropdownData) localStorage.setItem('atm_dropdown_config', dropdownData)
   }
 
   const updateUser = (id, changes) =>

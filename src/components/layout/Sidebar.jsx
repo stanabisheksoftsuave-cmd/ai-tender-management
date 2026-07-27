@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useTenders } from '../../context/TenderContext'
+import { useDismissable } from '../../context/NavigationContext'
+import Badge from '../ui/Badge'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
 const Icon = ({ src, size = 16, color }) => (
@@ -26,6 +28,7 @@ const Icon = ({ src, size = 16, color }) => (
 const STRATEGY_BASE_ITEMS = [
   { key: 'sow',                label: 'Contract Initiating Form' },
   { key: 'strategy-templates', label: 'Strategy Templates' },
+  { key: 'psf-strategy',       label: 'PSF Strategy' },
 ]
 
 // Template/workflow sub-items — shown only when included in the tender's selected templates.
@@ -33,11 +36,25 @@ const STRATEGY_BASE_ITEMS = [
 const STRATEGY_TEMPLATE_ITEMS = [
   { key: 'company-estimate',    label: 'Company Estimate' },
   { key: 'contract-risk',       label: 'Contract Risk' },
-  { key: 'benchmarking-oem',    label: 'Benchmarking OEM' },
+  { key: 'icv',                 label: 'ICV' },
+  { key: 'technical-eval-matrix', label: 'Technical Evaluation Matrix' },
   { key: 'hse-risk',            label: 'HSE Risk Assessment' },
   { key: 'negotiation-strategy',label: 'Negotiation Strategy' },
   { key: 'pre-qual',            label: 'Pre-Qualification' },
 ]
+
+// A tender "created by the Contract Initiating Form" is one still inside the
+// Contract Holder's strategy flow: the CIF saves new tenders as prequal_stage1
+// and they walk the prequal_* stages from there. A `draft` tender only belongs
+// here once selectedTemplates exists, which the Strategy Templates
+// acknowledgement gate writes — that keeps ITT/CE-created drafts out of the picker.
+const CIF_STATUSES = [
+  'prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4',
+  'prequal_final_review', 'prequal_rejected',
+]
+const isCifTender = (t) =>
+  CIF_STATUSES.includes(t.status) ||
+  (t.status === 'draft' && Array.isArray(t.selectedTemplates))
 
 const navByRole = {
   it_admin: [
@@ -51,25 +68,21 @@ const navByRole = {
   ],
   pof: [
     { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
-    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
-    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.createItt'   },
+    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
+    { to: '/pre-qualification',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
+    { to: '/commercial-eval',    icon: '/src/assets/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
     { to: '/upload',             icon: '/src/assets/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
     { to: '/contract',           icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.contract'    },
     { to: '/contract-management',icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
+    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   contract_holder: [
     { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
-    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
     { to: '/contract-strategy',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.contractStrategy',
       hasChildren: true },
-  ],
-  tech_eval: [
-    { to: '/dashboard',      icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
-    { to: '/technical-eval', icon: '/src/assets/icons/tech-eval.svg',  labelKey: 'nav.techEval'  },
-  ],
-  comm_eval: [
-    { to: '/dashboard',       icon: '/src/assets/icons/dashboard.svg', labelKey: 'nav.dashboard' },
-    { to: '/commercial-eval', icon: '/src/assets/icons/comm-eval.svg', labelKey: 'nav.commEval'  },
+    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.createItt'   },
+    { to: '/technical-eval',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.ittTechEval' },
+    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   mgmt_review: [
     { to: '/dashboard',   icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
@@ -80,6 +93,19 @@ const navByRole = {
     { to: '/dashboard',    icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
     { to: '/legal-review', icon: '/src/assets/icons/audit-log.svg',  labelKey: 'nav.legalReview' },
   ],
+  // HSE and ICV each own their ITT sections; they reach them from the same
+  // "ITT Draft" entry the Contract Engineer uses (the page scopes to each role's
+  // own sections). Tender Tracking is included so they can find generated ITTs.
+  hse: [
+    { to: '/dashboard',  icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
+    { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
+    { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+  ],
+  icv: [
+    { to: '/dashboard',  icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
+    { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
+    { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+  ],
 }
 
 export default function Sidebar() {
@@ -88,6 +114,7 @@ export default function Sidebar() {
   const { theme } = useTheme()
   const { tenders } = useTenders()
   const location = useLocation()
+  const navigate = useNavigate()
   const navItems = navByRole[user?.role?.id] || []
   const isRtl = lang === 'ar'
 
@@ -107,17 +134,43 @@ export default function Sidebar() {
     ...STRATEGY_TEMPLATE_ITEMS.filter(it => selectedTemplateKeys.includes(it.key)),
   ]
 
+  // Tenders the Contract Holder started from the Contract Initiating Form —
+  // offered as a picker when a strategy sub-item is clicked without a tenderId.
+  const cifTenders = useMemo(() => tenders.filter(isCifTender), [tenders])
+
+  const pathFor = (key, id) =>
+    key === 'pre-qual'
+      ? `/pre-qualification/${id || ''}`
+      : key === 'psf-strategy'
+      ? `/psf-strategy/${id || ''}`
+      : key === 'sow'
+        ? (id ? `/contract-strategy/${id}` : '/contract-strategy')
+        : key === 'strategy-templates'
+          ? `/strategy-templates/${id || ''}`
+          : `/strategy-templates/${id || ''}?form=${key}`
+
+  // Sub-item awaiting a tender choice (null when the picker is closed).
+  const [pickerItem, setPickerItem] = useState(null)
+  useDismissable(!!pickerItem, () => setPickerItem(null))
+
+  const chooseTender = (id) => {
+    const key = pickerItem?.key
+    setPickerItem(null)
+    if (key) navigate(pathFor(key, id))
+  }
+
   const isOlng   = theme === 'olng'
   const isBright = theme === 'bright'
 
   // Is the current path under the Contract Strategy umbrella?
-  const strategyPaths = ['/contract-strategy', '/strategy-templates', '/pre-qualification']
+  const strategyPaths = ['/contract-strategy', '/strategy-templates', '/pre-qualification', '/psf-strategy']
   const isStrategySection = strategyPaths.some(p => location.pathname.startsWith(p))
   const [strategyOpen, setStrategyOpen] = useState(isStrategySection)
 
   // Determine which sub-item is active based on current path
   const activeSubKey = (() => {
     if (location.pathname.startsWith('/pre-qualification')) return 'pre-qual'
+    if (location.pathname.startsWith('/psf-strategy')) return 'psf-strategy'
     if (location.pathname.startsWith('/strategy-templates')) {
       const searchParams = new URLSearchParams(location.search)
       const formParam = searchParams.get('form')
@@ -152,6 +205,7 @@ export default function Sidebar() {
   }
 
   return (
+    <>
     <aside
       className={`fixed ${isRtl ? 'right-0' : 'left-0'} top-16 h-[calc(100vh-4rem)] w-[220px] flex flex-col z-40 select-none`}
       style={{
@@ -256,44 +310,46 @@ export default function Sidebar() {
                     {strategySubItems.map(sub => {
                       const isSubActive = activeSubKey === sub.key
 
-                      const isCifCompleted = !!tenderIdFromUrl
-                      const isDisabled = !isCifCompleted && sub.key !== 'sow'
-                      
-                      const targetPath = sub.key === 'pre-qual'
-                        ? `/pre-qualification/${tenderIdFromUrl || ''}`
-                        : sub.key === 'sow'
-                          ? (tenderIdFromUrl ? `/contract-strategy/${tenderIdFromUrl}` : '/contract-strategy')
-                          : sub.key === 'strategy-templates'
-                            ? `/strategy-templates/${tenderIdFromUrl || ''}`
-                            : `/strategy-templates/${tenderIdFromUrl || ''}?form=${sub.key}`
-                          
-                      return (
-                        <NavLink
-                          key={sub.key}
-                          to={targetPath}
-                          className={`block ${isDisabled ? 'pointer-events-none opacity-50 cursor-not-allowed' : ''}`}
-                          onClick={e => {
-                            if (isDisabled) {
-                              e.preventDefault()
-                            }
+                      // Without a tenderId in the URL the sub-item cannot resolve a
+                      // target, so it asks the user which CIF tender to open instead.
+                      const needsTender = !tenderIdFromUrl && sub.key !== 'sow'
+                      const targetPath = pathFor(sub.key, tenderIdFromUrl)
+
+                      const row = (
+                        <div
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
+                          style={{
+                            background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
+                            color: isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)',
+                            borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
                           }}
+                          onMouseOver={e => { if (!isSubActive) e.currentTarget.style.background = hoverBg }}
+                          onMouseOut={e => { if (!isSubActive) e.currentTarget.style.background = 'transparent' }}
                         >
-                          <div
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
-                            style={{
-                              background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
-                              color: isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)',
-                              borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
-                            }}
-                            onMouseOver={e => { if (!isSubActive) e.currentTarget.style.background = hoverBg }}
-                            onMouseOut={e => { if (!isSubActive) e.currentTarget.style.background = 'transparent' }}
+                          <span className="w-1 h-1 rounded-full shrink-0" style={{
+                            background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
+                            boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
+                          }} />
+                          {sub.label}
+                        </div>
+                      )
+
+                      if (needsTender) {
+                        return (
+                          <button
+                            key={sub.key}
+                            type="button"
+                            onClick={() => setPickerItem(sub)}
+                            className="block w-full text-start"
                           >
-                            <span className="w-1 h-1 rounded-full shrink-0" style={{
-                              background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
-                              boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
-                            }} />
-                            {sub.label}
-                          </div>
+                            {row}
+                          </button>
+                        )
+                      }
+
+                      return (
+                        <NavLink key={sub.key} to={targetPath} className="block">
+                          {row}
                         </NavLink>
                       )
                     })}
@@ -378,5 +434,94 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+
+    {/* ── Tender picker: choose which CIF tender the strategy sub-item opens ── */}
+    {pickerItem && (
+      <>
+        <div
+          className="fixed inset-0 z-30"
+          style={{ background: 'rgba(2,10,20,0.45)' }}
+          onClick={() => setPickerItem(null)}
+        />
+        <div
+          className={`fixed top-24 ${isRtl ? 'right-[228px]' : 'left-[228px]'} w-[320px] max-h-[70vh] flex flex-col z-50 rounded-2xl overflow-hidden`}
+          style={{
+            background: sidebarBg,
+            border: `1px solid ${divider}`,
+            boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
+          }}
+        >
+          <div className="px-4 pt-4 pb-3" style={{ borderBottom: `1px solid ${divider}` }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: navLabel }}>
+                  Select Tender
+                </p>
+                <p className="text-xs font-semibold mt-1 truncate" style={{ color: '#ffffff' }}>
+                  {pickerItem.label}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPickerItem(null)}
+                className="text-sm leading-none px-1.5 py-1 rounded-md shrink-0"
+                style={{ color: 'rgba(255,255,255,0.55)' }}
+                onMouseOver={e => { e.currentTarget.style.background = hoverBg }}
+                onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {cifTenders.length === 0 ? (
+              <div className="px-3 py-5 text-center">
+                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  No tenders yet. Complete a Contract Initiating Form first — its tender
+                  will then appear here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setPickerItem(null); navigate('/contract-strategy') }}
+                  className="mt-3 w-full px-3 py-2 rounded-lg text-[11px] font-semibold"
+                  style={{ background: accent, color: '#ffffff' }}
+                >
+                  Contract Initiating Form
+                </button>
+              </div>
+            ) : (
+              cifTenders.map(tender => (
+                <button
+                  key={tender.id}
+                  type="button"
+                  onClick={() => chooseTender(tender.id)}
+                  className="w-full text-start px-3 py-2.5 rounded-xl transition-all"
+                  style={{ background: chipBg, border: chipBorder }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.14)' }}
+                  onMouseOut={e => { e.currentTarget.style.background = chipBg }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold tracking-wide" style={{ color: accent }}>
+                      {tender.id}
+                    </span>
+                    <Badge variant={tender.status}>{tender.status.replace(/_/g, ' ')}</Badge>
+                  </div>
+                  <p className="text-[11px] font-medium mt-1 leading-snug" style={{ color: '#ffffff' }}>
+                    {tender.title}
+                  </p>
+                  {tender.stage && (
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      {tender.stage}
+                    </p>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </>
+    )}
+    </>
   )
 }
