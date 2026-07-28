@@ -62,7 +62,7 @@ const ModSvg = {
   comm_eval: p => <Svg {...p}>
     <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
   </Svg>,
-  mgmt_review: p => <Svg {...p}>
+  scm_review: p => <Svg {...p}>
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </Svg>,
@@ -89,7 +89,7 @@ const DEFAULT_ROLES = [
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#0089cf' },
   { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
-  { id: 'mgmt_review', label: 'Management Reviewer',  color: '#0F766E' },
+  { id: 'scm',         label: 'Supply Chain Manager', color: '#0F766E' },
   { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
   { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
 ]
@@ -103,19 +103,20 @@ const MODULES = [
   { key: 'ingestion',         label: 'Bid Ingestion'         },
   { key: 'tech_eval',         label: 'Technical Evaluation'  },
   { key: 'comm_eval',         label: 'Commercial Evaluation' },
-  { key: 'mgmt_review',       label: 'Management Review'     },
+  { key: 'scm_review',        label: 'SCM Approval Gates'    },
   { key: 'contract_creation', label: 'Contract Creation'     },
 ]
 
 const DEFAULT_MATRIX = {
-  it_admin:    { user_management:'CRUD', task_assignment:'CRUD', audit_log:'CRUD', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
-  biz_admin:   { user_management:'NONE', task_assignment:'CRUD', audit_log:'READ', itt_creation:'READ', tender_export:'READ', ingestion:'READ', tech_eval:'READ', comm_eval:'READ', mgmt_review:'READ', contract_creation:'READ' },
+  it_admin:    { user_management:'CRUD', task_assignment:'CRUD', audit_log:'CRUD', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
+  biz_admin:   { user_management:'NONE', task_assignment:'CRUD', audit_log:'READ', itt_creation:'READ', tender_export:'READ', ingestion:'READ', tech_eval:'READ', comm_eval:'READ', scm_review:'READ', contract_creation:'READ' },
   // Contract Engineer owns commercial evaluation; Contract Holder owns technical.
-  pof:         { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'READ', comm_eval:'CRUD', mgmt_review:'READ', contract_creation:'CRUD' },
-  contract_holder: { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'READ', mgmt_review:'NONE', contract_creation:'NONE' },
-  mgmt_review: { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'READ', comm_eval:'READ', mgmt_review:'ACTION', contract_creation:'NONE' },
-  hse:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
-  icv:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', mgmt_review:'NONE', contract_creation:'NONE' },
+  pof:         { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'READ', comm_eval:'CRUD', scm_review:'READ', contract_creation:'CRUD' },
+  contract_holder: { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'READ', scm_review:'NONE', contract_creation:'NONE' },
+  // The Supply Chain Manager acts on all three approval gates but authors nothing.
+  scm:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'READ', comm_eval:'READ', scm_review:'ACTION', contract_creation:'READ' },
+  hse:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
+  icv:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
 }
 
 const emptyModule   = () => Object.fromEntries(MODULES.map(m => [m.key, 'NONE']))
@@ -277,7 +278,7 @@ export default function UserManagement() {
     if (user.roleId === 'pof')         return tenders.filter(t =>
       ['draft','upload','award'].includes(t.status) &&
       (!t.assignedContractEngineer || t.assignedContractEngineer.id === user.id))
-    if (user.roleId === 'mgmt_review') return tenders.filter(t => t.status === 'mgmt_review')
+    if (user.roleId === 'scm')         return tenders.filter(t => ['scm_gate1','scm_gate2','scm_gate3'].includes(t.status))
     return []
   }
 
@@ -368,8 +369,8 @@ export default function UserManagement() {
           assignedPof: { id: target.id, name: target.name },
           assignedContractEngineer: { id: target.id, name: target.name },
         })
-      else if (reassignSource.roleId === 'mgmt_review')
-        updateTender(t.id, { assignedMgmt: { id: target.id, name: target.name } })
+      else if (reassignSource.roleId === 'scm')
+        updateTender(t.id, { assignedScm: { id: target.id, name: target.name } })
     })
     setShowReassign(false)
   }

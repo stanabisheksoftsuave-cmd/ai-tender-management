@@ -45,7 +45,7 @@ export default function AwardRecommendation() {
   const navigate     = useNavigate()
   const { goBack }   = useNavigation()
   const { user }     = useAuth()
-  const { tenders, advanceTender, updateTender } = useTenders()
+  const { tenders, updateTender, approveGate, returnGate } = useTenders()
 
   const [winnerId,   setWinnerId]   = useState(null)
   const [rejected,   setRejected]   = useState({}) // { [bidderId]: true }
@@ -53,14 +53,14 @@ export default function AwardRecommendation() {
   const [submitted,  setSubmitted]  = useState(false)
 
   // ── Role gate ──
-  if (user?.role?.id !== 'mgmt_review') return (
+  if (user?.role?.id !== 'scm') return (
     <div className="flex flex-col items-center justify-center h-64 gap-4">
       <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
         <ShieldOff size={22} className="text-red-400" />
       </div>
       <div className="text-center">
         <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
-        <p className="text-xs text-slate-400 mt-1">Management Review is only accessible to Management Reviewers.</p>
+        <p className="text-xs text-slate-400 mt-1">This review is only accessible to the Supply Chain Manager.</p>
       </div>
       <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
         <ArrowLeft size={13} /> Back to Dashboard
@@ -72,11 +72,11 @@ export default function AwardRecommendation() {
   if (!tenderId) return (
     <TenderSelectList
       tenders={tenders}
-      status="mgmt_review"
-      basePath="/mgmt-review"
-      title="Management Review"
-      description="Select a tender to review the technical result and commercial recommendation, then approve or reject"
-      emptyText="No tenders pending management review"
+      status="scm_gate2"
+      basePath="/scm-review"
+      title="SCM Review — Commercial & Award"
+      description="Select a tender to review the technical result and commercial recommendation, then award or reject"
+      emptyText="No tenders pending SCM award review"
     />
   )
 
@@ -84,10 +84,10 @@ export default function AwardRecommendation() {
 
   // Once submitted, keep rendering even though the tender has advanced — the
   // reviewer can still see the outcome and use "Change decision" to revise it.
-  if (!tender || (tender.status !== 'mgmt_review' && !submitted)) return (
+  if (!tender || (tender.status !== 'scm_gate2' && !submitted)) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
       <FileText size={32} className="text-slate-300" />
-      <p className="text-sm font-medium">Tender not found or not in Management Review stage.</p>
+      <p className="text-sm font-medium">Tender not found or not awaiting SCM award review.</p>
       <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
         <ArrowLeft size={13} /> Back to Dashboard
       </Button>
@@ -127,14 +127,21 @@ export default function AwardRecommendation() {
       mgmtRemarks:   remarks,
       mgmtRejected:  Object.keys(rejected).filter(id => rejected[id]),
     })
-    advanceTender(tender.id)
+    // Gate 2 approval releases the tender to contract drafting.
+    approveGate(tender.id, 'scm_gate2', remarks.trim())
     setSubmitted(true)
   }
 
-  // Revise a submitted decision: pull the tender back into Management Review so
+  // Send the tender back to the Contract Engineer for commercial rework.
+  const handleReturn = () => {
+    returnGate(tender.id, 'scm_gate2', remarks.trim())
+    navigate('/tenders')
+  }
+
+  // Revise a submitted decision: pull the tender back into SCM award review so
   // the approve/reject can be changed, and re-open the decision UI.
   const handleChangeDecision = () => {
-    updateTender(tender.id, { status: 'mgmt_review', stage: 'Management Review' })
+    updateTender(tender.id, { status: 'scm_gate2', stage: 'SCM Review — Commercial & Award' })
     setSubmitted(false)
   }
 
@@ -152,7 +159,7 @@ export default function AwardRecommendation() {
               </button>
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
-              <Badge variant="mgmt_review">Management Review</Badge>
+              <Badge variant="scm_gate">SCM Award Review</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
             <p className="text-xs text-slate-500 mt-0.5">{tender.department} · Deadline: {tender.deadline} · {tender.budget}</p>
@@ -374,12 +381,21 @@ export default function AwardRecommendation() {
             </div>
           )}
 
-          <Button
-            className="w-full justify-center"
-            disabled={!winnerId}
-            onClick={handleSubmit}>
-            <Award size={14} /> Submit Decision
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="secondary"
+              className="flex-1 justify-center"
+              disabled={!remarks.trim()}
+              onClick={handleReturn}>
+              <RotateCcw size={13} /> Return to Commercial Evaluation
+            </Button>
+            <Button
+              className="flex-1 justify-center"
+              disabled={!winnerId}
+              onClick={handleSubmit}>
+              <Award size={14} /> Approve Award
+            </Button>
+          </div>
         </Card>
       ) : (
         <Card className="p-5">

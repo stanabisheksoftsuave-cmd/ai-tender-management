@@ -93,14 +93,14 @@ export const tenders = [
     assignedCommEval: { id: 2, name: 'John Smith' },
   },
 
-  // ── Management Review ─────────────────────────────────────────────────────
+  // ── SCM approval gates (one tender parked at each gate) ───────────────────
   {
     id: 'ITT-2025-013',
     title: 'Oman National Railway Signalling & Control System',
     department: 'Oman Rail',
     budget: 'OMR 2,770,000',
-    status: 'mgmt_review',
-    stage: 'Management Review',
+    status: 'scm_gate1',
+    stage: 'SCM Review — Technical',
     evalProgress: 'in_progress',
     created: '2025-01-10',
     deadline: '2025-03-25',
@@ -112,8 +112,8 @@ export const tenders = [
     title: 'Al Ghubrah Desalination Plant SCADA Upgrade',
     department: 'Oman Electricity Transmission Company',
     budget: 'OMR 1,731,000',
-    status: 'mgmt_review',
-    stage: 'Management Review',
+    status: 'scm_gate2',
+    stage: 'SCM Review — Commercial & Award',
     evalProgress: 'not_started',
     created: '2025-01-28',
     deadline: '2025-04-05',
@@ -125,13 +125,18 @@ export const tenders = [
     title: 'Civil Defence Integrated Emergency Response Platform',
     department: 'Civil Defence & Ambulance Authority',
     budget: 'OMR 693,000',
-    status: 'mgmt_review',
-    stage: 'Management Review',
+    status: 'scm_gate3',
+    stage: 'SCM Review — Contract Draft',
     evalProgress: 'not_started',
     created: '2025-02-18',
     deadline: '2025-04-30',
     bidders: 3,
     aiScore: 90,
+    // Already through gate 2 — the award decision is recorded, so gate 3 can
+    // show exactly what approving will issue.
+    mgmtWinnerId: 1,
+    mgmtRemarks: 'Strongest technical response and within budget envelope.',
+    contractDraftReady: true,
   },
 
   // ── Other Stages ───────────────────────────────────────────────────────────

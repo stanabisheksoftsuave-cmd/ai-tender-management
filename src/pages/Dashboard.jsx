@@ -26,6 +26,14 @@ import { useTheme } from '../context/ThemeContext'
 import { technicalCriteria } from '../data/mockData'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// The three approval gates owned by the Supply Chain Manager.
+const SCM_GATE_STATUSES = ['scm_gate1', 'scm_gate2', 'scm_gate3']
+const SCM_GATE_ROUTE = {
+  scm_gate1: '/scm-tech-review',
+  scm_gate2: '/scm-review',
+  scm_gate3: '/scm-contract-review',
+}
+
 const statusVariant = {
   prequal_stage1:  'prequal_stage1',
   prequal_stage2:  'prequal_stage2',
@@ -36,7 +44,9 @@ const statusVariant = {
   upload:      'upload',
   tech_eval:   'tech_eval',
   comm_eval:   'comm_eval',
-  mgmt_review: 'mgmt_review',
+  scm_gate1:   'scm_gate',
+  scm_gate2:   'scm_gate',
+  scm_gate3:   'scm_gate',
   award:       'award',
   legal_review:       'legal_review',
   contract_execution: 'contract_execution',
@@ -88,12 +98,13 @@ const getVisibleTenders = (roleId, tenders) => {
   if (roleId === 'contract_holder') return tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_final_review','prequal_rejected','draft','tech_eval'].includes(t.status))
   if (roleId === 'tech_eval')   return tenders.filter(t => t.status === 'tech_eval')
   if (roleId === 'comm_eval')   return tenders.filter(t => t.status === 'comm_eval')
-  if (roleId === 'mgmt_review') return tenders.filter(t => t.status === 'mgmt_review')
+  if (roleId === 'scm')         return tenders.filter(t => SCM_GATE_STATUSES.includes(t.status))
   return tenders
 }
 
 const getStatCards = (roleId, tenders) => {
   const byStatus = (s) => tenders.filter(t => t.status === s)
+  const byGates = () => tenders.filter(t => SCM_GATE_STATUSES.includes(t.status))
   const notStarted = (s) => tenders.filter(t => t.status === s && t.evalProgress === 'not_started').length
   const inProgress  = (s) => tenders.filter(t => t.status === s && t.evalProgress === 'in_progress').length
 
@@ -115,17 +126,17 @@ const getStatCards = (roleId, tenders) => {
     { label: 'Bids to Evaluate',   value: String(byStatus('comm_eval').reduce((sum, t) => sum + t.bidders, 0)), icon: Briefcase, accentColor: '#6366F1', trend: 'Total',    chipVariant: '',       sub: 'Across assigned tenders' },
   ]
 
-  if (roleId === 'mgmt_review') return [
-    { label: 'Assigned Tenders',   value: String(byStatus('mgmt_review').length), icon: UserCog,  accentColor: '#2563EB', trend: 'SOON',     chipVariant: 'soon', sub: 'Pending recommendation' },
-    { label: 'Not Yet Started',    value: String(notStarted('mgmt_review')),       icon: Clock,    accentColor: '#F59E0B', trend: 'URGENT',   chipVariant: 'urgent',sub: 'Awaiting review start' },
-    { label: 'Under Review',       value: String(inProgress('mgmt_review')),       icon: Activity, accentColor: '#6366F1', trend: 'Active',   chipVariant: '',     sub: 'Review in progress' },
-    { label: 'AI Recommendations', value: String(byStatus('mgmt_review').length),  icon: BulbIcon, accentColor: '#7C3AED', trend: '96% ACC.', chipVariant: 'acc',  sub: 'Ready for review' },
+  if (roleId === 'scm') return [
+    { label: 'Awaiting My Approval', value: String(byGates().length),                icon: UserCog,  accentColor: '#2563EB', trend: 'SOON',     chipVariant: 'soon', sub: 'Across all three gates' },
+    { label: 'Technical Review',     value: String(byStatus('scm_gate1').length),    icon: Clock,    accentColor: '#F59E0B', trend: 'GATE 1',   chipVariant: 'urgent',sub: 'Technical evaluation outcome' },
+    { label: 'Award Review',         value: String(byStatus('scm_gate2').length),    icon: Activity, accentColor: '#6366F1', trend: 'GATE 2',   chipVariant: '',     sub: 'Commercial & award decision' },
+    { label: 'Contract Review',      value: String(byStatus('scm_gate3').length),    icon: BulbIcon, accentColor: '#7C3AED', trend: 'GATE 3',   chipVariant: 'acc',  sub: 'Draft awaiting issue' },
   ]
 
   if (roleId === 'pof') return [
     { label: 'Active Tenders',  value: String(tenders.length),              icon: FileText,  accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
     { label: 'In Evaluation',   value: String(byStatus('tech_eval').length + byStatus('comm_eval').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT', chipVariant: 'urgent', sub: 'Closing next 7 days' },
-    { label: 'Under Review',    value: String(byStatus('mgmt_review').length), icon: UserCog, accentColor: '#2563EB', trend: 'SOON',         chipVariant: 'soon',   sub: 'Opening next 7 days' },
+    { label: 'At SCM Gates',    value: String(byGates().length),               icon: UserCog, accentColor: '#2563EB', trend: 'SOON',         chipVariant: 'soon',   sub: 'Awaiting SCM approval' },
     { label: 'AI Extractions',  value: '8',                                  icon: BulbIcon,  accentColor: '#7C3AED', trend: '96% ACC.',     chipVariant: 'acc',    sub: 'Documents processed' },
   ]
 
@@ -152,7 +163,7 @@ const getStatCards = (roleId, tenders) => {
     return [
       { label: 'Total Tenders',  value: String(tenders.length),                                                                        icon: FileText,       accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
       { label: 'In Evaluation',  value: String(byStatus('tech_eval').length + byStatus('comm_eval').length),                           icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT',        chipVariant: 'urgent', sub: 'Active evaluation stage' },
-      { label: 'Under Review',   value: String(byStatus('mgmt_review').length),                                                         icon: UserCog,        accentColor: '#2563EB', trend: 'SOON',          chipVariant: 'soon',   sub: 'Pending recommendation' },
+      { label: 'At SCM Gates',   value: String(byGates().length),                                                                       icon: UserCog,        accentColor: '#2563EB', trend: 'SOON',          chipVariant: 'soon',   sub: 'Awaiting SCM approval' },
       { label: 'Awarded',        value: String(byStatus('award').length),                                                                icon: BulbIcon,       accentColor: '#7C3AED', trend: 'Complete',      chipVariant: '',       sub: 'Contracts recommended' },
     ]
   }
@@ -182,12 +193,11 @@ const getActionItems = (roleId, tenders) => {
       ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Start Evaluation — ${t.id}: ${t.title}`, urgent: false })),
     ]
   }
-  if (roleId === 'mgmt_review') {
-    const mine = tenders.filter(t => t.status === 'mgmt_review')
-    return [
-      ...mine.filter(t => t.evalProgress === 'in_progress').map(t => ({ label: `Submit Award Recommendation — ${t.id}: ${t.title}`, urgent: true })),
-      ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Begin Management Review — ${t.id}: ${t.title}`, urgent: false })),
-    ]
+  if (roleId === 'scm') {
+    const gateLabel = { scm_gate1: 'Approve Technical Evaluation', scm_gate2: 'Take Award Decision', scm_gate3: 'Approve Contract Draft' }
+    return tenders
+      .filter(t => SCM_GATE_STATUSES.includes(t.status))
+      .map(t => ({ label: `${gateLabel[t.status]} — ${t.id}: ${t.title}`, urgent: t.status === 'scm_gate3' }))
   }
   if (roleId === 'pof') return [
     ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Complete Financial Assessment — ${t.id}: ${t.title}`, urgent: true })),
@@ -256,7 +266,7 @@ const PIPELINE_STAGES = [
   { key: 'upload',      label: 'Bid Ingestion',       color: '#0891B2' },
   { key: 'tech_eval',   label: 'Technical Eval',      color: '#2563EB' },
   { key: 'comm_eval',   label: 'Commercial Eval',     color: '#D97706' },
-  { key: 'mgmt_review', label: 'Management Review',   color: '#7C3AED' },
+  { key: 'scm_gate2',   label: 'SCM Award Review',    color: '#7C3AED' },
   { key: 'award',       label: 'Award',               color: '#10B981' },
 ]
 
@@ -301,8 +311,8 @@ const QUICK_ACTIONS_BY_ROLE = {
     { icon: BulbIcon,  label: 'AI Score Assist',  color: '#D97706', bg: '#FFFBEB', action: null               },
     { icon: BulbIcon,  label: 'Ask AI',            color: '#0891B2', bg: '#E0F7FA', action: null               },
   ],
-  mgmt_review: [
-    { icon: UserCog,  label: 'Management Review', color: '#2563EB', bg: '#EEF2FF', action: '/mgmt-review' },
+  scm: [
+    { icon: UserCog,  label: 'Award Review',      color: '#2563EB', bg: '#EEF2FF', action: '/scm-review' },
     { icon: FileText, label: 'View Tenders',      color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'     },
     { icon: BulbIcon, label: 'AI Insights',       color: '#D97706', bg: '#FFFBEB', action: null           },
     { icon: BulbIcon, label: 'Ask AI',             color: '#0891B2', bg: '#E0F7FA', action: null           },
@@ -703,7 +713,7 @@ export default function Dashboard() {
                             else if (roleId === 'contract_holder') navigate(getContractHolderTenderRoute(tender))
                             else if (roleId === 'tech_eval') navigate(`/technical-eval/${tender.id}`)
                             else if (roleId === 'comm_eval') navigate(`/commercial-eval/${tender.id}`)
-                            else if (roleId === 'mgmt_review') navigate(`/mgmt-review/${tender.id}`)
+                            else if (roleId === 'scm') navigate(`${SCM_GATE_ROUTE[tender.status] || '/scm-review'}/${tender.id}`)
                             else if (roleId === 'legal_review') navigate(`/legal-review/${tender.id}`)
                             else navigate('/tenders')
                           }}>
@@ -728,7 +738,9 @@ export default function Dashboard() {
                               upload:      [{ label: 'Upload Bids',        route: `/upload/${tender.id}` },     { label: 'View in Tenders', route: '/tenders' }],
                               tech_eval:   [{ label: 'Technical Eval',     route: `/technical-eval/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               comm_eval:   [{ label: 'Commercial Eval',    route: `/commercial-eval/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
-                              mgmt_review: [{ label: 'Management Review',  route: `/mgmt-review/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
+                              scm_gate1:   [{ label: 'Technical Review',   route: `/scm-tech-review/${tender.id}` },     { label: 'View in Tenders', route: '/tenders' }],
+                              scm_gate2:   [{ label: 'Award Review',       route: `/scm-review/${tender.id}` },          { label: 'View in Tenders', route: '/tenders' }],
+                              scm_gate3:   [{ label: 'Contract Review',    route: `/scm-contract-review/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               award:       [{ label: 'Draft Contract',     route: `/contract/${tender.id}` },   { label: 'View in Tenders', route: '/tenders' }],
                               prequal_stage1: [{ label: 'Continue Bidder Matching',      route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               prequal_stage2: [{ label: 'Continue Questionnaire',        route: `/pre-qualification/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],

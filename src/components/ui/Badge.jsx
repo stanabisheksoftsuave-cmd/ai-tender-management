@@ -5,7 +5,7 @@ const variants = {
   tech_eval:         'bg-blue-50 text-blue-600 ring-1 ring-blue-200',
   comm_eval:         'bg-violet-50 text-violet-600 ring-1 ring-violet-200',
   parallel_eval:     'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200',
-  mgmt_review:       'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200',
+  scm_gate:          'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200',
   review:            'bg-blue-50 text-blue-600 ring-1 ring-blue-200',
   award:             'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   closed:            'bg-slate-100 text-slate-500 ring-1 ring-slate-200',

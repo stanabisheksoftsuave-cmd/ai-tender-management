@@ -15,7 +15,8 @@ const REASSIGN_OPTIONS = [
   { status: 'upload',      stage: 'Awaiting Ingestion',      label: 'Bid Ingestion' },
   { status: 'tech_eval',   stage: 'Technical Evaluation',    label: 'Technical Evaluation' },
   { status: 'comm_eval',   stage: 'Commercial Evaluation',   label: 'Commercial Evaluation' },
-  { status: 'mgmt_review', stage: 'Management Review',       label: 'Management Review' },
+  { status: 'scm_gate1',   stage: 'SCM Review — Technical',  label: 'SCM Review — Technical' },
+  { status: 'scm_gate2',   stage: 'SCM Review — Commercial & Award', label: 'SCM Review — Award' },
 ]
 
 const getTenderRoute = (t) => {
@@ -24,7 +25,9 @@ const getTenderRoute = (t) => {
   if (t.status === 'upload')       return `/upload/${t.id}`
   if (t.status === 'tech_eval')    return `/technical-eval/${t.id}`
   if (t.status === 'comm_eval')    return `/commercial-eval/${t.id}`
-  if (t.status === 'mgmt_review')  return `/mgmt-review/${t.id}`
+  if (t.status === 'scm_gate1')    return `/scm-tech-review/${t.id}`
+  if (t.status === 'scm_gate2')    return `/scm-review/${t.id}`
+  if (t.status === 'scm_gate3')    return `/scm-contract-review/${t.id}`
   if (t.status === 'award')        return `/contract/${t.id}`
   if (t.status === 'legal_review')       return `/legal-review/${t.id}`
   if (t.status === 'contract_execution') return `/contract-execution/${t.id}`
@@ -39,7 +42,9 @@ const getTimelineStage = (t) => {
   if (t.status === 'upload')       return 'upload'
   if (t.status === 'tech_eval')    return 'tech_eval'
   if (t.status === 'comm_eval')    return 'comm_eval'
-  if (t.status === 'mgmt_review')  return 'mgmt'
+  if (t.status === 'scm_gate1')    return 'scm_gate1'
+  if (t.status === 'scm_gate2')    return 'scm_gate2'
+  if (t.status === 'scm_gate3')    return 'scm_gate3'
   if (t.status === 'award')        return 'award'
   if (t.status === 'legal_review')       return 'legal'
   if (t.status === 'contract_execution') return 'execution'
@@ -59,7 +64,9 @@ const statusVariant = {
   upload:       'upload',
   tech_eval:    'tech_eval',
   comm_eval:    'comm_eval',
-  mgmt_review:  'mgmt_review',
+  scm_gate1:    'scm_gate',
+  scm_gate2:    'scm_gate',
+  scm_gate3:    'scm_gate',
   award:        'award',
   legal_review:       'legal_review',
   contract_execution: 'contract_execution',
@@ -79,8 +86,10 @@ const statusLabelsEn = {
   upload:       'Awaiting Ingestion',
   tech_eval:    'Technical Evaluation',
   comm_eval:    'Commercial Evaluation',
-  mgmt_review:  'Management Review',
-  award:        'Award Recommended',
+  scm_gate1:    'SCM Review — Technical',
+  scm_gate2:    'SCM Review — Award',
+  scm_gate3:    'SCM Review — Contract Draft',
+  award:        'Contract Drafting',
   legal_review:       'Legal Review',
   contract_execution: 'Contract Execution',
   active:             'Contract Active',
@@ -99,8 +108,10 @@ const statusLabelsAr = {
   upload:       'في انتظار الاستيعاب',
   tech_eval:    'التقييم الفني',
   comm_eval:    'التقييم التجاري',
-  mgmt_review:  'مراجعة الإدارة',
-  award:        'موصى بالترسية',
+  scm_gate1:    'مراجعة مدير سلسلة التوريد — الفني',
+  scm_gate2:    'مراجعة مدير سلسلة التوريد — الترسية',
+  scm_gate3:    'مراجعة مدير سلسلة التوريد — مسودة العقد',
+  award:        'صياغة العقد',
   legal_review:       'المراجعة القانونية',
   contract_execution: 'تنفيذ العقد',
   active:             'العقد نشط',
@@ -137,7 +148,7 @@ export default function TenderList() {
 
   // Map tender status → the role that evaluates it. Technical evaluation is owned
   // by the Contract Holder, commercial by the Contract Engineer.
-  const stageRoleMap = { tech_eval: 'contract_holder', comm_eval: 'pof', mgmt_review: 'mgmt_review' }
+  const stageRoleMap = { tech_eval: 'contract_holder', comm_eval: 'pof', scm_gate1: 'scm', scm_gate2: 'scm', scm_gate3: 'scm' }
 
   const getEvaluatorsForTender = td => {
     const roleNeeded = stageRoleMap[td.status]
@@ -151,7 +162,7 @@ export default function TenderList() {
     if (!target) return
     if (evalModal.status === 'tech_eval')   updateTender(evalModal.id, { assignedTechEval: { id: target.id, name: target.name } })
     if (evalModal.status === 'comm_eval')   updateTender(evalModal.id, { assignedCommEval: { id: target.id, name: target.name } })
-    if (evalModal.status === 'mgmt_review') updateTender(evalModal.id, { assignedMgmt:    { id: target.id, name: target.name } })
+    if (evalModal.status?.startsWith('scm_gate')) updateTender(evalModal.id, { assignedScm: { id: target.id, name: target.name } })
     setEvalModal(null)
     setSelectedEvaluator('')
   }
@@ -164,7 +175,7 @@ export default function TenderList() {
     { key: 'progress', label: lang === 'ar' ? 'قيد التقدم'     : 'In Progress',  fn: td => ['draft', 'upload'].includes(td.status) },
     { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' },
     { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' },
-    { key: 'review',   label: lang === 'ar' ? 'المراجعة'       : 'Review',       fn: td => td.status === 'mgmt_review' },
+    { key: 'review',   label: lang === 'ar' ? 'مراجعة سلسلة التوريد' : 'SCM Review', fn: td => ['scm_gate1','scm_gate2','scm_gate3'].includes(td.status) },
     { key: 'award',    label: lang === 'ar' ? 'الترسية'        : 'Awarded',      fn: td => td.status === 'award' },
     { key: 'contract', label: lang === 'ar' ? 'العقد'          : 'Contract',     fn: td => ['legal_review','contract_execution','active','contract_closure'].includes(td.status) },
     { key: 'closed',   label: lang === 'ar' ? 'مغلقة'          : 'Closed',       fn: td => ['closed','prequal_rejected'].includes(td.status) },
@@ -459,9 +470,9 @@ export default function TenderList() {
                                 <FileText size={13} /> Commercial Evaluation
                               </Button>
                             )}
-                            {roleId === 'mgmt_review' && td.status === 'mgmt_review' && (
-                              <Button size="sm" onClick={() => navigate(`/mgmt-review/${td.id}`)}>
-                                Management Review
+                            {roleId === 'scm' && ['scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
+                              <Button size="sm" onClick={() => navigate(getTenderRoute(td))}>
+                                {statusLabels[td.status]}
                               </Button>
                             )}
                             {isPof && td.status === 'award' && (
@@ -470,14 +481,14 @@ export default function TenderList() {
                               </Button>
                             )}
                             {/* Contract Engineer: Reassign Stage */}
-                            {isPof && ['upload','tech_eval','comm_eval','mgmt_review'].includes(td.status) && (
+                            {isPof && ['upload','tech_eval','comm_eval','scm_gate1','scm_gate2'].includes(td.status) && (
                               <Button size="sm" variant="secondary"
                                 onClick={e => { e.stopPropagation(); setReassignModal(td) }}>
                                 <RefreshCw size={13} /> Reassign Stage
                               </Button>
                             )}
                             {/* Business Admin: Reassign Evaluator */}
-                            {isBizAdmin && ['tech_eval','comm_eval','mgmt_review'].includes(td.status) && (
+                            {isBizAdmin && ['tech_eval','comm_eval','scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
                               <Button size="sm" variant="secondary"
                                 onClick={e => { e.stopPropagation(); setEvalModal(td); setSelectedEvaluator(''); setEvalSearch('') }}>
                                 <RefreshCw size={13} /> Reassign

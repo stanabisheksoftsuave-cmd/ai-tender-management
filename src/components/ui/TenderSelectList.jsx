@@ -6,7 +6,9 @@ import Badge from './Badge'
 const statusVariant = {
   tech_eval:   'tech_eval',
   comm_eval:   'comm_eval',
-  mgmt_review: 'mgmt_review',
+  scm_gate1:   'scm_gate',
+  scm_gate2:   'scm_gate',
+  scm_gate3:   'scm_gate',
   upload:      'upload',
   prequal_stage1:      'prequal_stage1',
   prequal_stage2:      'prequal_stage2',

@@ -368,10 +368,10 @@ export default function ContractTemplate() {
                     Contract drafted for {awardedBidder.name}.
                   </div>
                   <p className="text-xs text-slate-500">
-                    Draft the contract for the winner and issue the regret letters below, then finalise — the procurement flow completes here (it does not proceed to legal review).
+                    Draft the contract for the winner and prepare the regret letters below, then submit the draft to the Supply Chain Manager. Nothing is issued until the SCM approves — on approval the winner’s contract and every regret letter are released together.
                   </p>
-                  <Button onClick={() => { updateTender(tender.id, { status: 'active', stage: 'Contract Active', contractCompleted: true }); navigate('/tenders') }}>
-                    <CheckCircle size={14} /> Finalise Contract <ChevronRight size={14} />
+                  <Button onClick={() => { updateTender(tender.id, { status: 'scm_gate3', stage: 'SCM Review — Contract Draft', contractDraftReady: true }); navigate('/tenders') }}>
+                    <CheckCircle size={14} /> Submit Draft for SCM Approval <ChevronRight size={14} />
                   </Button>
                 </div>
               )}

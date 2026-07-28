@@ -32,6 +32,7 @@ import BidderUpload from './pages/BidderUpload'
 import TechnicalEvaluation from './pages/TechnicalEvaluation'
 import CommercialEvaluation from './pages/CommercialEvaluation'
 import AwardRecommendation from './pages/AwardRecommendation'
+import ScmGateReview from './pages/ScmGateReview'
 import ContractTemplate from './pages/ContractTemplate'
 import AuditLog from './pages/AuditLog'
 import UserManagement from './pages/UserManagement'
@@ -66,9 +67,10 @@ function CommEvalRoute({ children }) {
   return children
 }
 
-function MgmtReviewRoute({ children }) {
+// All three approval gates belong to the Supply Chain Manager.
+function ScmRoute({ children }) {
   const { user } = useAuth()
-  if (user?.role?.id !== 'mgmt_review') return <Navigate to="/dashboard" replace />
+  if (user?.role?.id !== 'scm') return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -142,8 +144,15 @@ function ProtectedRoutes() {
           <Route path="/technical-eval/:tenderId" element={<TechEvalRoute><TechnicalEvaluation /></TechEvalRoute>} />
           <Route path="/commercial-eval" element={<CommEvalRoute><CommercialEvaluation /></CommEvalRoute>} />
           <Route path="/commercial-eval/:tenderId" element={<CommEvalRoute><CommercialEvaluation /></CommEvalRoute>} />
-          <Route path="/mgmt-review" element={<MgmtReviewRoute><AwardRecommendation /></MgmtReviewRoute>} />
-          <Route path="/mgmt-review/:tenderId" element={<MgmtReviewRoute><AwardRecommendation /></MgmtReviewRoute>} />
+          {/* SCM gate 1 — technical evaluation review */}
+          <Route path="/scm-tech-review" element={<ScmRoute><ScmGateReview gate="scm_gate1" /></ScmRoute>} />
+          <Route path="/scm-tech-review/:tenderId" element={<ScmRoute><ScmGateReview gate="scm_gate1" /></ScmRoute>} />
+          {/* SCM gate 2 — commercial evaluation & award decision */}
+          <Route path="/scm-review" element={<ScmRoute><AwardRecommendation /></ScmRoute>} />
+          <Route path="/scm-review/:tenderId" element={<ScmRoute><AwardRecommendation /></ScmRoute>} />
+          {/* SCM gate 3 — contract draft approval, which issues the outcome */}
+          <Route path="/scm-contract-review" element={<ScmRoute><ScmGateReview gate="scm_gate3" /></ScmRoute>} />
+          <Route path="/scm-contract-review/:tenderId" element={<ScmRoute><ScmGateReview gate="scm_gate3" /></ScmRoute>} />
           <Route path="/contract" element={<PofRoute><ContractTemplate /></PofRoute>} />
           <Route path="/contract/:tenderId" element={<PofRoute><ContractTemplate /></PofRoute>} />
           <Route path="/legal-review" element={<LegalReviewRoute><LegalReview /></LegalReviewRoute>} />

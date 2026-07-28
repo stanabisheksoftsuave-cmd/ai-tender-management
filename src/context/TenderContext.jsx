@@ -3,23 +3,38 @@ import { tenders as initialTenders } from '../data/mockData'
 
 const TenderContext = createContext()
 
+// The Supply Chain Manager (SCM) gates the flow three times: after technical
+// evaluation, after commercial evaluation (where the award decision is taken),
+// and after the contract draft. Nothing skips a gate — each one returns to its
+// immediate predecessor when the SCM sends it back.
+//
+//   tech_eval → scm_gate1 → comm_eval → scm_gate2 → award (drafting)
+//             → scm_gate3 → active (winner contract + regret letters issued)
 const NEXT_STATUS = {
   draft:            { status: 'upload',      stage: 'Awaiting Ingestion' },
   upload:           { status: 'tech_eval',   stage: 'Technical Evaluation',  evalProgress: 'not_started' },
   // Bidder documents are uploaded up-front at ingestion, so evaluations advance
   // straight to the next stage — there is no post-evaluation report-upload step.
-  tech_eval:        { status: 'comm_eval',   stage: 'Commercial Evaluation', evalProgress: 'not_started' },
-  comm_eval:        { status: 'mgmt_review',  stage: 'Management Review',     evalProgress: 'not_started' },
-  mgmt_review:      { status: 'award',        stage: 'Award Recommended' },
-  // The procurement flow ends once the contract is created — it does not
-  // continue to legal review / execution.
-  award:            { status: 'active',       stage: 'Contract Active' },
+  tech_eval:        { status: 'scm_gate1',   stage: 'SCM Review — Technical' },
+  scm_gate1:        { status: 'comm_eval',   stage: 'Commercial Evaluation', evalProgress: 'not_started' },
+  comm_eval:        { status: 'scm_gate2',   stage: 'SCM Review — Commercial & Award', evalProgress: 'not_started' },
+  scm_gate2:        { status: 'award',       stage: 'Contract Drafting' },
+  award:            { status: 'scm_gate3',   stage: 'SCM Review — Contract Draft' },
+  scm_gate3:        { status: 'active',      stage: 'Contract Active' },
   // Retained for any seed tenders already in these later contract stages.
   legal_review:     { status: 'contract_execution',stage: 'Contract Execution' },
   contract_execution:{ status: 'active',           stage: 'Contract Active' },
   active:           { status: 'contract_closure',  stage: 'Closure In Progress' },
   contract_closure: { status: 'closed',            stage: 'Closed & Archived' },
 }
+
+// Where each SCM gate sends the tender back to when the manager returns it.
+const GATE_RETURN = {
+  scm_gate1: { status: 'tech_eval', stage: 'Technical Evaluation',  evalProgress: 'in_progress' },
+  scm_gate2: { status: 'comm_eval', stage: 'Commercial Evaluation', evalProgress: 'in_progress' },
+  scm_gate3: { status: 'award',     stage: 'Contract Drafting' },
+}
+
 
 /* ─── Default dropdown options (used as fallback) ─── */
 const DEFAULT_DROPDOWN_CONFIG = {
@@ -60,7 +75,9 @@ const DEFAULT_DROPDOWN_CONFIG = {
 // TENDERS_VERSION to force every client back to the seed data.
 const TENDERS_KEY = 'atm_tenders'
 const TENDERS_VERSION_KEY = 'atm_tenders_v'
-const TENDERS_VERSION = '2'
+// Bumped to 3 when the single Management Review step became the three SCM gates —
+// persisted tenders still carrying `mgmt_review` would have no screen to land on.
+const TENDERS_VERSION = '3'
 
 function loadTenders() {
   try {
@@ -125,29 +142,68 @@ export function TenderProvider({ children }) {
     }))
   }
 
+  // ── SCM gates ──
+  // Approving a gate advances along NEXT_STATUS and stamps the decision so the
+  // downstream stage (and the audit trail) can show who cleared it and when.
+  const approveGate = (tenderId, gate, comment = '') => {
+    setTenders(prev => prev.map(t => {
+      if (t.id !== tenderId) return t
+      const next = NEXT_STATUS[gate]
+      if (!next) return t
+      // Gate 3 is the point of issue: approving it releases the winner's
+      // contract and generates the regret letters for everyone else. Nothing
+      // leaves the building before this.
+      const issued = gate === 'scm_gate3'
+        ? { contractCompleted: true, contractIssuedAt: new Date().toISOString(), regretLettersIssued: true }
+        : {}
+      return {
+        ...t,
+        ...next,
+        ...issued,
+        scmDecisions: { ...(t.scmDecisions || {}), [gate]: { decision: 'approved', comment, at: new Date().toISOString() } },
+      }
+    }))
+  }
+
+  // Returning a gate sends the tender back to the stage that submitted it. The
+  // comment is mandatory at the call site — the owner sees it on re-entry.
+  const returnGate = (tenderId, gate, comment) => {
+    setTenders(prev => prev.map(t => {
+      if (t.id !== tenderId) return t
+      const back = GATE_RETURN[gate]
+      if (!back) return t
+      return {
+        ...t,
+        ...back,
+        scmDecisions: { ...(t.scmDecisions || {}), [gate]: { decision: 'returned', comment, at: new Date().toISOString() } },
+      }
+    }))
+  }
+
   // ── Parallel evaluation ──
   // An evaluator submits their side (tech/comm) of a parallel tender. The side is
-  // marked done immediately (no post-evaluation report upload); once both sides
-  // are done the tender converges to Management Review.
+  // marked done immediately (no post-evaluation report upload). Parallel tenders
+  // run both evaluations at once, so they skip gate 1 and converge on gate 2 —
+  // there is no separate technical outcome for the SCM to clear on its own.
   const submitParallelEval = (tenderId, side) => {
     setTenders(prev => prev.map(t => {
       if (t.id !== tenderId) return t
       const updated = { ...t, [side === 'tech' ? 'techSide' : 'commSide']: 'done' }
       if (updated.techSide === 'done' && updated.commSide === 'done') {
-        return { ...updated, status: 'mgmt_review', stage: 'Management Review', evalProgress: 'not_started' }
+        return { ...updated, status: 'scm_gate2', stage: 'SCM Review — Commercial & Award', evalProgress: 'not_started' }
       }
       return updated
     }))
   }
 
   // Contract Engineer uploads a side's evaluation report. When BOTH sides are
-  // done, the parallel tender converges to Management Review.
+  // done, the parallel tender converges on SCM gate 2.
   const uploadParallelReport = (tenderId, side) => {
     setTenders(prev => prev.map(t => {
       if (t.id !== tenderId) return t
       const updated = { ...t, [side === 'tech' ? 'techSide' : 'commSide']: 'done' }
       if (updated.techSide === 'done' && updated.commSide === 'done') {
-        return { ...updated, status: 'mgmt_review', stage: 'Management Review', evalProgress: 'not_started' }
+        return { ...updated, status: 'scm_gate2', stage: 'SCM Review — Commercial & Award', evalProgress: 'not_started' }
       }
       return updated
     }))
@@ -178,7 +234,7 @@ export function TenderProvider({ children }) {
   return (
     <TenderContext.Provider value={{
       tenders, advanceTender, addTender, updateTender, reassignTender,
-      submitParallelEval, uploadParallelReport,
+      submitParallelEval, uploadParallelReport, approveGate, returnGate,
       dropdownConfig, updateDropdownConfig,
     }}>
       {children}

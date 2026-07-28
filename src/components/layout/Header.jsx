@@ -11,7 +11,7 @@ const roleColors = {
   pof:         '#1B4F8A',
   tech_eval:   '#059669',
   comm_eval:   '#D97706',
-  mgmt_review: '#0F766E',
+  scm:         '#0F766E',
   hse:         '#0EA5E9',
   icv:         '#DB2777',
 }
