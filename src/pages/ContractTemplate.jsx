@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
 import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
+import { useHomePath } from '../utils/permissions'
 import { useTenders } from '../context/TenderContext'
 import { useBackHandler } from '../context/NavigationContext'
 import { openHtmlDoc, rejectionLetterDoc } from '../utils/docGen'
@@ -43,9 +44,10 @@ const flowStages = [
 const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
 
 // The ITT sections a contract can be drafted against — mirrors the ITT creation
-// section flow, offered here as a reference dropdown.
+// section flow, offered here as a reference dropdown. Section 1 (Instructions to
+// Tenderers) is not listed: it governs how tenderers submit their bids, not the
+// contract that follows.
 const ITT_SECTIONS = [
-  'Section 1 — Instructions to Tenderers',
   'Section A — Form of Agreement',
   'Section D — Statement of Work',
   'Section B1 — General Conditions of Contract',
@@ -65,12 +67,15 @@ export default function ContractTemplate() {
   const { tenderId } = useParams()
   const navigate     = useNavigate()
   const { user }     = useAuth()
+  const home         = useHomePath()
   const { tenders, updateTender }  = useTenders()
   const tender       = tenders.find(t => t.id === tenderId)
 
   const [sent,        setSent]        = useState(false)
   const [sentLetters, setSentLetters] = useState(false)
-  const [ittSection,  setIttSection]  = useState('')
+  // Defaults to the first section in the list, so the page always has a drafting
+  // reference selected.
+  const [ittSection,  setIttSection]  = useState(ITT_SECTIONS[0])
   const [reviewOpen,  setReviewOpen]  = useState(false)
   const [ittApproved, setIttApproved] = useState(false)
 
@@ -111,8 +116,8 @@ export default function ContractTemplate() {
       <FileText size={32} />
       <p className="text-sm font-medium">Tender not found or not yet awarded.</p>
       <p className="text-xs">Complete Management Review before drafting a contract.</p>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-        Back to Dashboard
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+        Back to Home
       </Button>
     </div>
   )
@@ -281,7 +286,6 @@ export default function ContractTemplate() {
               onChange={e => setIttSection(e.target.value)}
               className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
             >
-              <option value="">Select an ITT section to draft against…</option>
               {ITT_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <p className="text-[11px] text-slate-500 mt-2">

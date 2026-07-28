@@ -14,11 +14,13 @@ import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { useBackHandler } from '../context/NavigationContext'
-import { buildFilledDocxBlob } from '../utils/docxTemplate'
+import { buildFilledDocxBlob, parseDocxTemplate } from '../utils/docxTemplate'
 import AiEditableTextarea from '../components/ui/AiEditableTextarea'
 import SectionFillStep from '../components/itt/SectionFillStep'
 import B1CategoryChooser from '../components/itt/B1CategoryChooser'
+import B2ClassEditor from '../components/itt/B2ClassEditor'
 import { B1_CATEGORY_MAP } from '../components/itt/b1Categories'
+import { cloneB2Classes, renderB2Text } from '../components/itt/b2Classes'
 import ErrorBoundary from '../components/ErrorBoundary'
 
 // Fixed section order for the real ITT template fill-in wizard: 1 → A → D → B1 → B2 → C → E → F → H → J → K → L → G
@@ -184,9 +186,15 @@ export default function ITTCreation() {
   const [genStep, setGenStep] = useState(0)
   const [draftTenderId, setDraftTenderId] = useState(existingTender?.id || null)
   const [sectionAnswers, setSectionAnswers] = useState(existingTender?.sectionAnswers || {})
+  // AI edits made to a section template's own prose (not its fields), keyed
+  // { [sectionId]: { [textRunIndex]: rewrittenText } }.
+  const [sectionProse, setSectionProse] = useState(existingTender?.sectionProse || {})
   // Which sections each owner has reviewed and approved: { [sectionId]: true }.
   const [sectionApproved, setSectionApproved] = useState(existingTender?.sectionApproved || {})
   const [b1Category, setB1Category] = useState(existingTender?.b1Category || null)
+  // Section B2 is authored as clause classes / sub-classes rather than template
+  // fields. Seeded from the AI default set the first time the section is opened.
+  const [b2Classes, setB2Classes] = useState(existingTender?.sectionB2Classes || cloneB2Classes())
   // Index into the current role's own sections (the scoped section dropdown).
   const [mySectionIndex, setMySectionIndex] = useState(0)
   const [approvalNote, setApprovalNote] = useState('')
@@ -246,8 +254,10 @@ export default function ITTCreation() {
     })
     setDraftTenderId(existingTender.id)
     setSectionAnswers(existingTender.sectionAnswers || {})
+    setSectionProse(existingTender.sectionProse || {})
     setSectionApproved(existingTender.sectionApproved || {})
     setB1Category(existingTender.b1Category || null)
+    setB2Classes(existingTender.sectionB2Classes || cloneB2Classes())
     setTemplateUploads(existingTender.strategyTemplateUploads || {})
     setSectionUploads(existingTender.sectionUploads || {})
     setStep(existingTender.sectionsGenerated === true ? 2 : 0)
@@ -437,6 +447,10 @@ export default function ITTCreation() {
     setSectionAnswers(prev => ({ ...prev, [sectionId]: answers }))
   }
 
+  const handleProseChange = (sectionId, edits) => {
+    setSectionProse(prev => ({ ...prev, [sectionId]: edits }))
+  }
+
   // Persist section answers to the tender record as a side effect (not inside the
   // setSectionAnswers updater, which React may invoke outside of a normal commit).
   useEffect(() => {
@@ -448,9 +462,38 @@ export default function ITTCreation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionAnswers, draftTenderId])
 
+  // Same for AI edits made to the section templates' prose.
+  useEffect(() => {
+    if (!draftTenderId) return
+    if (!alreadyGenerated && Object.keys(sectionProse).length === 0) return
+    updateTender(draftTenderId, { sectionProse })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionProse, draftTenderId])
+
   const handleB1Select = (categoryId) => {
     setB1Category(categoryId)
     if (draftTenderId) updateTender(draftTenderId, { b1Category: categoryId })
+  }
+
+  // Section B2's clause classes persist to the tender so an add / edit / delete
+  // survives a reload or a role hand-off. The write is debounced — typing clause
+  // text would otherwise re-serialise the whole tender list on every keystroke —
+  // and flushed whenever the editor is left.
+  const b2PendingRef = useRef(null)
+  const b2TimerRef   = useRef(null)
+  const flushB2 = () => {
+    if (b2TimerRef.current) { clearTimeout(b2TimerRef.current); b2TimerRef.current = null }
+    if (b2PendingRef.current && draftTenderId) {
+      updateTender(draftTenderId, { sectionB2Classes: b2PendingRef.current })
+      b2PendingRef.current = null
+    }
+  }
+  const handleB2Change = (next) => {
+    setB2Classes(next)
+    if (!draftTenderId) return
+    b2PendingRef.current = next
+    if (b2TimerRef.current) clearTimeout(b2TimerRef.current)
+    b2TimerRef.current = setTimeout(flushB2, 600)
   }
 
   // Export step -> back to the section board. Shared by the in-page "Back to
@@ -501,8 +544,15 @@ export default function ITTCreation() {
     try {
       const zip = new JSZip()
       for (const section of effectiveFlow) {
-        const answers = sectionAnswers[section.id] || []
-        const blob = await buildFilledDocxBlob(section.docxUrl, answers)
+        const answers = [...(sectionAnswers[section.id] || [])]
+        // Section B2's clause classes fill the template's "clauses that deviate
+        // from B1" field, so the authored special conditions reach the export.
+        if (section.id === 'sectionB2') {
+          const model = await parseDocxTemplate(section.docxUrl)
+          const idx = model.fields.findIndex(f => /deviate\s+from\s+b\s*1/i.test(f.defaultText || ''))
+          if (idx >= 0) answers[idx] = renderB2Text(b2Classes)
+        }
+        const blob = await buildFilledDocxBlob(section.docxUrl, answers, sectionProse[section.id] || null)
         zip.file(section.exportFilename, blob)
       }
       const zipBlob = await zip.generateAsync({ type: 'blob' })
@@ -1242,6 +1292,20 @@ export default function ITTCreation() {
                       </p>
                     </Card>
                   )
+                ) : current && current.id === 'sectionB2' ? (
+                  /* Section B2 is authored as clause classes → sub-classes → clause
+                     text, rather than as template fields. */
+                  <B2ClassEditor
+                    key={current.id}
+                    section={current}
+                    classes={b2Classes}
+                    onChange={handleB2Change}
+                    onNext={() => { flushB2(); approveAndAdvance() }}
+                    onSkip={current.optional ? () => { flushB2(); skipAndAdvance() } : undefined}
+                    onBack={() => { flushB2(); goToPrevSection() }}
+                    readOnly={!canEditCurrent}
+                    readOnlyNote={`Read-only — owned by ${OWNER_LABEL[ownerOf(current.id)]}`}
+                  />
                 ) : current ? (
                   canEditCurrent ? (
                     <SectionFillStep
@@ -1249,6 +1313,8 @@ export default function ITTCreation() {
                       section={current}
                       answers={sectionAnswers[current.id]}
                       prefill={prefillMap}
+                      proseEdits={sectionProse[current.id] || {}}
+                      onProseChange={handleProseChange}
                       onAnswersChange={handleAnswersChange}
                       onNext={approveAndAdvance}
                       onSkip={current.optional ? skipAndAdvance : undefined}
@@ -1270,6 +1336,9 @@ export default function ITTCreation() {
                       section={current}
                       answers={sectionAnswers[current.id]}
                       prefill={prefillMap}
+                      // Prose edits made by the owner are shown here, but this
+                      // role only views the section — no onProseChange.
+                      proseEdits={sectionProse[current.id] || {}}
                       onAnswersChange={() => {}}
                       onNext={() => {}}
                       onBack={goToPrevSection}
@@ -1440,9 +1509,9 @@ export default function ITTCreation() {
 
             <div className="mb-4">
               <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Export Notes (Optional)</label>
-              <textarea
+              <AiEditableTextarea
                 value={approvalNote}
-                onChange={e => setApprovalNote(e.target.value)}
+                onChange={setApprovalNote}
                 rows={3}
                 placeholder="Add notes for the external reviewer..."
                 className="w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input"

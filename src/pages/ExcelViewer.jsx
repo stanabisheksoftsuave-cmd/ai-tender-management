@@ -97,8 +97,9 @@ export default function ExcelViewer() {
       navigate(-1)
       return
     }
+    // '/' resolves to whichever landing page the signed-in role may open.
     window.close()
-    setTimeout(() => { if (!window.closed) navigate('/dashboard') }, 150)
+    setTimeout(() => { if (!window.closed) navigate('/') }, 150)
   }
 
   const handleDownload = () => {
