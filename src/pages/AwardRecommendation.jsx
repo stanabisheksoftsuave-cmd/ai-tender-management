@@ -90,8 +90,8 @@ export default function AwardRecommendation() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
       <FileText size={32} className="text-slate-300" />
       <p className="text-sm font-medium">Tender not found or not in Management Review stage.</p>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-        <ArrowLeft size={13} /> Back to Dashboard
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+        <ArrowLeft size={13} /> Back to Home
       </Button>
     </div>
   )
