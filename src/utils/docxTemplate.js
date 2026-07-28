@@ -42,6 +42,10 @@ function attrValue(token, name) {
 //  - paragraphs: flat list of every paragraph block (back-compat / convenience).
 //  - fields: merged runs of highlighted text, with byte offsets into the ORIGINAL xml
 //    string so export can splice in answers without a lossy DOM round-trip.
+//  - texts: every non-highlighted text run, carrying the same byte offsets. This is
+//    what makes the template's own prose select-to-edit-with-AI: an edit is stored
+//    as an override against the run's index and spliced back on export, exactly
+//    like a field answer.
 // w:delText (tracked-change deletions) is a distinct tag name from w:t, so deleted
 // placeholder text is naturally excluded without any extra bookkeeping.
 export function buildFieldModel(xml) {
@@ -49,6 +53,7 @@ export function buildFieldModel(xml) {
   const rootBlocks = []
   const paragraphs = []
   const fields = []
+  const texts = []
   const containerStack = [rootBlocks]
   const tableStack = []
   const container = () => containerStack[containerStack.length - 1]
@@ -154,13 +159,14 @@ export function buildFieldModel(xml) {
         })
         currentParagraph.segments.push({ type: 'field', fieldIndex: fields.length - 1 })
       } else {
-        currentParagraph.segments.push({ type: 'text', text: decoded })
+        currentParagraph.segments.push({ type: 'text', text: decoded, textIndex: texts.length })
+        texts.push({ index: texts.length, text: decoded, start: textStart, end: textEnd })
       }
       lastWasField = isField
     }
   }
 
-  return { xml, blocks: rootBlocks, paragraphs, fields }
+  return { xml, blocks: rootBlocks, paragraphs, fields, texts }
 }
 
 export async function parseDocxTemplate(url) {
@@ -172,7 +178,10 @@ export async function parseDocxTemplate(url) {
   return buildFieldModel(xml)
 }
 
-export function applyAnswers(xml, fields, answers) {
+// `proseEdits` is an optional { [textIndex]: string } map of AI edits made to the
+// template's own prose. Field spans and text spans are always distinct w:t
+// elements, so the two sets of ops never overlap.
+export function applyAnswers(xml, fields, answers, texts = [], proseEdits = null) {
   const ops = []
   fields.forEach((field, i) => {
     const raw = answers && answers[i] != null ? String(answers[i]) : field.defaultText
@@ -182,18 +191,25 @@ export function applyAnswers(xml, fields, answers) {
     })
     field.highlightSpans.forEach(hs => ops.push({ start: hs.start, end: hs.end, replacement: '' }))
   })
+  if (proseEdits) {
+    texts.forEach((t, i) => {
+      const edited = proseEdits[i]
+      if (edited == null || edited === t.text) return
+      ops.push({ start: t.start, end: t.end, replacement: escapeXmlText(String(edited).replace(/\r\n|\r|\n/g, ' ')) })
+    })
+  }
   ops.sort((a, b) => b.start - a.start)
   let result = xml
   for (const op of ops) result = result.slice(0, op.start) + op.replacement + result.slice(op.end)
   return result
 }
 
-export async function buildFilledDocxBlob(url, answers) {
+export async function buildFilledDocxBlob(url, answers, proseEdits = null) {
   const buf = await fetchDocxArrayBuffer(url)
   const zip = await JSZip.loadAsync(buf)
   const xml = await zip.file('word/document.xml').async('string')
-  const { fields } = buildFieldModel(xml)
-  const filledXml = applyAnswers(xml, fields, answers)
+  const { fields, texts } = buildFieldModel(xml)
+  const filledXml = applyAnswers(xml, fields, answers, texts, proseEdits)
   zip.file('word/document.xml', filledXml)
   return zip.generateAsync({
     type: 'blob',

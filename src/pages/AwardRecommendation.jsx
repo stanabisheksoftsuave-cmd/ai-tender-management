@@ -8,6 +8,7 @@ import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
+import { useHomePath } from '../utils/permissions'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -45,6 +46,7 @@ export default function AwardRecommendation() {
   const navigate     = useNavigate()
   const { goBack }   = useNavigation()
   const { user }     = useAuth()
+  const home         = useHomePath()
   const { tenders, advanceTender, updateTender } = useTenders()
 
   const [winnerId,   setWinnerId]   = useState(null)
@@ -62,8 +64,8 @@ export default function AwardRecommendation() {
         <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
         <p className="text-xs text-slate-400 mt-1">Management Review is only accessible to Management Reviewers.</p>
       </div>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-        <ArrowLeft size={13} /> Back to Dashboard
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+        <ArrowLeft size={13} /> Back to Home
       </Button>
     </div>
   )
@@ -88,8 +90,8 @@ export default function AwardRecommendation() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
       <FileText size={32} className="text-slate-300" />
       <p className="text-sm font-medium">Tender not found or not in Management Review stage.</p>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-        <ArrowLeft size={13} /> Back to Dashboard
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+        <ArrowLeft size={13} /> Back to Home
       </Button>
     </div>
   )

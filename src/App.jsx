@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { Component } from 'react'
 
 class ErrorBoundary extends Component {
@@ -11,7 +11,8 @@ class ErrorBoundary extends Component {
           <h2 style={{ color: '#d32f2f' }}>Runtime Error</h2>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: '#333' }}>{this.state.error?.message}</pre>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, color: '#666' }}>{this.state.error?.stack}</pre>
-          <button onClick={() => window.location.href = '/dashboard'} style={{ marginTop: 16, padding: '8px 16px', cursor: 'pointer' }}>Go to Dashboard</button>
+          {/* '/' resolves to whichever landing page the signed-in role may open. */}
+          <button onClick={() => window.location.href = '/'} style={{ marginTop: 16, padding: '8px 16px', cursor: 'pointer' }}>Go to Home</button>
         </div>
       )
     }
@@ -45,66 +46,7 @@ import StrategyTemplatesDashboard from './pages/StrategyTemplatesDashboard'
 import PsfStrategy from './pages/PsfStrategy'
 import ExcelViewer from './pages/ExcelViewer'
 import DocxViewer from './pages/DocxViewer'
-
-function AdminRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'it_admin' && user?.role?.id !== 'biz_admin') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-// Technical evaluation is now owned by the Contract Holder.
-function TechEvalRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'contract_holder') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-// Commercial evaluation is now owned by the Contract Engineer.
-function CommEvalRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'pof') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-function MgmtReviewRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'mgmt_review') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-function PofRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'pof') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-function LegalReviewRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'legal_review') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-function ContractHolderRoute({ children }) {
-  const { user } = useAuth()
-  if (user?.role?.id !== 'contract_holder') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-// Pre-qualification is the Contract Holder's, except the financial assessment
-// stage, which the Contract Engineer owns. The page itself gates per stage.
-function PreQualRoute({ children }) {
-  const { user } = useAuth()
-  const roleId = user?.role?.id
-  if (roleId !== 'contract_holder' && roleId !== 'pof') return <Navigate to="/dashboard" replace />
-  return children
-}
-
-function IttSectionRoute({ children }) {
-  const { user } = useAuth()
-  const roleId = user?.role?.id
-  if (!['pof','contract_holder','hse','icv'].includes(roleId)) return <Navigate to="/dashboard" replace />
-  return children
-}
+import { canAccess, isKnownRoute, landingPath } from './utils/permissions'
 
 // Both /create-itt (picker) and /create-itt/:tenderId (a specific ITT) render
 // ITTCreation. Keying it by the tender id forces a fresh mount when you switch
@@ -112,51 +54,62 @@ function IttSectionRoute({ children }) {
 // ITT opened from the picker would wrongly show the "being prepared" screen.
 function CreateIttRoute() {
   const { tenderId } = useParams()
-  return (
-    <IttSectionRoute>
-      <ITTCreation key={tenderId || 'picker'} />
-    </IttSectionRoute>
-  )
+  return <ITTCreation key={tenderId || 'picker'} />
 }
 
+/*
+ * Every protected route is authorised here, against the shared ROUTE_ROLES map
+ * in utils/permissions — the same map the sidebar filters its menu with. The
+ * check runs on the URL itself, so it applies equally to a click, a typed-in
+ * address, a refresh and a deep link; unknown paths fall through to the
+ * catch-all below. Denied users go to the landing page their own role can open.
+ */
 function ProtectedRoutes() {
   const { user } = useAuth()
+  const { pathname } = useLocation()
   if (!user) return <Navigate to="/login" replace />
+
+  const roleId = user.role?.id
+  const home = landingPath(roleId)
+  if (isKnownRoute(pathname) && !canAccess(roleId, pathname)) {
+    return <Navigate to={home} replace />
+  }
+
   return (
     <MainLayout>
       <ErrorBoundary>
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tenders" element={<TenderList />} />
-          <Route path="/contract-strategy" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
-          <Route path="/contract-strategy/:tenderId" element={<ContractHolderRoute><ContractStrategy /></ContractHolderRoute>} />
-          <Route path="/strategy-templates/:tenderId" element={<ContractHolderRoute><StrategyTemplatesDashboard /></ContractHolderRoute>} />
-          <Route path="/psf-strategy/:tenderId" element={<ContractHolderRoute><PsfStrategy /></ContractHolderRoute>} />
-          <Route path="/pre-qualification" element={<PreQualRoute><PreQualification /></PreQualRoute>} />
-          <Route path="/pre-qualification/:tenderId" element={<PreQualRoute><PreQualification /></PreQualRoute>} />
+          <Route path="/contract-strategy" element={<ContractStrategy />} />
+          <Route path="/contract-strategy/:tenderId" element={<ContractStrategy />} />
+          <Route path="/strategy-templates/:tenderId" element={<StrategyTemplatesDashboard />} />
+          <Route path="/psf-strategy/:tenderId" element={<PsfStrategy />} />
+          <Route path="/pre-qualification" element={<PreQualification />} />
+          <Route path="/pre-qualification/:tenderId" element={<PreQualification />} />
           <Route path="/create-itt" element={<CreateIttRoute />} />
           <Route path="/create-itt/:tenderId" element={<CreateIttRoute />} />
-          <Route path="/upload" element={<PofRoute><BidderUpload /></PofRoute>} />
-          <Route path="/upload/:tenderId" element={<PofRoute><BidderUpload /></PofRoute>} />
-          <Route path="/technical-eval" element={<TechEvalRoute><TechnicalEvaluation /></TechEvalRoute>} />
-          <Route path="/technical-eval/:tenderId" element={<TechEvalRoute><TechnicalEvaluation /></TechEvalRoute>} />
-          <Route path="/commercial-eval" element={<CommEvalRoute><CommercialEvaluation /></CommEvalRoute>} />
-          <Route path="/commercial-eval/:tenderId" element={<CommEvalRoute><CommercialEvaluation /></CommEvalRoute>} />
-          <Route path="/mgmt-review" element={<MgmtReviewRoute><AwardRecommendation /></MgmtReviewRoute>} />
-          <Route path="/mgmt-review/:tenderId" element={<MgmtReviewRoute><AwardRecommendation /></MgmtReviewRoute>} />
-          <Route path="/contract" element={<PofRoute><ContractTemplate /></PofRoute>} />
-          <Route path="/contract/:tenderId" element={<PofRoute><ContractTemplate /></PofRoute>} />
-          <Route path="/legal-review" element={<LegalReviewRoute><LegalReview /></LegalReviewRoute>} />
-          <Route path="/legal-review/:tenderId" element={<LegalReviewRoute><LegalReview /></LegalReviewRoute>} />
-          <Route path="/contract-execution" element={<PofRoute><ContractExecution /></PofRoute>} />
-          <Route path="/contract-execution/:tenderId" element={<PofRoute><ContractExecution /></PofRoute>} />
-          <Route path="/contract-management" element={<PofRoute><ContractManagement /></PofRoute>} />
-          <Route path="/contract-management/:tenderId" element={<PofRoute><ContractManagement /></PofRoute>} />
-          <Route path="/contract-closure" element={<PofRoute><ContractClosure /></PofRoute>} />
-          <Route path="/contract-closure/:tenderId" element={<PofRoute><ContractClosure /></PofRoute>} />
-          <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
-          <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/upload" element={<BidderUpload />} />
+          <Route path="/upload/:tenderId" element={<BidderUpload />} />
+          <Route path="/technical-eval" element={<TechnicalEvaluation />} />
+          <Route path="/technical-eval/:tenderId" element={<TechnicalEvaluation />} />
+          <Route path="/commercial-eval" element={<CommercialEvaluation />} />
+          <Route path="/commercial-eval/:tenderId" element={<CommercialEvaluation />} />
+          <Route path="/mgmt-review" element={<AwardRecommendation />} />
+          <Route path="/mgmt-review/:tenderId" element={<AwardRecommendation />} />
+          <Route path="/contract" element={<ContractTemplate />} />
+          <Route path="/contract/:tenderId" element={<ContractTemplate />} />
+          <Route path="/legal-review" element={<LegalReview />} />
+          <Route path="/legal-review/:tenderId" element={<LegalReview />} />
+          <Route path="/contract-execution" element={<ContractExecution />} />
+          <Route path="/contract-execution/:tenderId" element={<ContractExecution />} />
+          <Route path="/contract-management" element={<ContractManagement />} />
+          <Route path="/contract-management/:tenderId" element={<ContractManagement />} />
+          <Route path="/contract-closure" element={<ContractClosure />} />
+          <Route path="/contract-closure/:tenderId" element={<ContractClosure />} />
+          <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>
       </ErrorBoundary>
     </MainLayout>

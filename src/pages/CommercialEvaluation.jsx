@@ -51,6 +51,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation, useBackHandler } from '../context/NavigationContext'
+import { useHomePath } from '../utils/permissions'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
 const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -75,6 +76,7 @@ export default function CommercialEvaluation() {
   const navigate = useNavigate()
   const { goBack } = useNavigation()
   const { user } = useAuth()
+  const home = useHomePath()
   const { tenders, advanceTender, submitParallelEval, updateTender } = useTenders()
 
   const tender = tenders.find(t => t.id === tenderId)
@@ -418,8 +420,8 @@ export default function CommercialEvaluation() {
           <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
           <p className="text-xs text-slate-400 mt-1">Commercial Evaluation is only accessible to the Contract Engineer.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={13} /> Back to Dashboard
+        <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+          <ArrowLeft size={13} /> Back to Home
         </Button>
       </div>
     )
@@ -448,8 +450,8 @@ export default function CommercialEvaluation() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
         <p className="text-sm">{!tender ? 'Tender not found.' : 'This tender is not assigned to you.'}</p>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={13} /> Back to Dashboard
+        <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+          <ArrowLeft size={13} /> Back to Home
         </Button>
       </div>
     )
@@ -611,8 +613,8 @@ export default function CommercialEvaluation() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft size={13} /> Back to Dashboard
+            <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+              <ArrowLeft size={13} /> Back to Home
             </Button>
           </div>
         </Card>

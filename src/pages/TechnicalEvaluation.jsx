@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useBackHandler, useDismissable, useNavigation } from '../context/NavigationContext'
 import { openHtmlDoc, scoreRationaleDoc, failReasonDoc, scoreNarrative, scoreEvidence } from '../utils/docGen'
+import { useHomePath } from '../utils/permissions'
 
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -247,6 +248,7 @@ export default function TechnicalEvaluation() {
   const navigate   = useNavigate()
   const { goBack } = useNavigation()
   const { user }   = useAuth()
+  const home       = useHomePath()
   const { tenders, advanceTender, updateTender, submitParallelEval } = useTenders()
 
   const [expandedBidder,   setExpandedBidder]   = useState(null)
@@ -491,8 +493,8 @@ export default function TechnicalEvaluation() {
           <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
           <p className="text-xs text-slate-400 mt-1">Technical Evaluation is only accessible to the Contract Holder.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={13} /> Back to Dashboard
+        <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+          <ArrowLeft size={13} /> Back to Home
         </Button>
       </div>
     )
@@ -521,8 +523,8 @@ export default function TechnicalEvaluation() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
         <p className="text-sm">{!tender ? 'Tender not found.' : 'This tender is not assigned to you.'}</p>
-        <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={13} /> Back to Dashboard
+        <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
+          <ArrowLeft size={13} /> Back to Home
         </Button>
       </div>
     )
@@ -1069,7 +1071,7 @@ export default function TechnicalEvaluation() {
               updateTender(tenderId, { bidderList: scoredBidders })
               if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'tech')
               else advanceTender(tenderId)
-              navigate('/dashboard')
+              navigate(home)
             }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all
               ${canSubmit

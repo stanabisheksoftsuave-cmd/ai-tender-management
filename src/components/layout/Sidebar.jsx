@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useTenders } from '../../context/TenderContext'
 import { useDismissable } from '../../context/NavigationContext'
+import { canAccess } from '../../utils/permissions'
 import Badge from '../ui/Badge'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
@@ -56,6 +57,9 @@ const isCifTender = (t) =>
   CIF_STATUSES.includes(t.status) ||
   (t.status === 'draft' && Array.isArray(t.selectedTemplates))
 
+// Menu per role. Every entry is still run through canAccess() below, so an item
+// can never appear for a role the route itself would turn away — the Dashboard,
+// for instance, belongs to the Contract Holder and the two admin roles only.
 const navByRole = {
   it_admin: [
     { to: '/dashboard', icon: '/src/assets/icons/dashboard.svg', labelKey: 'nav.dashboard' },
@@ -67,7 +71,6 @@ const navByRole = {
     { to: '/tenders',   icon: '/src/assets/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
   ],
   pof: [
-    { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
     { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
     { to: '/pre-qualification',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
     { to: '/commercial-eval',    icon: '/src/assets/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
@@ -85,24 +88,20 @@ const navByRole = {
     { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   mgmt_review: [
-    { to: '/dashboard',   icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
-    { to: '/tenders',     icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
     { to: '/mgmt-review', icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.mgmtReview'},
+    { to: '/tenders',     icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
   ],
   legal_review: [
-    { to: '/dashboard',    icon: '/src/assets/icons/dashboard.svg',  labelKey: 'nav.dashboard' },
     { to: '/legal-review', icon: '/src/assets/icons/audit-log.svg',  labelKey: 'nav.legalReview' },
   ],
   // HSE and ICV each own their ITT sections; they reach them from the same
   // "ITT Draft" entry the Contract Engineer uses (the page scopes to each role's
   // own sections). Tender Tracking is included so they can find generated ITTs.
   hse: [
-    { to: '/dashboard',  icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
     { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
     { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   icv: [
-    { to: '/dashboard',  icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
     { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
     { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
@@ -115,7 +114,8 @@ export default function Sidebar() {
   const { tenders } = useTenders()
   const location = useLocation()
   const navigate = useNavigate()
-  const navItems = navByRole[user?.role?.id] || []
+  const roleId = user?.role?.id
+  const navItems = (navByRole[roleId] || []).filter(item => canAccess(roleId, item.to))
   const isRtl = lang === 'ar'
 
   // Tender id from the current URL (/…/:tenderId) drives which strategy sub-items appear.

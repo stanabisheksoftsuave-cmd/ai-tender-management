@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
+import { useHomePath } from '../utils/permissions'
 import { exportClosureReportPDF } from '../utils/exportPDF'
 
 const CHECKLIST = [
@@ -18,6 +19,7 @@ export default function ContractClosure() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const home = useHomePath()
   const { tenders, updateTender } = useTenders()
   const tender = tenderId ? tenders.find(t => t.id === tenderId) : null
 
@@ -73,7 +75,7 @@ export default function ContractClosure() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
       <FileText size={32} />
       <p className="text-sm font-medium">Tender not found or not in closure.</p>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>Back to Home</Button>
     </div>
   )
 

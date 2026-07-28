@@ -13,6 +13,7 @@ import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
+import { useHomePath } from '../utils/permissions'
 
 // ── Legal review criteria ────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export default function LegalReview() {
   const navigate     = useNavigate()
   const { goBack }   = useNavigation()
   const { user }     = useAuth()
+  const home         = useHomePath()
   const { tenders, advanceTender } = useTenders()
   const tender = tenders.find(t => t.id === tenderId)
 
@@ -97,7 +99,7 @@ export default function LegalReview() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
       <FileText size={32} />
       <p className="text-sm font-medium">Tender not found</p>
-      <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+      <Button variant="secondary" size="sm" onClick={() => navigate(home)}>Back to Home</Button>
     </div>
   )
 
