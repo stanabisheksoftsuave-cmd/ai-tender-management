@@ -14,7 +14,10 @@ const normKey = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ').repla
 const POPUP_W = 340
 const POPUP_H = 300
 
-export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange }) {
+// bodyMaxHeight caps the scrolling document area. The wizard gives it most of
+// the viewport; a caller that nests this inside its own chrome (the contract
+// page's review popup) passes something smaller so the whole card still fits.
+export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange, bodyMaxHeight = '62vh' }) {
   const [load, setLoad] = useState({ docxUrl: null, model: null, error: null })
   const [values, setValues] = useState([])
   const debounceRef = useRef(null)
@@ -457,7 +460,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       )}
 
       {!loading && !error && model && (
-        <div className="max-h-[62vh] overflow-y-auto rounded-xl bg-white" style={{ border: '1px solid #cce6f8' }}>
+        <div className="overflow-y-auto rounded-xl bg-white" style={{ maxHeight: bodyMaxHeight, border: '1px solid #cce6f8' }}>
           <div
             ref={bodyRef}
             onMouseUp={captureProseSelection}

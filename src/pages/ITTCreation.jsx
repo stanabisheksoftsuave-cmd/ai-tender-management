@@ -20,25 +20,9 @@ import SectionFillStep from '../components/itt/SectionFillStep'
 import B1CategoryChooser from '../components/itt/B1CategoryChooser'
 import B2ClassEditor from '../components/itt/B2ClassEditor'
 import { B1_CATEGORY_MAP } from '../components/itt/b1Categories'
+import { resolveFlow } from '../components/itt/sectionFlow'
 import { cloneB2Classes, renderB2Text } from '../components/itt/b2Classes'
 import ErrorBoundary from '../components/ErrorBoundary'
-
-// Fixed section order for the real ITT template fill-in wizard: 1 → A → D → B1 → B2 → C → E → F → H → J → K → L → G
-const SECTION_FLOW = [
-  { id: 'section1', title: 'Section 1 — Instructions to Tenderers', docxUrl: '/itt-templates/section-1-instructions.docx', exportFilename: 'Section 1 - Instructions.docx' },
-  { id: 'sectionA', title: 'Section A — Form of Agreement', docxUrl: '/itt-templates/section-a-form-of-agreement.docx', exportFilename: 'Section A - Form of Agreement.docx' },
-  { id: 'sectionD', title: 'Section D — Statement of Work', docxUrl: '/itt-templates/section-d-scope-of-work.docx', exportFilename: 'Section D - Statement of Work.docx' },
-  { id: 'sectionB1', title: 'Section B1 — General Conditions of Contract', kind: 'b1-chooser' },
-  { id: 'sectionB2', title: 'Section B2 — Special Conditions of Contract', docxUrl: '/itt-templates/section-b2-special-conditions.docx', exportFilename: 'Section B2 - Special Conditions.docx', optional: true },
-  { id: 'sectionC', title: 'Section C — QHSSE Requirements', docxUrl: '/itt-templates/section-c-qhsse.docx', exportFilename: 'Section C - QHSSE Requirements.docx' },
-  { id: 'sectionE', title: 'Section E — Schedule of Prices', docxUrl: '/itt-templates/section-e-schedule-of-prices.docx', exportFilename: 'Section E - Schedule of Prices.docx' },
-  { id: 'sectionF', title: 'Section F — Execution Methodology', docxUrl: '/itt-templates/section-f-execution-methodology.docx', exportFilename: 'Section F - Execution Methodology.docx' },
-  { id: 'sectionH', title: 'Section H — ICV Requirements', docxUrl: '/itt-templates/section-h-icv-requirements.docx', exportFilename: 'Section H - ICV Requirements.docx', attachmentUrl: '/itt-templates/section-h-appendix-tenderplan.xlsx', attachmentLabel: 'Appendix A — Tender Plan (reference)' },
-  { id: 'sectionJ', title: 'Section J — JSRS Requirements', docxUrl: '/itt-templates/section-j-jsrs-requirements.docx', exportFilename: 'Section J - JSRS Requirements.docx' },
-  { id: 'sectionK', title: 'Section K — OPAL Requirements', docxUrl: '/itt-templates/section-k-opal-requirements.docx', exportFilename: 'Section K - OPAL Requirements.docx' },
-  { id: 'sectionL', title: 'Section L — Minimum Salaries', docxUrl: '/itt-templates/section-l-minimum-salaries.docx', exportFilename: 'Section L - Minimum Salaries.docx' },
-  { id: 'sectionG', title: 'Section G — Administration Instructions', docxUrl: '/itt-templates/section-g-admin-instructions.docx', exportFilename: 'Section G - Administration Instructions.docx' },
-]
 
 // Who fills which ITT section. Contract Holder owns the SOW & methodology; HSE
 // owns QHSSE; ICV owns the ICV requirements; the Contract Engineer owns the
@@ -54,15 +38,6 @@ const OWNER_COLOR = { pof: '#1B4F8A', contract_holder: '#0891B2', hse: '#0EA5E9'
 // Sections whose owner may attach a finalised document alongside filling the
 // template fields — Section B1 (General Conditions) and Section H (ICV).
 const SECTION_UPLOAD_LABELS = { sectionB1: 'General Conditions of Contract', sectionH: 'ICV Requirements' }
-
-function resolveFlow(b1Category) {
-  return SECTION_FLOW.map(s => {
-    if (s.kind !== 'b1-chooser') return s
-    if (!b1Category) return s
-    const cat = B1_CATEGORY_MAP[b1Category]
-    return { id: s.id, title: s.title, docxUrl: cat.docxUrl, exportFilename: cat.exportFilename, isStandIn: cat.isStandIn, nearestTier: cat.nearestTier }
-  })
-}
 
 // steps moved inside component to use t()
 
