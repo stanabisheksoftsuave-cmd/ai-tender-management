@@ -4,10 +4,10 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
-import { bidders as seedBidders, contractTemplates } from '../data/mockData'
+import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
-import { useDismissable, useBackHandler } from '../context/NavigationContext'
+import { useBackHandler } from '../context/NavigationContext'
 import { openHtmlDoc, rejectionLetterDoc } from '../utils/docGen'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
@@ -16,20 +16,17 @@ const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
     strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
     style={style} className={className}>{children}</svg>
 )
-const FileSignature = p => <Svg {...p}><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L18 5.5"/><path d="M18 14v4h4"/><path d="m21.5 12.5-5 5"/></Svg>
 const Bot           = p => <Svg {...p}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></Svg>
 const Star          = p => <Svg {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Svg>
 const CheckCircle   = p => <Svg {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Svg>
 const Eye           = p => <Svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Svg>
 const Send          = p => <Svg {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Svg>
 const ChevronRight  = p => <Svg {...p}><polyline points="9 18 15 12 9 6"/></Svg>
-const Tag           = p => <Svg {...p}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></Svg>
 const Globe         = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Svg>
 const BarChart3     = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></Svg>
 const Award         = p => <Svg {...p}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></Svg>
 const ShieldOff     = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></Svg>
 const FileText      = p => <Svg {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></Svg>
-const Scale         = p => <Svg {...p}><line x1="12" y1="3" x2="12" y2="21"/><path d="M3 6l9 6 9-6"/><path d="M3 18h18"/></Svg>
 
 // ── Stage breadcrumb ──────────────────────────────────────────────────────────
 const flowStages = [
@@ -45,6 +42,24 @@ const flowStages = [
 // Simple average of the technical and commercial results, out of 100.
 const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
 
+// The ITT sections a contract can be drafted against — mirrors the ITT creation
+// section flow, offered here as a reference dropdown.
+const ITT_SECTIONS = [
+  'Section 1 — Instructions to Tenderers',
+  'Section A — Form of Agreement',
+  'Section D — Statement of Work',
+  'Section B1 — General Conditions of Contract',
+  'Section B2 — Special Conditions of Contract',
+  'Section C — QHSSE Requirements',
+  'Section E — Schedule of Prices',
+  'Section F — Execution Methodology',
+  'Section H — ICV Requirements',
+  'Section J — JSRS Requirements',
+  'Section K — OPAL Requirements',
+  'Section L — Minimum Salaries',
+  'Section G — Administration Instructions',
+]
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ContractTemplate() {
   const { tenderId } = useParams()
@@ -53,15 +68,20 @@ export default function ContractTemplate() {
   const { tenders, updateTender }  = useTenders()
   const tender       = tenders.find(t => t.id === tenderId)
 
-  const [selected,    setSelected]    = useState(null)
-  const [preview,     setPreview]     = useState(null)
   const [sent,        setSent]        = useState(false)
   const [sentLetters, setSentLetters] = useState(false)
+  const [ittSection,  setIttSection]  = useState('')
+  const [reviewOpen,  setReviewOpen]  = useState(false)
+  const [ittApproved, setIttApproved] = useState(false)
 
-  useDismissable(!!preview, () => setPreview(null))
+  // The Contract Engineer is the only role on this page (role-gated below), so
+  // the ITT template review & approval is theirs by definition.
+  const approver     = user?.name || 'Contract Engineer'
+  const approverRole = user?.role?.label || 'Contract Engineer'
+  const approvedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
   useBackHandler(() => {
-    if (selected && !sent) { setSelected(null); return true }
+    if (reviewOpen) { setReviewOpen(false); return true }
     return false
   })
 
@@ -107,8 +127,15 @@ export default function ContractTemplate() {
     ? tenderBidders.find(b => b.id === tender.mgmtWinnerId) ?? [...tenderBidders].sort((a, b) => combined(b) - combined(a))[0]
     : [...tenderBidders].sort((a, b) => combined(b) - combined(a))[0]
 
-  // All bidders ranked (for the scores overview)
+  // All bidders ranked (for the overview)
   const ranked = [...tenderBidders].sort((a, b) => combined(b) - combined(a))
+
+  // Commercial hands over a recommendation (a bidder), not a score. Use the
+  // recorded recommendation; fall back to the strongest commercial bidder for
+  // seeded tenders that predate it.
+  const commRec = tender.commercialRecommendation
+  const commRecId = commRec?.bidderId
+    ?? [...tenderBidders].sort((a, b) => (b.commScore ?? 0) - (a.commScore ?? 0))[0]?.id ?? null
 
   // Unsuccessful bidders — everyone except the awarded party — get a regret letter.
   const failedBidders = ranked.filter(b => awardedBidder && b.id !== awardedBidder.id)
@@ -136,7 +163,7 @@ export default function ContractTemplate() {
             <p className="text-xs text-slate-500 mt-0.5">{tender.department} · Deadline: {tender.deadline} · {tender.budget}</p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 shrink-0">
-            <Bot size={13} /> {contractTemplates.length} AI contract templates available
+            <Bot size={13} /> AI contract drafting from the ITT
           </div>
         </div>
       </Card>
@@ -172,15 +199,14 @@ export default function ContractTemplate() {
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">Bidder</th>
                 <th className="text-center px-3 py-3 font-semibold text-blue-500">Technical<br/><span className="font-normal text-slate-400">/100</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-violet-500">Commercial<br/><span className="font-normal text-slate-400">/100</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-slate-600">Combined<br/><span className="font-normal text-slate-400">avg</span></th>
+                <th className="text-center px-3 py-3 font-semibold text-violet-500">Commercial<br/><span className="font-normal text-slate-400">recommendation</span></th>
                 <th className="text-center px-3 py-3 font-semibold text-slate-600">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {ranked.map((b, i) => {
-                const comb       = combined(b)
+              {ranked.map((b) => {
                 const isAwarded  = b.id === awardedBidder?.id
+                const isCommRec  = b.id === commRecId
                 return (
                   <tr key={b.id} className={isAwarded ? 'bg-[var(--color-primary)]/5' : 'hover:bg-slate-50/40'}>
                     <td className="px-4 py-3">
@@ -196,9 +222,10 @@ export default function ContractTemplate() {
                       </div>
                     </td>
                     <td className="px-3 py-3 text-center font-semibold text-blue-600">{b.techScore ?? 75}</td>
-                    <td className="px-3 py-3 text-center font-semibold text-violet-600">{b.commScore ?? 70}</td>
                     <td className="px-3 py-3 text-center">
-                      <span className={`font-bold ${comb >= 80 ? 'text-emerald-600' : comb >= 65 ? 'text-amber-600' : 'text-red-500'}`}>{comb}</span>
+                      {isCommRec
+                        ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">Recommended</span>
+                        : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="px-3 py-3 text-center">
                       {isAwarded
@@ -244,82 +271,71 @@ export default function ContractTemplate() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Combined Score',   value: `${combined(awardedBidder)}/100`, icon: Award,    cls: 'text-[var(--color-primary)] bg-[var(--color-primary)]/10' },
-              { label: 'Technical Score',  value: `${awardedBidder.techScore ?? 75}/100`, icon: Scale,    cls: 'text-blue-600 bg-blue-50' },
-              { label: 'Commercial Score', value: `${awardedBidder.commScore ?? 70}/100`, icon: BarChart3, cls: 'text-violet-600 bg-violet-50' },
-            ].map(s => (
-              <div key={s.label} className={`rounded-xl p-3 ${s.cls.split(' ')[1]}`}>
-                <s.icon size={14} className={`${s.cls.split(' ')[0]} mb-1.5`} />
-                <p className={`text-lg font-bold ${s.cls.split(' ')[0]}`}>{s.value}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">{s.label}</p>
-              </div>
-            ))}
+          {/* ── ITT section reference ── */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <label className="text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <FileText size={13} className="text-[var(--color-primary)]" /> ITT Section
+            </label>
+            <select
+              value={ittSection}
+              onChange={e => setIttSection(e.target.value)}
+              className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+            >
+              <option value="">Select an ITT section to draft against…</option>
+              {ITT_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <p className="text-[11px] text-slate-500 mt-2">
+              {ittSection
+                ? <>The contract will be drafted with reference to <strong className="text-slate-700">{ittSection}</strong> from the ITT.</>
+                : 'Choose the ITT section this contract should be drafted against.'}
+            </p>
           </div>
         </Card>
       )}
 
-      {/* ── Template selection ── */}
+      {/* ── ITT template review & approval (Contract Engineer only) ── */}
       {awardedBidder && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <FileSignature size={16} className="text-[var(--color-primary)]" />
-            <h3 className="font-semibold text-slate-800 text-sm">
-              Select Contract Template for {awardedBidder.name}
-            </h3>
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <FileText size={16} className="text-[var(--color-primary)]" />
+            <h3 className="font-semibold text-slate-800 text-sm">ITT Template — Review &amp; Approve</h3>
+            {ittApproved
+              ? <Badge variant="success"><CheckCircle size={10} /> Approved</Badge>
+              : <Badge variant="non_compliant">Pending review</Badge>}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {contractTemplates.map(t => (
-              <Card
-                key={t.id}
-                className={`overflow-hidden cursor-pointer transition-all hover:shadow-md ${selected === t.id ? 'ring-2 ring-[var(--color-primary)]' : ''}`}
-                onClick={() => setSelected(t.id)}>
-                {t.recommended && (
-                  <div className="flex items-center gap-1.5 px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-medium">
-                    <Star size={11} /> AI Recommended
-                  </div>
-                )}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="p-2.5 rounded-xl bg-[var(--color-primary)]/10">
-                      <FileSignature size={18} className="text-[var(--color-primary)]" />
-                    </div>
-                    {selected === t.id && (
-                      <div className="w-5 h-5 rounded-full bg-[var(--color-primary)] flex items-center justify-center">
-                        <CheckCircle size={12} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-slate-800 text-sm mb-1">{t.name}</h3>
-                  <p className="text-xs text-slate-400 mb-3">{t.pages} pages · {t.type}</p>
-                  <p className="text-xs text-slate-600 leading-relaxed mb-4">{t.description}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {t.tags.map(tag => (
-                      <span key={tag} className="flex items-center gap-1 text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                        <Tag size={8} /> {tag}
-                      </span>
-                    ))}
-                  </div>
+          <p className="text-xs text-slate-500 mb-4">
+            The <strong>Contract Engineer</strong> reviews the ITT template{ittSection ? <> ({ittSection})</> : ''} and approves it before the contract is drafted.
+          </p>
+
+          {ittApproved ? (
+            <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-emerald-800">ITT template reviewed &amp; approved</p>
+                  <p className="text-[11px] text-emerald-700">By {approver} · {approverRole} · {approvedDate}</p>
                 </div>
-                <div className="px-4 pb-4 flex gap-2">
-                  <Button variant="secondary" size="sm" className="flex-1 justify-center"
-                    onClick={e => { e.stopPropagation(); setPreview(t) }}>
-                    <Eye size={12} /> Preview
-                  </Button>
-                  <Button variant={selected === t.id ? 'primary' : 'ghost'} size="sm" className="flex-1 justify-center"
-                    onClick={e => { e.stopPropagation(); setSelected(t.id) }}>
-                    {selected === t.id ? 'Selected' : 'Select'}
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => setIttApproved(false)}>
+                Re-open review
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="secondary" size="sm" onClick={() => setReviewOpen(true)}>
+                <Eye size={13} /> Review Template
+              </Button>
+              <Button size="sm" onClick={() => setIttApproved(true)}>
+                <CheckCircle size={13} /> Approve ITT Template
+              </Button>
+              <span className="text-[11px] text-slate-400">Approval unlocks contract drafting.</span>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* ── AI Drafting ── */}
-      {selected && awardedBidder && (
+      {awardedBidder && (
         <Card className="p-4">
           <div className="flex items-start gap-4">
             <div className="p-2.5 rounded-xl bg-blue-50 shrink-0">
@@ -330,14 +346,21 @@ export default function ContractTemplate() {
                 Draft Contract for {awardedBidder.name}
               </h3>
               <p className="text-xs text-slate-500 mb-3">
-                Template <strong>{contractTemplates.find(t => t.id === selected)?.name}</strong> will be
-                populated with tender scope, {awardedBidder.name}'s agreed terms
+                The contract will be drafted from {ittSection ? <strong>{ittSection}</strong> : 'the ITT'} and
+                populated with the tender scope, {awardedBidder.name}'s agreed terms
                 {awardedBidder.totalBid ? ` (${awardedBidder.totalBid})` : ''}, and all legal clauses.
               </p>
               {!sent ? (
-                <Button onClick={() => setSent(true)}>
-                  <Send size={14} /> Draft Contract with AI <ChevronRight size={14} />
-                </Button>
+                <>
+                  <Button disabled={!ittApproved} onClick={() => setSent(true)}>
+                    <Send size={14} /> Draft Contract with AI <ChevronRight size={14} />
+                  </Button>
+                  {!ittApproved && (
+                    <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                      <CheckCircle size={11} /> Review &amp; approve the ITT template above to enable drafting.
+                    </p>
+                  )}
+                </>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">
@@ -375,7 +398,7 @@ export default function ContractTemplate() {
                   <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 font-bold text-sm flex items-center justify-center shrink-0">{b.name?.[0]}</div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">{b.name}</p>
-                    <p className="text-[11px] text-slate-400">Combined score {combined(b)}/100 · Not selected</p>
+                    <p className="text-[11px] text-slate-400">Technical {b.techScore ?? 75}/100 · Not selected</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -404,20 +427,20 @@ export default function ContractTemplate() {
         </Card>
       )}
 
-      {/* ── Preview Modal ── */}
-      {preview && (
+      {/* ── ITT Template Review Modal ── */}
+      {reviewOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
-          onClick={() => setPreview(null)}>
+          onClick={() => setReviewOpen(false)}>
           <Card className="w-full max-w-2xl max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <div>
-                <h3 className="font-semibold text-slate-800">{preview.name}</h3>
-                <p className="text-xs text-slate-400">{preview.pages} pages · {preview.type}</p>
+                <h3 className="font-semibold text-slate-800">ITT Template Review</h3>
+                <p className="text-xs text-slate-400">{ittSection || 'Full ITT'} · {tender.id}</p>
               </div>
-              <button onClick={() => setPreview(null)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
+              <button onClick={() => setReviewOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
             </div>
             <div className="p-5 space-y-4">
-              {['1. Parties & Recitals','2. Statement of Work','3. Contract Price & Payment','4. Delivery & Milestones','5. Warranties & SLA','6. Liability & Indemnity','7. Dispute Resolution','8. Governing Law'].map(section => (
+              {['1. Instructions to Tenderers','2. Form of Agreement','3. Statement of Work','4. Conditions of Contract','5. QHSSE Requirements','6. Schedule of Prices','7. Execution Methodology','8. Administration Instructions'].map(section => (
                 <div key={section}>
                   <h4 className="text-xs font-semibold text-slate-700 mb-1">{section}</h4>
                   <div className="h-2 bg-slate-100 rounded mb-1 w-4/5" />
@@ -426,8 +449,14 @@ export default function ContractTemplate() {
                 </div>
               ))}
               <p className="text-xs text-slate-400 italic text-center">
-                AI will populate all sections with {awardedBidder?.name}'s tender data
+                Read-only preview of the ITT template for the Contract Engineer's review.
               </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-100">
+              <Button variant="secondary" size="sm" onClick={() => setReviewOpen(false)}>Close</Button>
+              <Button size="sm" onClick={() => { setIttApproved(true); setReviewOpen(false) }}>
+                <CheckCircle size={13} /> Approve ITT Template
+              </Button>
             </div>
           </Card>
         </div>

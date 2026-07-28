@@ -39,6 +39,7 @@ const ScanSearch     = p => <Svg {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path 
 const Download       = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
 const Clock          = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
 const Upload         = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
+const Save           = p => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Svg>
 
 // ── Evaluation Metric Definitions ────────────────────────────────────────────
 
@@ -275,6 +276,14 @@ export default function TechnicalEvaluation() {
   // In-UI justification modal: { kind: 'score' | 'fail', ...context }
   const [rationaleModal, setRationaleModal] = useState(null)
   const eligibleBiddersRef            = useRef([])
+  // ── Interim re-upload (post-scoring) ──
+  // Bidders that FAIL the technical scoring can re-upload a corrected document
+  // in-page; while any failure is awaiting re-upload the tender sits in the
+  // "Interim" stage. Re-upload re-runs the evaluation for that bidder.
+  const [interimUploads, setInterimUploads] = useState({}) // { [bidderId]: { name, size } }
+  const [interimReEval,  setInterimReEval]  = useState({}) // { [bidderId]: { step, done } }
+  const [draftSaved,     setDraftSaved]     = useState(false) // interim "Save as Draft" feedback
+  const interimStageRef  = useRef(null)                    // desired tender.stage this render
 
   const AI_STEPS = [
     'Parsing bidder submission bundles…',
@@ -459,6 +468,17 @@ export default function TechnicalEvaluation() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiScoring, aiScoreStep])
+
+  // Keep the tender's stage label in sync with the interim state. The desired
+  // stage is computed during render (once the scoring helpers exist) and stashed
+  // on a ref; this commit-time effect writes it through. Runs every commit but
+  // only writes when the label actually changes, so it never loops.
+  useEffect(() => {
+    const desired = interimStageRef.current
+    if (!desired || !tender || submitted) return
+    if (tender.status !== 'tech_eval' && tender.status !== 'parallel_eval') return
+    if (tender.stage !== desired) updateTender(tenderId, { stage: desired })
+  })
 
   // ── Role gate — technical evaluation is owned by the Contract Holder ──
   if (user?.role?.id !== 'contract_holder') {
@@ -716,6 +736,28 @@ export default function TechnicalEvaluation() {
   const techPassFail = bidderId =>
     mustFailures(bidderId).length === 0 && techTotalFor(bidderId) >= overallPass ? 'PASS' : 'FAIL'
 
+  // ── Interim (post-scoring re-upload) derivations ──
+  // Fully-scored eligible bidders whose result is FAIL — these are offered a
+  // document re-upload (same as the PQQ failed process).
+  const scoredFailedIds = eligibleBidders
+    .filter(b => techFullyScored(b.id) && techPassFail(b.id) === 'FAIL')
+    .map(b => b.id)
+  // Bidders whose corrected document is being re-marked right now (scores cleared
+  // while the AI re-assesses, so they aren't "fully scored" during this window).
+  const reEvaluatingIds = Object.keys(interimReEval)
+    .filter(id => interimReEval[id] && !interimReEval[id].done)
+    .map(Number)
+  // Everyone still in the interim loop: failing, or being re-evaluated.
+  const interimBidderIds = [...new Set([...scoredFailedIds, ...reEvaluatingIds])]
+  // Re-uploaded and now passing — the resolved (green) list.
+  const resolvedInterimIds = Object.keys(interimReEval)
+    .filter(id => interimReEval[id]?.done && !scoredFailedIds.includes(Number(id)))
+    .map(Number)
+  const inInterim = interimBidderIds.length > 0
+  const defaultStage = tender.evaluationMode === 'parallel' ? 'Parallel Evaluation' : 'Technical Evaluation'
+  // Stash the stage the tender should show; the commit-time effect writes it.
+  interimStageRef.current = inInterim ? 'Interim' : defaultStage
+
   const handleNotifyPOF = (bidder) => {
     if (notifications.some(n => n.bidder.id === bidder.id)) return
     const now = new Date()
@@ -754,6 +796,65 @@ export default function TechnicalEvaluation() {
       }
     }
     setTimeout(advance, 700)
+  }
+
+  // A failed bidder re-uploads their corrected document in-page. Same as the PQQ
+  // failed process: the bidder is sent back for a fresh submission and the AI
+  // re-marks it — usually clearing the bar, but a genuine re-assessment, so a
+  // bidder can still fall short and be sent for another re-upload.
+  const handleInterimUpload = (bidderId, file) => {
+    if (!file) return
+    setInterimUploads(prev => ({ ...prev, [bidderId]: { name: file.name, size: file.size } }))
+    startInterimReEval(bidderId)
+  }
+
+  // Save the evaluation as a draft — useful in the Interim stage, where Submit is
+  // blocked until re-uploads are re-evaluated. Persists the current scores and
+  // keeps the tender in the evaluator's queue (stage stays Interim while pending).
+  const saveDraft = () => {
+    updateTender(tenderId, {
+      evalProgress: 'in_progress',
+      techEvalDraft: { scores: techScores, savedAt: new Date().toISOString() },
+    })
+    setDraftSaved(true)
+    setTimeout(() => setDraftSaved(false), 2500)
+  }
+
+  const startInterimReEval = (bidderId) => {
+    // Send the bidder back for a fresh submission (PQQ-style) — clear the current
+    // scores so the matrix shows them being re-assessed…
+    setTechScores(prev => {
+      const next = { ...prev }
+      techCriteria.forEach(c => { delete next[`${bidderId}-${c.id}`] })
+      return next
+    })
+    setInterimReEval(prev => ({ ...prev, [bidderId]: { step: 0, done: false } }))
+    let step = 0
+    const advance = () => {
+      step++
+      if (step < RE_EVAL_STEPS.length) {
+        setInterimReEval(prev => ({ ...prev, [bidderId]: { step, done: false } }))
+        setTimeout(advance, 650)
+      } else {
+        // …then re-run AI marking on the corrected submission. Corrected docs
+        // usually clear the bar, but the AI genuinely re-assesses, so ~15% of the
+        // time a Must still falls below its minimum and the bidder stays failed.
+        setTechScores(prev => {
+          const next = { ...prev }
+          const musts = techCriteria.filter(c => c.type === 'Must' && c.minScore != null)
+          const stillFails = musts.length > 0 && Math.random() < 0.15
+          const dipId = stillFails ? musts[Math.floor(Math.random() * musts.length)].id : null
+          techCriteria.forEach(c => {
+            next[`${bidderId}-${c.id}`] = c.id === dipId
+              ? Math.max(0, (c.minScore ?? 1) - 1)
+              : (Math.random() < 0.7 ? 3 : 2)
+          })
+          return next
+        })
+        setInterimReEval(prev => ({ ...prev, [bidderId]: { step: RE_EVAL_STEPS.length - 1, done: true } }))
+      }
+    }
+    setTimeout(advance, 650)
   }
 
   const openBidderDocument = (bidder) => {
@@ -1764,6 +1865,82 @@ export default function TechnicalEvaluation() {
           </div>
         </Card>
 
+        {/* ── Interim — failed bidders re-upload documents, then re-evaluate ── */}
+        {!submitted && (interimBidderIds.length > 0 || resolvedInterimIds.length > 0) && (
+          <Card className="p-4 border border-amber-200">
+            <div className="flex items-center gap-2 flex-wrap">
+              <AlertTriangle size={15} className="text-amber-500 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-800">Interim — Document Re-upload</h3>
+              {interimBidderIds.length > 0 && (
+                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Interim</span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              {interimBidderIds.length > 0
+                ? <>Bidders below did not pass the technical evaluation. Re-upload their corrected document to re-run the AI assessment — the same as the pre-qualification failed process. The tender stays in the <strong>Interim</strong> stage until every re-upload has been re-evaluated.</>
+                : <>All re-uploaded documents have been re-evaluated. The tender has returned to <strong>{defaultStage}</strong>.</>}
+            </p>
+
+            <div className="mt-3 space-y-2">
+              {/* Bidders currently failing → awaiting re-upload, or being re-evaluated */}
+              {interimBidderIds.map(id => {
+                const b = eligibleBidders.find(x => x.id === id)
+                const re = interimReEval[id]
+                const up = interimUploads[id]
+                const reEvaluating = re && !re.done
+                const stillFailed = re?.done // done but still failing → re-assessed short
+                return (
+                  <div key={id} className="flex items-center justify-between gap-4 rounded-lg border border-amber-100 bg-amber-50/50 px-4 py-2.5 flex-wrap">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center shrink-0">{b?.name?.[0]}</div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{b?.name}</p>
+                        <p className={`text-[11px] truncate ${reEvaluating ? 'text-[var(--color-primary)]' : 'text-red-500'}`}>
+                          {reEvaluating ? 'Re-evaluating corrected submission…'
+                            : stillFailed ? 'Re-evaluated — still below pass. Re-upload again.'
+                            : 'Failed — awaiting re-upload'}
+                          {up && !reEvaluating ? ` · ${up.name}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    {reEvaluating ? (
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--color-primary)] shrink-0">
+                        <RotateCcw size={13} className="animate-spin" /> {RE_EVAL_STEPS[re.step]}
+                      </span>
+                    ) : (
+                      <label className="flex items-center gap-1.5 text-xs font-medium border border-dashed border-amber-300 rounded-lg px-3 py-2 cursor-pointer hover:border-[var(--color-primary)] transition-colors text-slate-600 shrink-0">
+                        <Upload size={13} className="text-amber-500" />
+                        {up ? 'Re-upload again' : 'Re-upload document'}
+                        <input type="file" className="hidden" onChange={e => handleInterimUpload(id, e.target.files?.[0])} />
+                      </label>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Bidders that re-uploaded and passed on re-evaluation */}
+              {resolvedInterimIds.map(id => {
+                const b = eligibleBidders.find(x => x.id === id)
+                if (!b) return null
+                return (
+                  <div key={`res-${id}`} className="flex items-center justify-between gap-4 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 flex-wrap">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0">{b.name?.[0]}</div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{b.name}</p>
+                        <p className="text-[11px] text-emerald-600 truncate">Re-evaluated{interimUploads[id] ? ` · ${interimUploads[id].name}` : ''}</p>
+                      </div>
+                    </div>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
+                      <CheckCircle size={11} /> Passed after re-upload
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )}
+
         {/* Submit / Export */}
         {!submitted ? (
           <Card className="p-4">
@@ -1771,17 +1948,34 @@ export default function TechnicalEvaluation() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Finalise Technical Evaluation</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {allTechScored
-                    ? 'All criteria scored. Submit to generate the evaluation report.'
-                    : `Score all ${eligibleBidders.length} eligible bidder${eligibleBidders.length !== 1 ? 's' : ''} across all ${techCriteria.length} criteria.`}
+                  {!allTechScored && interimBidderIds.length === 0
+                    ? `Score all ${eligibleBidders.length} eligible bidder${eligibleBidders.length !== 1 ? 's' : ''} across all ${techCriteria.length} criteria.`
+                    : interimBidderIds.length > 0
+                    ? `Interim: ${interimBidderIds.length} bidder${interimBidderIds.length !== 1 ? 's' : ''} must re-upload and be re-evaluated before you can submit.`
+                    : 'All criteria scored. Submit to generate the evaluation report.'}
                 </p>
               </div>
-              <Button size="sm" disabled={!allTechScored}
-                onClick={() => { advanceTender(tenderId); setSubmitted(true) }}>
-                <Send size={13} /> Submit & Export Report
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {draftSaved && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                    <CheckCircle size={12} /> Draft saved
+                  </span>
+                )}
+                <Button size="sm" variant="secondary" onClick={saveDraft}>
+                  <Save size={13} /> Save as Draft
+                </Button>
+                <Button size="sm" disabled={!allTechScored || interimBidderIds.length > 0}
+                  onClick={() => { advanceTender(tenderId); setSubmitted(true) }}>
+                  <Send size={13} /> Submit & Export Report
+                </Button>
+              </div>
             </div>
-            {!allTechScored && (
+            {interimBidderIds.length > 0 ? (
+              <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertTriangle size={12} />
+                Tender is in the <strong className="mx-1">Interim</strong> stage — resolve the {interimBidderIds.length} re-upload{interimBidderIds.length !== 1 ? 's' : ''} above before submitting.
+              </div>
+            ) : !allTechScored && (
               <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <AlertTriangle size={12} />
                 Score all {eligibleBidders.length} eligible bidder{eligibleBidders.length !== 1 ? 's' : ''} across all {techCriteria.length} criteria before submitting.

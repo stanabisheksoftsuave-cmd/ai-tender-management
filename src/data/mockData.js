@@ -317,6 +317,46 @@ export const bidders = [
   { id: 4, name: 'DataVault Solutions', country: 'Saudi Arabia', techScore: 72, commScore: 78, totalBid: 'OMR 712,000',  recommended: false },
 ]
 
+// ── Commercial Evaluation (Competitive – simple) ───────────────────────────
+// Line-item Company Estimate (Bill of Quantities), modelled on the client's
+// "Commercial Evaluation – Example 2 (Competitive – simple)" workbook: a priced
+// schedule split into Material & Services. `estUnit` is the base unit rate; the
+// estimate applies a 6% market increase on top. The evaluator compares each
+// bidder's submitted unit rates against this estimate.
+export const COMMERCIAL_MARKET_INCREASE = 0.06
+export const commercialEstimate = [
+  { id: 'm1',  section: 'Material', no: 1,  description: 'Rospa poster — photo-quality design & print', size: '50×76 cm',   uom: 'Pc',  qty: 15,   estUnit: 18.0 },
+  { id: 'm2',  section: 'Material', no: 2,  description: 'Roll-up stand — design & print',               size: '200×80 cm',  uom: 'Pc',  qty: 10,   estUnit: 35.0 },
+  { id: 'm3',  section: 'Material', no: 3,  description: 'Banner — design & print with eyelets',         size: '250×100 cm', uom: 'Pc',  qty: 100,  estUnit: 25.0 },
+  { id: 'm4',  section: 'Material', no: 4,  description: 'Helmet sticker — 4-colour, weatherproof',      size: '5×5 cm',     uom: 'Set', qty: 2000, estUnit: 0.5  },
+  { id: 'm5',  section: 'Material', no: 5,  description: 'Hand book — 200gsm, 4-colour, 14 pages',       size: '29×21 cm',   uom: 'Pc',  qty: 500,  estUnit: 0.5  },
+  { id: 'm6',  section: 'Material', no: 6,  description: 'Newsletter — design & 4-colour print',         size: 'A4',         uom: 'Pc',  qty: 103,  estUnit: 1.0  },
+  { id: 'm7',  section: 'Material', no: 7,  description: 'Site safety board with wooden frame',          size: '200×150 cm', uom: 'Pc',  qty: 30,   estUnit: 40.0 },
+  { id: 'm8',  section: 'Material', no: 8,  description: 'Lifesaving rule cards — PVC, both sides',      size: 'ID card',    uom: 'Pc',  qty: 6000, estUnit: 0.9  },
+  { id: 'm9',  section: 'Material', no: 9,  description: 'Reflective jacket — good quality with label',  size: 'Assorted',   uom: 'Pc',  qty: 150,  estUnit: 2.5  },
+  { id: 'm10', section: 'Material', no: 10, description: 'HSE sign boards',                              size: '115×90 cm',  uom: 'Pc',  qty: 100,  estUnit: 30.0 },
+  { id: 's1',  section: 'Services', no: 11, description: 'Exhibition stall installation & decoration',   size: 'Per m²',     uom: 'm²',  qty: 30,   estUnit: 25.0 },
+  { id: 's2',  section: 'Services', no: 12, description: 'Video documentary production + editing',       size: '10–15 min',  uom: 'No',  qty: 6,    estUnit: 400.0 },
+  { id: 's3',  section: 'Services', no: 13, description: 'Event photography',                            size: 'Per visit',  uom: 'hour', qty: 25,   estUnit: 40.0 },
+]
+
+// Each bidder's overall pricing posture vs the estimate. Per-item rates are
+// derived from this factor with a small deterministic per-item variation, so
+// bidders land at different grand totals (the lowest compliant one is
+// recommended). Bidder 2 is the keenest among the first three; bidder 4 the
+// keenest of all four.
+export const commercialBidFactors = { 1: 1.03, 2: 0.91, 3: 1.10, 4: 0.86 }
+
+// Mandatory commercial documents each bidder must submit — the compliance gate
+// that precedes the price comparison.
+export const commercialComplianceDocs = [
+  { id: 'cd1', name: 'Priced Schedule of Prices (Section E)', mandatory: true },
+  { id: 'cd2', name: 'Tender Guarantee / Bid Bond',           mandatory: true },
+  { id: 'cd3', name: 'Commercial Terms & Conditions Acceptance', mandatory: true },
+  { id: 'cd4', name: 'Price Validity Confirmation (120 days)', mandatory: true },
+  { id: 'cd5', name: 'Completed & Signed Form of Tender',      mandatory: true },
+]
+
 // ── Pre-Qualification: ERP bidder master registry ──────────────────────────
 // Shaped after the real "Supplier Registration Template - Tendering Phase" —
 // this stands in for the client's ERP bidder database that Stage 1 filters
