@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
+import ErrorBoundary from '../components/ErrorBoundary'
+import SectionFillStep from '../components/itt/SectionFillStep'
+import B2ClassEditor from '../components/itt/B2ClassEditor'
+import { resolveFlow } from '../components/itt/sectionFlow'
 import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useHomePath } from '../utils/permissions'
@@ -43,24 +48,13 @@ const flowStages = [
 // Simple average of the technical and commercial results, out of 100.
 const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
 
-// The ITT sections a contract can be drafted against — mirrors the ITT creation
-// section flow, offered here as a reference dropdown. Section 1 (Instructions to
-// Tenderers) is not listed: it governs how tenderers submit their bids, not the
-// contract that follows.
-const ITT_SECTIONS = [
-  'Section A — Form of Agreement',
-  'Section D — Statement of Work',
-  'Section B1 — General Conditions of Contract',
-  'Section B2 — Special Conditions of Contract',
-  'Section C — QHSSE Requirements',
-  'Section E — Schedule of Prices',
-  'Section F — Execution Methodology',
-  'Section H — ICV Requirements',
-  'Section J — JSRS Requirements',
-  'Section K — OPAL Requirements',
-  'Section L — Minimum Salaries',
-  'Section G — Administration Instructions',
-]
+// The ITT sections a contract can be drafted against — the very same section
+// templates the ITT was filled in against, so "Review Template" opens the real
+// document rather than a stand-in. Section 1 (Instructions to Tenderers) is not
+// listed: it governs how tenderers submit their bids, not the contract that
+// follows.
+const contractSections = (b1Category) =>
+  resolveFlow(b1Category).filter(s => s.id !== 'section1')
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ContractTemplate() {
@@ -73,11 +67,17 @@ export default function ContractTemplate() {
 
   const [sent,        setSent]        = useState(false)
   const [sentLetters, setSentLetters] = useState(false)
-  // Defaults to the first section in the list, so the page always has a drafting
-  // reference selected.
-  const [ittSection,  setIttSection]  = useState(ITT_SECTIONS[0])
+  // The section id being drafted against / reviewed. Defaults to the first in
+  // the list, so the page always has a drafting reference selected.
+  const [sectionId,   setSectionId]   = useState('sectionA')
   const [reviewOpen,  setReviewOpen]  = useState(false)
   const [ittApproved, setIttApproved] = useState(false)
+
+  // Resolved with the General Conditions tier chosen on this tender's ITT, so
+  // Section B1 points at the template that ITT actually used.
+  const sections = useMemo(() => contractSections(tender?.b1Category), [tender?.b1Category])
+  const section  = sections.find(s => s.id === sectionId) || sections[0]
+  const ittSection = section?.title || ''
 
   // The Contract Engineer is the only role on this page (role-gated below), so
   // the ITT template review & approval is theirs by definition.
@@ -145,6 +145,15 @@ export default function ContractTemplate() {
   // Unsuccessful bidders — everyone except the awarded party — get a regret letter.
   const failedBidders = ranked.filter(b => awardedBidder && b.id !== awardedBidder.id)
   const letterDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+  // The reviewed section is the ITT's own section, so an edit made here writes
+  // back to the same keys ITT creation uses — no separate copy of the answers.
+  const handleAnswersChange = (id, values) =>
+    updateTender(tender.id, { sectionAnswers: { ...(tender.sectionAnswers || {}), [id]: values } })
+  const handleProseChange = (id, edits) =>
+    updateTender(tender.id, { sectionProse: { ...(tender.sectionProse || {}), [id]: edits } })
+  const handleB2Change = (next) =>
+    updateTender(tender.id, { sectionB2Classes: next })
+
   const openRejectionLetter = (b) => {
     const d = rejectionLetterDoc({
       tenderId: tender.id, tenderTitle: tender.title, bidderName: b.name,
@@ -282,11 +291,11 @@ export default function ContractTemplate() {
               <FileText size={13} className="text-[var(--color-primary)]" /> ITT Section
             </label>
             <select
-              value={ittSection}
-              onChange={e => setIttSection(e.target.value)}
+              value={section?.id || ''}
+              onChange={e => setSectionId(e.target.value)}
               className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
             >
-              {ITT_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
             <p className="text-[11px] text-slate-500 mt-2">
               {ittSection
@@ -431,39 +440,84 @@ export default function ContractTemplate() {
         </Card>
       )}
 
-      {/* ── ITT Template Review Modal ── */}
-      {reviewOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      {/* ── ITT Template Review Modal ──
+           The selected section's real template, rendered by the same components
+           the ITT section route uses, so it behaves identically here: AI-filled
+           fields can be overwritten and any text — a field or the template's own
+           wording — can be selected and edited with AI.
+
+           Portalled to <body>: this page renders inside <main>, whose fade-in
+           animation gives it a stacking context. <main> is not positioned, so
+           everything inside it paints below the fixed header (z-50) and sidebar
+           (z-40) no matter what z-index the modal is given — it would sit under
+           the chrome with only the page area dimmed. On <body> it is a real
+           overlay, centred in the viewport and clipped by nothing. */}
+      {reviewOpen && section && createPortal(
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4"
           onClick={() => setReviewOpen(false)}>
-          <Card className="w-full max-w-2xl max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-semibold text-slate-800">ITT Template Review</h3>
-                <p className="text-xs text-slate-400">{ittSection || 'Full ITT'} · {tender.id}</p>
-              </div>
-              <button onClick={() => setReviewOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
-            </div>
-            <div className="p-5 space-y-4">
-              {['1. Instructions to Tenderers','2. Form of Agreement','3. Statement of Work','4. Conditions of Contract','5. QHSSE Requirements','6. Schedule of Prices','7. Execution Methodology','8. Administration Instructions'].map(section => (
-                <div key={section}>
-                  <h4 className="text-xs font-semibold text-slate-700 mb-1">{section}</h4>
-                  <div className="h-2 bg-slate-100 rounded mb-1 w-4/5" />
-                  <div className="h-2 bg-slate-100 rounded mb-1 w-3/5" />
-                  <div className="h-2 bg-slate-100 rounded w-2/3" />
+          {/* Scrolled internally, so the title and the approve buttons stay put
+              however long the template runs. */}
+          <div className="w-full max-w-4xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <Card className="flex flex-col min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100 shrink-0">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-slate-800">ITT Template Review</h3>
+                  <p className="text-xs text-slate-400 truncate">{ittSection} · {tender.id}</p>
                 </div>
-              ))}
-              <p className="text-xs text-slate-400 italic text-center">
-                Read-only preview of the ITT template for the Contract Engineer's review.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-100">
-              <Button variant="secondary" size="sm" onClick={() => setReviewOpen(false)}>Close</Button>
-              <Button size="sm" onClick={() => { setIttApproved(true); setReviewOpen(false) }}>
-                <CheckCircle size={13} /> Approve ITT Template
-              </Button>
-            </div>
-          </Card>
-        </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" onClick={() => { setIttApproved(true); setReviewOpen(false) }}>
+                    <CheckCircle size={13} /> Approve ITT Template
+                  </Button>
+                  <button onClick={() => setReviewOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-slate-50/60">
+                <ErrorBoundary>
+                  {section.kind === 'b1-chooser' ? (
+                    /* B1's template is whichever General Conditions tier the ITT
+                       picked — without that choice there is nothing to show. */
+                    <Card className="p-8 text-center">
+                      <FileText size={26} className="mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm font-medium text-slate-600">No General Conditions tier was selected on this ITT.</p>
+                      <p className="text-xs text-slate-400 mt-1">Section B1's template is chosen during ITT creation.</p>
+                    </Card>
+                  ) : section.id === 'sectionB2' ? (
+                    /* B2 is authored as clause classes → sub-classes rather than
+                       as template fields, exactly as in the ITT route. */
+                    <B2ClassEditor
+                      key={section.id}
+                      section={section}
+                      classes={tender.sectionB2Classes || []}
+                      onChange={handleB2Change}
+                      onNext={() => setReviewOpen(false)}
+                      onBack={() => setReviewOpen(false)}
+                    />
+                  ) : (
+                    <SectionFillStep
+                      key={section.id}
+                      section={section}
+                      answers={tender.sectionAnswers?.[section.id]}
+                      proseEdits={tender.sectionProse?.[section.id] || {}}
+                      onAnswersChange={handleAnswersChange}
+                      onProseChange={handleProseChange}
+                      onNext={() => setReviewOpen(false)}
+                      onBack={() => setReviewOpen(false)}
+                      isFirst={false}
+                      isLast={false}
+                      nextLabel="Save & Close"
+                      // Sized so the section card fits the panel without a second
+                      // scrollbar appearing outside the document itself.
+                      bodyMaxHeight="max(200px, calc(100vh - 32rem))"
+                    />
+                  )}
+                </ErrorBoundary>
+              </div>
+
+            </Card>
+          </div>
+        </div>,
+        document.body,
       )}
 
     </div>
