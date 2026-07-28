@@ -34,6 +34,9 @@ const ChevronDown   = p => <Svg {...p}><polyline points="6 9 12 15 18 9"/></Svg>
 const ChevronRight  = p => <Svg {...p}><polyline points="9 18 15 12 9 6"/></Svg>
 const RotateCcw     = p => <Svg {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></Svg>
 const Quote         = p => <Svg {...p}><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2H4c-1.25 0-2 .75-2 2v8c0 1.25.75 2 2 2h1"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2h-4c-1.25 0-2 .75-2 2v8c0 1.25.75 2 2 2h1"/></Svg>
+const Download      = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
+const Upload        = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
+const Paperclip     = p => <Svg {...p}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -52,6 +55,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation, useBackHandler } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
+import { openHtmlDoc, clarificationRequestDoc } from '../utils/docGen'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
 const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -364,6 +368,31 @@ export default function CommercialEvaluation() {
     return out
   }
   const setClar = (ref, changes) => setClarifications(prev => prev.map(c => c.ref === ref ? { ...c, ...changes } : c))
+
+  // There is no bidder-facing portal, so a clarification leaves the platform as
+  // an exported document and returns as an uploaded file.
+  const clarificationDate = () => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+  const exportClarification = (c) => {
+    const d = clarificationRequestDoc({
+      ref: c.ref, tenderId: tender?.id, tenderTitle: tender?.title, bidderName: c.bidderName,
+      department: tender?.department, subject: c.subject, request: c.request, dateStr: clarificationDate(),
+    })
+    openHtmlDoc(d.title, d.content)
+    if (c.status === 'draft') setClar(c.ref, { status: 'exported', exportedAt: clarificationDate() })
+  }
+  const exportAllClarifications = () => {
+    clarifications.filter(c => c.status === 'draft').forEach(exportClarification)
+  }
+  const uploadClarificationResponse = (c, file, e) => {
+    if (!file) return
+    setClar(c.ref, {
+      status: 'responded',
+      responseFile: file.name,
+      response: commercialClarificationReplies[c.kind],
+    })
+    // Let the same file be picked again if the evaluator re-uploads.
+    if (e?.target) e.target.value = ''
+  }
   const openClarifications   = clarifications.filter(c => c.status !== 'closed')
   const closedClarifications = clarifications.filter(c => c.status === 'closed')
 
@@ -1603,8 +1632,8 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                         <div className="flex items-center gap-2">
                           <Button variant="secondary" size="sm"
                             disabled={!clarifications.some(c => c.status === 'draft')}
-                            onClick={() => setClarifications(prev => prev.map(c => c.status === 'draft' ? { ...c, status: 'sent' } : c))}>
-                            <Send size={12} /> Send all drafts
+                            onClick={exportAllClarifications}>
+                            <Download size={12} /> Export all drafts
                           </Button>
                           <Button size="sm"
                             disabled={!clarifications.some(c => c.status === 'responded')}
@@ -1623,7 +1652,7 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                               <th className="text-left px-4 py-3 text-xs font-semibold">Ref</th>
                               <th className="text-left px-3 py-3 text-xs font-semibold min-w-32">Bidder</th>
                               <th className="text-left px-3 py-3 text-xs font-semibold min-w-44">Subject</th>
-                              <th className="text-left px-3 py-3 text-xs font-semibold min-w-80">Request & Response</th>
+                              <th className="text-left px-3 py-3 text-xs font-semibold min-w-80">Request &amp; Uploaded Response</th>
                               <th className="text-center px-3 py-3 text-xs font-semibold">Status</th>
                               <th className="text-center px-3 py-3 text-xs font-semibold min-w-40">Action</th>
                             </tr>
@@ -1638,6 +1667,12 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                                   <td className="px-3 py-3 text-[12px] text-slate-600">{c.subject}</td>
                                   <td className="px-3 py-3">
                                     <p className="text-[11px] text-slate-500 leading-relaxed">{c.request}</p>
+                                    {c.responseFile && (
+                                      <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1.5">
+                                        <Paperclip size={10} className="text-slate-400 shrink-0" />
+                                        <span className="font-medium text-slate-600 truncate">{c.responseFile}</span>
+                                      </p>
+                                    )}
                                     {c.response && (
                                       <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed border-l-2 border-emerald-200 pl-2">
                                         <strong>Bidder response:</strong> {c.response}
@@ -1647,13 +1682,24 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                                   <td className="px-3 py-3 text-center"><Badge variant={meta.badge}>{meta.label}</Badge></td>
                                   <td className="px-3 py-3 text-center">
                                     {c.status === 'draft' && (
-                                      <Button variant="secondary" size="sm" onClick={() => setClar(c.ref, { status: 'sent' })}><Send size={11} /> Send</Button>
-                                    )}
-                                    {c.status === 'sent' && (
-                                      <Button variant="secondary" size="sm"
-                                        onClick={() => setClar(c.ref, { status: 'responded', response: commercialClarificationReplies[c.kind] })}>
-                                        Record response
+                                      <Button variant="secondary" size="sm" onClick={() => exportClarification(c)}>
+                                        <Download size={11} /> Export
                                       </Button>
+                                    )}
+                                    {c.status === 'exported' && (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <Button variant="secondary" size="sm" onClick={() => exportClarification(c)}>
+                                          <Download size={11} />
+                                        </Button>
+                                        <label className="inline-flex">
+                                          <input type="file" className="hidden"
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                            onChange={e => uploadClarificationResponse(c, e.target.files?.[0], e)} />
+                                          <span className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] bg-white transition-colors whitespace-nowrap">
+                                            <Upload size={11} /> Upload response
+                                          </span>
+                                        </label>
+                                      </div>
                                     )}
                                     {c.status === 'responded' && (
                                       <Button size="sm" onClick={() => setClar(c.ref, { status: 'closed' })}><CheckCircle size={11} /> Close</Button>

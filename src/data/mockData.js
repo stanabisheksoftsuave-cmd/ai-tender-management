@@ -655,14 +655,18 @@ export const commercialNegotiationRules = [
 ]
 
 // ── Step 8 — clarification register ───────────────────────────────────────
+// The platform hosts no bidder-facing portal, so a clarification is exported as
+// a document, issued outside the system, and the bidder's reply comes back as an
+// uploaded file.
 export const commercialClarificationStatuses = {
-  draft:     { label: 'Draft',     badge: 'draft' },
-  sent:      { label: 'Sent',      badge: 'info' },
-  responded: { label: 'Responded', badge: 'warning' },
-  closed:    { label: 'Closed',    badge: 'compliant' },
+  draft:     { label: 'Draft',      badge: 'draft' },
+  exported:  { label: 'Exported',   badge: 'info' },
+  responded: { label: 'Response Uploaded', badge: 'warning' },
+  closed:    { label: 'Closed',     badge: 'compliant' },
 }
 
-// Canned bidder replies, so a clarification can be walked through to closure.
+// Summary recorded against an uploaded response, so a clarification can be
+// walked through to closure without transcribing the document by hand.
 export const commercialClarificationReplies = {
   submission: 'Bidder has re-submitted the missing document. Reviewed and accepted.',
   deviation:  'Bidder confirms withdrawal of the deviation and acceptance of the ITT condition without price change.',

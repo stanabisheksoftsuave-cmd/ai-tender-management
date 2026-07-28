@@ -96,8 +96,15 @@ function ProtectedRoutes() {
           <Route path="/technical-eval/:tenderId" element={<TechnicalEvaluation />} />
           <Route path="/commercial-eval" element={<CommercialEvaluation />} />
           <Route path="/commercial-eval/:tenderId" element={<CommercialEvaluation />} />
-          <Route path="/mgmt-review" element={<AwardRecommendation />} />
-          <Route path="/mgmt-review/:tenderId" element={<AwardRecommendation />} />
+          {/* SCM gate 1 — technical evaluation review */}
+          <Route path="/scm-tech-review" element={<ScmGateReview gate="scm_gate1" />} />
+          <Route path="/scm-tech-review/:tenderId" element={<ScmGateReview gate="scm_gate1" />} />
+          {/* SCM gate 2 — commercial evaluation & award decision */}
+          <Route path="/scm-review" element={<AwardRecommendation />} />
+          <Route path="/scm-review/:tenderId" element={<AwardRecommendation />} />
+          {/* SCM gate 3 — contract draft approval, which issues the outcome */}
+          <Route path="/scm-contract-review" element={<ScmGateReview gate="scm_gate3" />} />
+          <Route path="/scm-contract-review/:tenderId" element={<ScmGateReview gate="scm_gate3" />} />
           <Route path="/contract" element={<ContractTemplate />} />
           <Route path="/contract/:tenderId" element={<ContractTemplate />} />
           <Route path="/legal-review" element={<LegalReview />} />

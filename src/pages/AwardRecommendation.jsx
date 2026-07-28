@@ -47,7 +47,7 @@ export default function AwardRecommendation() {
   const { goBack }   = useNavigation()
   const { user }     = useAuth()
   const home         = useHomePath()
-  const { tenders, advanceTender, updateTender } = useTenders()
+  const { tenders, updateTender, approveGate, returnGate } = useTenders()
 
   const [winnerId,   setWinnerId]   = useState(null)
   const [rejected,   setRejected]   = useState({}) // { [bidderId]: true }

@@ -33,7 +33,15 @@ export const DEMO_USERS = INITIAL_USERS
 const STORAGE_KEY = 'atm_user'
 const USERS_STORAGE_KEY = 'atm_users'
 const USERS_VERSION_KEY = 'atm_users_v'
-const CURRENT_VERSION = '7' // bump whenever INITIAL_USERS structure changes
+const CURRENT_VERSION = '8' // bump whenever INITIAL_USERS structure changes
+
+// Role ids that were renamed. Stored users (and sessions) created before the
+// rename still carry the old id; without this they resolve to no role at all and
+// the session is discarded on mount, which reads as "login does nothing".
+const LEGACY_ROLE_IDS = { mgmt_review: 'scm' }
+const migrateRoleId = (id) => LEGACY_ROLE_IDS[id] ?? id
+const migrateUsers = (list) => list.map(u =>
+  LEGACY_ROLE_IDS[u.roleId] ? { ...u, roleId: LEGACY_ROLE_IDS[u.roleId] } : u)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -41,11 +49,18 @@ export function AuthProvider({ children }) {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (!stored) return null
       const parsed = JSON.parse(stored)
-      // Invalidate sessions with obsolete role IDs (e.g. old 'admin' role)
-      const validIds = roles.map(r => r.id)
-      if (!validIds.includes(parsed?.role?.id)) {
+      // A renamed role is migrated in place; only genuinely removed roles
+      // (e.g. the old 'admin') invalidate the session.
+      const migratedId = migrateRoleId(parsed?.role?.id)
+      const roleInfo = roles.find(r => r.id === migratedId)
+      if (!roleInfo) {
         localStorage.removeItem(STORAGE_KEY)
         return null
+      }
+      if (roleInfo.id !== parsed?.role?.id) {
+        const upgraded = { ...parsed, role: roleInfo }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
+        return upgraded
       }
       return parsed
     } catch {
@@ -58,7 +73,7 @@ export function AuthProvider({ children }) {
       if (storedVersion !== CURRENT_VERSION) {
         // Version mismatch — reset to latest INITIAL_USERS, keep any custom users (id > 100)
         const existing = localStorage.getItem(USERS_STORAGE_KEY)
-        const parsed = existing ? JSON.parse(existing) : []
+        const parsed = existing ? migrateUsers(JSON.parse(existing)) : []
         // Keep custom users, but drop any whose role no longer exists (e.g. the
         // removed tech_eval / comm_eval evaluators).
         const validRoleIds = new Set(roles.map(r => r.id))
@@ -76,11 +91,14 @@ export function AuthProvider({ children }) {
       }
       const stored = localStorage.getItem(USERS_STORAGE_KEY)
       if (!stored) return INITIAL_USERS
-      const parsed = JSON.parse(stored)
+      const parsed = migrateUsers(JSON.parse(stored))
       // Merge in any newly added INITIAL_USERS not already in list
       const storedIds = new Set(parsed.map(u => u.id))
       const missing = INITIAL_USERS.filter(u => !storedIds.has(u.id))
-      if (missing.length === 0) return parsed
+      if (missing.length === 0) {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(parsed))
+        return parsed
+      }
       const merged = [...parsed, ...missing]
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(merged))
       return merged
@@ -109,7 +127,10 @@ export function AuthProvider({ children }) {
     if (byEmail.mustSetPassword) return 'must_set_password'
     const match = byEmail.password === password ? byEmail : null
     if (!match) return 'invalid'
-    const roleInfo = roles.find(r => r.id === match.roleId)
+    const roleInfo = roles.find(r => r.id === migrateRoleId(match.roleId))
+    // Without a resolvable role the session is discarded on the next mount, so
+    // fail here rather than appearing to sign in and bouncing straight back.
+    if (!roleInfo) return 'invalid'
     const userData = { id: match.id, name: match.name, email: match.username, role: roleInfo }
     setUser(userData)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData))
@@ -190,12 +211,15 @@ export function AuthProvider({ children }) {
     })
     setUser(prev => {
       if (!prev) return prev
-      const validIds = roles.map(r => r.id)
-      if (!validIds.includes(prev?.role?.id)) {
+      const roleInfo = roles.find(r => r.id === migrateRoleId(prev?.role?.id))
+      if (!roleInfo) {
         localStorage.removeItem(STORAGE_KEY)
         return null
       }
-      return prev
+      if (roleInfo.id === prev.role?.id) return prev
+      const upgraded = { ...prev, role: roleInfo }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
+      return upgraded
     })
   }, [])
 

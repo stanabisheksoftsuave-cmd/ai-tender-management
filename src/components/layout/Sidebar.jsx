@@ -87,9 +87,11 @@ const navByRole = {
     { to: '/technical-eval',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.ittTechEval' },
     { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
-  mgmt_review: [
-    { to: '/mgmt-review', icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.mgmtReview'},
-    { to: '/tenders',     icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
+  scm: [
+    { to: '/scm-tech-review',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview' },
+    { to: '/scm-review',          icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview' },
+    { to: '/scm-contract-review', icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
+    { to: '/tenders',             icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
   ],
   legal_review: [
     { to: '/legal-review', icon: '/src/assets/icons/audit-log.svg',  labelKey: 'nav.legalReview' },

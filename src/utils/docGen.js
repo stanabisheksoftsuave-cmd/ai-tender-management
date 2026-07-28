@@ -142,6 +142,48 @@ export function failReasonDoc({ tenderId, tenderTitle, bidderName, total, overal
 }
 
 // Builds a formal regret / rejection letter for an unsuccessful bidder.
+// Clarification request issued to a bidder. Exported as a document the Contract
+// Engineer sends through their own channel — the platform hosts no bidder-facing
+// portal, so the response comes back as an uploaded file.
+export function clarificationRequestDoc({ ref, tenderId, tenderTitle, bidderName, department, subject, request, dateStr }) {
+  const content = `
+    <div class="head">
+      <div class="brand">Oman LNG · Tender Management</div>
+      <h1>Commercial Clarification Request</h1>
+      <div class="sub">${esc(ref || '')}${tenderId ? ' · ' + esc(tenderId) : ''}</div>
+    </div>
+    <div class="body">
+      <div class="meta">
+        <div><b>To:</b> ${esc(bidderName)}</div>
+        <div><b>Date:</b> ${esc(dateStr || '')}</div>
+        <div><b>Tender:</b> ${esc(tenderTitle || tenderId || '')}</div>
+        <div><b>Department:</b> ${esc(department || '—')}</div>
+        <div><b>Reference:</b> ${esc(ref || '')}</div>
+        <div><b>Subject:</b> ${esc(subject || '—')}</div>
+      </div>
+
+      <p>Dear ${esc(bidderName)},</p>
+
+      <p>In the course of evaluating your commercial submission for <b>${esc(tenderTitle || tenderId || '')}</b>, the following point requires clarification before the evaluation can be concluded.</p>
+
+      <h2>Clarification Required — ${esc(subject || '')}</h2>
+      <div class="quote">${esc(request || '')}</div>
+
+      <p>Please provide your written response, together with any supporting documentation, quoting the reference <b>${esc(ref || '')}</b>. Your response will be recorded against this clarification in the evaluation file.</p>
+
+      <p>Please note that your response must not alter the substance of your tendered price except where this request expressly invites a priced response.</p>
+
+      <div class="sign">
+        Yours sincerely,<br><br>
+        <b>Contracts &amp; Procurement Team</b><br>
+        Oman LNG
+      </div>
+
+      <div class="foot">System-generated clarification request. Reference: ${esc(ref || '')} · Tender: ${esc(tenderId || '')}.</div>
+    </div>`
+  return { title: `Clarification ${ref} — ${bidderName}`, content }
+}
+
 export function rejectionLetterDoc({ tenderId, tenderTitle, bidderName, department, awardedTo, dateStr }) {
   const content = `
     <div class="head">

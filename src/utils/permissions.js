@@ -14,7 +14,7 @@ export const ROLE = {
   BIZ_ADMIN:         'biz_admin',
   CONTRACT_ENGINEER: 'pof',
   CONTRACT_HOLDER:   'contract_holder',
-  MGMT_REVIEW:       'mgmt_review',
+  SCM:               'scm',
   LEGAL_REVIEW:      'legal_review',
   HSE:               'hse',
   ICV:               'icv',
@@ -44,7 +44,10 @@ export const ROUTE_ROLES = {
   '/upload':              [ROLE.CONTRACT_ENGINEER],
   '/technical-eval':      [ROLE.CONTRACT_HOLDER],
   '/commercial-eval':     [ROLE.CONTRACT_ENGINEER],
-  '/mgmt-review':         [ROLE.MGMT_REVIEW],
+  // The Supply Chain Manager's three approval gates.
+  '/scm-tech-review':     [ROLE.SCM],
+  '/scm-review':          [ROLE.SCM],
+  '/scm-contract-review': [ROLE.SCM],
   '/contract':            [ROLE.CONTRACT_ENGINEER],
   '/legal-review':        [ROLE.LEGAL_REVIEW],
   '/contract-execution':  [ROLE.CONTRACT_ENGINEER],
@@ -73,10 +76,11 @@ export function canAccess(roleId, path) {
  *
  * The first entry the role may actually open wins, so this can never point at a
  * page that would bounce the user straight back. Roles without the Dashboard
- * land on the ITT page; the two review roles have no ITT access either, so they
- * fall through to their own workspace.
+ * land on the ITT page; the review roles have no ITT access either, so they fall
+ * through to their own workspace. The SCM lands on the award gate, the busiest
+ * of its three.
  */
-const LANDING_ORDER = ['/dashboard', ITT_PATH, '/mgmt-review', '/legal-review', '/tenders']
+const LANDING_ORDER = ['/dashboard', ITT_PATH, '/scm-review', '/legal-review', '/tenders']
 
 export function landingPath(roleId) {
   return LANDING_ORDER.find(path => canAccess(roleId, path)) || '/login'
