@@ -348,14 +348,460 @@ export const commercialEstimate = [
 export const commercialBidFactors = { 1: 1.03, 2: 0.91, 3: 1.10, 4: 0.86 }
 
 // Mandatory commercial documents each bidder must submit — the compliance gate
-// that precedes the price comparison.
+// (step 2, part A) that precedes any evaluation of price. `localOnly` rows are
+// N/A for foreign bidders; `conditional` rows are N/A when the tender does not
+// call for them.
 export const commercialComplianceDocs = [
-  { id: 'cd1', name: 'Priced Schedule of Prices (Section E)', mandatory: true },
-  { id: 'cd2', name: 'Tender Guarantee / Bid Bond',           mandatory: true },
-  { id: 'cd3', name: 'Commercial Terms & Conditions Acceptance', mandatory: true },
-  { id: 'cd4', name: 'Price Validity Confirmation (120 days)', mandatory: true },
-  { id: 'cd5', name: 'Completed & Signed Form of Tender',      mandatory: true },
+  { id: 'cd5', group: 'Tender Submission',        name: 'Completed & Signed Form of Tender',      mandatory: true },
+  { id: 'cd6', group: 'Tender Submission',        name: 'Signed Tender Documents',                mandatory: true },
+  { id: 'cd1', group: 'Tender Submission',        name: 'Priced Schedule of Prices (Section E)',  mandatory: true },
+  { id: 'cd4', group: 'Tender Submission',        name: 'Price Validity Confirmation (120 days)', mandatory: true },
+  { id: 'cd3', group: 'Tender Submission',        name: 'Commercial Terms & Conditions Acceptance', mandatory: true },
+  { id: 'cd7',  group: 'Registration & Statutory', name: 'OPAL Registration',                     mandatory: true },
+  { id: 'cd8',  group: 'Registration & Statutory', name: 'JSRS Registration',                     mandatory: true },
+  { id: 'cd9',  group: 'Registration & Statutory', name: 'Commercial Registration (CR)',          mandatory: true },
+  { id: 'cd10', group: 'Registration & Statutory', name: 'Tax Certificate',                       mandatory: true },
+  { id: 'cd11', group: 'Registration & Statutory', name: 'MoL Omanization Certificate',           mandatory: true, localOnly: true },
+  { id: 'cd12', group: 'Authority & Security',     name: 'Power of Attorney / Signatory Authority', mandatory: true },
+  { id: 'cd2',  group: 'Authority & Security',     name: 'Tender Guarantee / Bid Bond',           mandatory: true, conditional: true },
+  { id: 'cd13', group: 'Authority & Security',     name: 'Insurance Certificate',                 mandatory: true },
 ]
+
+export const commercialComplianceGroups = ['Tender Submission', 'Registration & Statutory', 'Authority & Security']
+
+// ── Commercial Evaluation — the nine evaluation steps ──────────────────────
+// The commercial evaluation runs as nine sequential AI passes. Award
+// Recommendation is always last and only unlocks once every preceding step is
+// complete.
+//
+// Sequencing note: Sensitivity Analysis (step 5) runs BEFORE the preference
+// mechanisms (step 6) so two questions can be answered independently —
+// (1) who has the best offer on pure commercial merit, and (2) how the ranking
+// moves once Local Content, ICV, PAF and Omani Preference are applied.
+export const commercialSteps = [
+  {
+    no: 1, id: 'extraction',
+    name: 'Commercial Data Extraction', short: 'Data Extraction',
+    purpose: 'Convert bidder submissions into structured, machine-readable commercial data with full evidence references.',
+    steps: [
+      'Opening bidder commercial submissions…',
+      'Parsing priced schedules & unit rates…',
+      'Extracting payment, warranty & delivery commitments…',
+      'Extracting bonds, insurance & escalation clauses…',
+      'Capturing LC / ICV commitments & evidence references…',
+    ],
+  },
+  {
+    no: 2, id: 'compliance', name: 'Commercial Compliance', short: 'Compliance',
+    purpose: 'Verify compliance against mandatory tender requirements and ITT conditions before any evaluation of price.',
+    steps: [
+      'Opening bidder commercial documents…',
+      'Checking mandatory submission documents…',
+      'Validating registrations & statutory certificates…',
+      'Reviewing commercial terms against ITT conditions…',
+      'Classifying bidder responsiveness…',
+    ],
+  },
+  {
+    no: 3, id: 'risk', name: 'Commercial Risk', short: 'Risk',
+    purpose: 'Assess commercial and contractual risk exposure. Findings are recommendations only — never automatic rejections.',
+    steps: [
+      'Screening cash-flow & advance payment exposure…',
+      'Testing cost certainty & escalation exposure…',
+      'Checking delivery security & liability cover…',
+      'Rating and ranking the risk register…',
+    ],
+  },
+  {
+    no: 4, id: 'benchmark', name: 'Price Normalization & Benchmarking', short: 'Normalization',
+    purpose: 'Establish the true commercial position through an apples-to-apples comparison against the company estimate and historical awards.',
+    steps: [
+      'Comparing unit rates against the company estimate…',
+      'Rolling up section & grand totals…',
+      'Normalizing bidder pricing structures…',
+      'Benchmarking against historical awarded contracts…',
+      'Screening abnormal bids & line-item outliers…',
+    ],
+  },
+  {
+    no: 5, id: 'sensitivity', name: 'Sensitivity Analysis', short: 'Sensitivity',
+    purpose: 'Stress-test the commercial ranking under pure market and commercial assumptions, before any policy-driven adjustment is applied.',
+    steps: [
+      'Modelling escalation scenarios (+2% / +5% / +10%)…',
+      'Modelling quantity variation (−20% … +20%)…',
+      'Modelling currency movement (±5% / ±10%)…',
+      'Discounting payment terms to NPV…',
+      'Testing ranking stability across all scenarios…',
+    ],
+  },
+  {
+    no: 6, id: 'preference', optional: true, name: 'LC + ICV + PAF + Omani Preference', short: 'LC / ICV / PAF',
+    purpose: 'Apply all strategic value and localization preference mechanisms. The single source of truth for evaluation adjustments, configurable per tender.',
+    steps: [
+      'Reading LC scores & ICV retained values…',
+      'Calculating LCC and ICV adjustment factors…',
+      'Applying the Price Adjustment Factor (PAF)…',
+      'Applying Omani Company preference…',
+      'Re-ranking on evaluated price…',
+    ],
+  },
+  {
+    no: 7, id: 'negotiation', optional: true, name: 'Negotiation Strategy', short: 'Negotiation',
+    purpose: 'Identify value-improvement opportunities. Activated only when the tendering strategy permits commercial negotiations.',
+    steps: [
+      'Scanning priced schedules for negotiable elements…',
+      'Testing escalation & payment-term positions…',
+      'Quantifying indicative savings…',
+      'Drafting the negotiation position…',
+    ],
+  },
+  {
+    no: 8, id: 'clarification', name: 'Clarification Management', short: 'Clarifications',
+    purpose: 'Draft and track bidder clarification requests and responses until closure.',
+    steps: [
+      'Collecting open findings from the preceding steps…',
+      'Drafting clarification requests per bidder…',
+      'Building the clarification register…',
+      'Opening the closure tracker…',
+    ],
+  },
+  {
+    no: 9, id: 'award', name: 'Award Recommendation', short: 'Award',
+    purpose: 'Consolidate the outputs of every preceding step into an auditable recommendation package for the Endorsing Body.',
+    steps: [
+      'Consolidating outputs from every preceding step…',
+      'Verifying every mandatory gate is closed…',
+      'Assembling the evaluated price ranking…',
+      'Drafting the recommendation package…',
+    ],
+  },
+]
+
+// ── Step 1 — the commercial data points extracted from each submission ────
+export const commercialExtractionFields = [
+  { id: 'pricing',    label: 'Pricing Schedule' },
+  { id: 'discount',   label: 'Discounts' },
+  { id: 'payment',    label: 'Payment Terms' },
+  { id: 'warranty',   label: 'Warranty Commitment' },
+  { id: 'delivery',   label: 'Delivery Schedule' },
+  { id: 'bond',       label: 'Performance Bond' },
+  { id: 'insurance',  label: 'Insurance Requirements' },
+  { id: 'escalation', label: 'Escalation Clause' },
+  { id: 'lc',         label: 'Local Content (LC) Commitment' },
+  { id: 'icv',        label: 'ICV Commitment' },
+]
+
+// ── Step 2 (part B) — commercial conditions reviewed against the ITT ──────
+export const commercialReviewItems = [
+  { id: 'cr1', name: 'Payment Terms',                 requirement: '60 days from certified invoice · no advance payment' },
+  { id: 'cr2', name: 'Warranty / Defects Liability',  requirement: '24 months from acceptance' },
+  { id: 'cr3', name: 'Insurance',                     requirement: 'CAR + Workmen’s Comp + Third Party · min OMR 2,000,000' },
+  { id: 'cr4', name: 'Performance Bond',              requirement: '10% of contract value, valid to DLP expiry' },
+  { id: 'cr5', name: 'Delivery Schedule',             requirement: 'Completion within 24 weeks of Notice to Proceed' },
+  { id: 'cr6', name: 'Escalation',                    requirement: 'Fixed price, or CPI-linked capped at 3% p.a.' },
+  { id: 'cr7', name: 'Liquidated Damages',            requirement: '0.5% per week of delay, capped at 10%' },
+  { id: 'cr8', name: 'Limitation of Liability',       requirement: 'Not less than 100% of contract value' },
+]
+
+// Responsiveness is driven by the mandatory submission matrix alone. Commercial
+// deviations and exceptions never reject a bidder on their own — they make the
+// bidder conditionally responsive, pending clarification.
+export const commercialResponsiveness = {
+  responsive:    { label: 'Responsive',               badge: 'compliant',         hint: 'All mandatory requirements met, no commercial deviations.' },
+  conditional:   { label: 'Conditionally Responsive', badge: 'partial_compliant', hint: 'Mandatory requirements met, but deviations / exceptions need clarification.' },
+  nonResponsive: { label: 'Non-Responsive',           badge: 'non_compliant',     hint: 'A mandatory submission requirement failed — excluded from the price comparison.' },
+}
+
+// ── Step 3 — commercial risk rules (advisory, never a rejection) ──────────
+export const commercialRiskRules = [
+  { id: 'rk1', risk: 'Advance payment requested',              impact: 'Cash-flow exposure', rating: 'High',
+    applies: p => p.advancePct > 0,
+    detail:  p => `${(p.advancePct * 100).toFixed(0)}% of the contract value requested up front, ahead of any delivery milestone.`,
+    mitigation: 'Require an advance payment guarantee for 100% of the advance, or negotiate the advance out entirely.' },
+  { id: 'rk2', risk: 'Unlimited / uncapped escalation',        impact: 'Cost certainty', rating: 'High',
+    applies: p => p.escalationCapPct == null,
+    detail:  p => `Escalation is open-ended over ~${(p.escalationExposure * 100).toFixed(0)}% of the priced scope, with no annual ceiling.`,
+    mitigation: 'Cap escalation at 3% p.a. against a published index, or convert to a fixed-price basis.' },
+  { id: 'rk3', risk: 'No performance bond',                    impact: 'Delivery security', rating: 'Medium',
+    applies: p => !p.performanceBondPct,
+    detail:  () => 'No performance security offered — OLNG carries the full non-performance exposure.',
+    mitigation: 'Make a 10% unconditional performance bond a condition of award.' },
+  { id: 'rk4', risk: 'Performance bond below requirement',     impact: 'Delivery security', rating: 'Medium',
+    applies: p => p.performanceBondPct > 0 && p.performanceBondPct < 10,
+    detail:  p => `Bond offered at ${p.performanceBondPct}% against the 10% ITT requirement.`,
+    mitigation: 'Require the bond to be topped up to 10% before contract signature.' },
+  { id: 'rk5', risk: 'Uninsured personnel',                    impact: 'Liability', rating: 'Medium',
+    applies: p => !p.personnelInsured,
+    detail:  () => 'No Workmen’s Compensation / personnel cover evidenced in the submission.',
+    mitigation: 'Obtain certificates of cover for all site personnel before mobilisation.' },
+  { id: 'rk6', risk: 'Long delivery period',                   impact: 'Schedule', rating: 'Medium',
+    applies: p => p.deliveryWeeks > 24,
+    detail:  p => `${p.deliveryWeeks} weeks offered against the 24-week ITT completion requirement.`,
+    mitigation: 'Negotiate the programme back to 24 weeks, or price the schedule impact into the comparison.' },
+  { id: 'rk7', risk: 'Liability capped below contract value',  impact: 'Recovery', rating: 'Medium',
+    applies: p => p.lolPct < 100,
+    detail:  p => `Liability capped at ${p.lolPct}% of contract value against the 100% ITT minimum.`,
+    mitigation: 'Restore the cap to 100% of contract value, or accept with a documented risk waiver.' },
+  { id: 'rk8', risk: 'Foreign currency exposure',              impact: 'Cost certainty', rating: 'Low',
+    applies: p => p.fxShare > 0.5,
+    detail:  p => `${(p.fxShare * 100).toFixed(0)}% of the price is denominated in ${p.currency}.`,
+    mitigation: 'Fix the exchange rate at contract date, or require the bid to be re-denominated in OMR.' },
+]
+
+// ── Step 4 — normalization parameters & the historical benchmark ──────────
+export const commercialNormalization = {
+  financingRatePa:      0.06,  // cost of money used to price advances / payment terms
+  standardPaymentDays:  60,
+  standardWarrantyMths: 24,
+  standardBondPct:      10,
+  warrantyCostPerMonth: 0.004, // % of price per month of warranty shortfall
+  bondRiskFactor:       0.25,  // % of price per point of bond shortfall
+  uncappedEscalationPa: 0.04,  // assumed escalation where the clause is uncapped
+  abnormallyLowPct:    -15,
+  abnormallyHighPct:    20,
+  outlierRatePct:       25,    // line-item rate deviation from the mean that flags an outlier
+}
+
+// Held as a ratio of the company estimate so the benchmark stays in scale
+// whatever the tender size.
+export const commercialHistoricalAwards = [
+  { ref: 'C-2023-118', title: 'Expressway Bridge Rehabilitation — Phase 1', year: 2023, ratio: 0.88, basis: 'Unit Rate' },
+  { ref: 'C-2024-042', title: 'Expressway Bridge Rehabilitation — Phase 2', year: 2024, ratio: 0.97, basis: 'Unit Rate' },
+  { ref: 'C-2024-137', title: 'Highway Structures Maintenance Framework',   year: 2024, ratio: 1.04, basis: 'Framework' },
+]
+
+// ── Step 5 — sensitivity scenarios ────────────────────────────────────────
+export const commercialScenarios = [
+  { id: 'base',   family: 'Base Case',     label: 'Base Case',              range: 'Normalized price' },
+  { id: 'esc2',   family: 'Escalation',    label: 'Escalation +2%',         range: '+2%',     esc: 0.02 },
+  { id: 'esc5',   family: 'Escalation',    label: 'Escalation +5%',         range: '+5%',     esc: 0.05 },
+  { id: 'esc10',  family: 'Escalation',    label: 'Escalation +10%',        range: '+10%',    esc: 0.10 },
+  { id: 'qtyM20', family: 'Quantity',      label: 'Quantity −20%',          range: '−20%',    qty: -0.20 },
+  { id: 'qtyM10', family: 'Quantity',      label: 'Quantity −10%',          range: '−10%',    qty: -0.10 },
+  { id: 'qtyP10', family: 'Quantity',      label: 'Quantity +10%',          range: '+10%',    qty:  0.10 },
+  { id: 'qtyP20', family: 'Quantity',      label: 'Quantity +20%',          range: '+20%',    qty:  0.20 },
+  { id: 'fxM10',  family: 'Currency',      label: 'Currency −10%',          range: '−10%',    fx: -0.10 },
+  { id: 'fxM5',   family: 'Currency',      label: 'Currency −5%',           range: '−5%',     fx: -0.05 },
+  { id: 'fxP5',   family: 'Currency',      label: 'Currency +5%',           range: '+5%',     fx:  0.05 },
+  { id: 'fxP10',  family: 'Currency',      label: 'Currency +10%',          range: '+10%',    fx:  0.10 },
+  { id: 'npvAdv', family: 'Payment Terms', label: 'As bid (advance / NPV)', range: 'As bid',  npvDays: null },
+  { id: 'npv30',  family: 'Payment Terms', label: 'Payment 30 days (NPV)',  range: '30 days', npvDays: 30 },
+  { id: 'npv60',  family: 'Payment Terms', label: 'Payment 60 days (NPV)',  range: '60 days', npvDays: 60 },
+  { id: 'npv90',  family: 'Payment Terms', label: 'Payment 90 days (NPV)',  range: '90 days', npvDays: 90 },
+]
+
+export const commercialScenarioFamilies = [
+  { family: 'Escalation impact',      range: '+2% / +5% / +10%' },
+  { family: 'Quantity variation',     range: '−20% / −10% / Base / +10% / +20%' },
+  { family: 'Currency movement',      range: 'USD / EUR / GBP  ±5% / ±10%' },
+  { family: 'Payment terms (NPV)',    range: 'Advance vs 30 / 60 / 90 days' },
+  { family: 'Index-based adjustment', range: 'User defined' },
+]
+
+export const commercialStability = {
+  stable:   { label: 'Stable Recommendation', badge: 'compliant',         hint: 'The preferred bidder holds first place across effectively every scenario.' },
+  moderate: { label: 'Moderately Sensitive',  badge: 'partial_compliant', hint: 'The preferred bidder changes under some scenarios — review before award.' },
+  high:     { label: 'Highly Sensitive',      badge: 'non_compliant',     hint: 'The ranking is unstable — the recommendation depends heavily on the assumptions used.' },
+}
+
+// ── Step 6 — PAF / preference configuration ───────────────────────────────
+export const commercialPafDefaults = {
+  lccWeightingPct:    5,   // LCC Adjustment Factor = LC Score          x LCC Weighting %
+  icvWeightingPct:    5,   // ICV Adjustment Factor = ICV Retained Value x ICV Weighting %
+  capPct:            10,   // ceiling on the Total LC Adjustment
+  omaniPreferencePct: 10,  // Omani Company / SME / Omani JV preference
+  applyPreference:  true,
+  basis: 'normalized',     // 'normalized' (price normalization output) | 'submitted'
+}
+
+export const COMMERCIAL_PAF_NOTE =
+  'PAF-adjusted prices are evaluation prices only. The contract shall be awarded at the original submitted bid price. This mechanism rewards higher local content without altering the actual contract cost.'
+
+export const omaniEligibleTypes = ['Omani Company', 'Omani SME', 'Omani JV']
+
+// ── Step 7 — negotiation opportunities ────────────────────────────────────
+export const COMMERCIAL_MOBILISATION_BENCHMARK = 0.03
+
+export const commercialNegotiationRules = [
+  { id: 'ng1', title: 'Reduce mobilization fee', unit: 'one-off',
+    applies: p => p.mobilisationPct > COMMERCIAL_MOBILISATION_BENCHMARK,
+    basis:   p => `Mobilization priced at ${(p.mobilisationPct * 100).toFixed(1)}% of the bid against a ${(COMMERCIAL_MOBILISATION_BENCHMARK * 100).toFixed(0)}% benchmark.`,
+    savings: (p, price) => price * (p.mobilisationPct - COMMERCIAL_MOBILISATION_BENCHMARK) },
+  { id: 'ng2', title: 'Cap annual escalation', unit: 'per year',
+    applies: p => p.escalationCapPct == null || p.escalationCapPct > 3,
+    basis:   p => p.escalationCapPct == null
+      ? 'Escalation is uncapped — capping at 3% p.a. removes the open-ended exposure.'
+      : `Escalation capped at ${p.escalationCapPct}% p.a.; bringing it to the 3% ITT standard.`,
+    savings: (p, price) => price * p.escalationExposure * (((p.escalationCapPct ?? 6) - 3) / 100) },
+  { id: 'ng3', title: 'Align payment terms to OLNG standard', unit: 'financing cost',
+    applies: p => p.advancePct > 0 || p.paymentDays < 60,
+    basis:   p => p.advancePct > 0
+      ? `${(p.advancePct * 100).toFixed(0)}% advance requested; moving to 60-day terms removes the financing cost.`
+      : `${p.paymentDays}-day terms offered; moving to the 60-day standard releases working capital.`,
+    savings: (p, price) => price * (p.advancePct * 0.03 + Math.max(0, (60 - p.paymentDays) / 365) * 0.06) },
+  { id: 'ng4', title: 'Convert conditional discount to an unconditional rebate', unit: 'one-off',
+    applies: p => p.discountPct > 0 && !p.discountApplied,
+    basis:   p => `${(p.discountPct * 100).toFixed(1)}% discount is conditional and could not be taken into the evaluation — making it unconditional secures it.`,
+    savings: (p, price) => price * p.discountPct * 0.5 },
+  { id: 'ng5', title: 'Extend warranty to the 24-month standard', unit: 'risk avoided',
+    applies: p => p.warrantyMonths < 24,
+    basis:   p => `${p.warrantyMonths}-month warranty offered — closing the ${24 - p.warrantyMonths}-month gap removes a post-award cost.`,
+    savings: (p, price) => price * (24 - p.warrantyMonths) * 0.004 },
+]
+
+// ── Step 8 — clarification register ───────────────────────────────────────
+export const commercialClarificationStatuses = {
+  draft:     { label: 'Draft',     badge: 'draft' },
+  sent:      { label: 'Sent',      badge: 'info' },
+  responded: { label: 'Responded', badge: 'warning' },
+  closed:    { label: 'Closed',    badge: 'compliant' },
+}
+
+// Canned bidder replies, so a clarification can be walked through to closure.
+export const commercialClarificationReplies = {
+  submission: 'Bidder has re-submitted the missing document. Reviewed and accepted.',
+  deviation:  'Bidder confirms withdrawal of the deviation and acceptance of the ITT condition without price change.',
+  exception:  'Bidder maintains the exception but has offered a compensating commercial concession. Referred to the Contract Engineer.',
+  pricing:    'Bidder confirms the rate is correct as submitted and has provided the supporting build-up.',
+}
+
+// ── Bidder commercial profiles ─────────────────────────────────────────────
+// Positional profiles (the first bidder in the list gets profile 0, and so on)
+// so any tender's bidder list produces a complete, deterministic commercial
+// data set. These stand in for what step 1 would read from real submissions.
+const cev = (doc, page, quote) => ({ doc, page, quote })
+
+export const commercialProfiles = [
+  {
+    key: 'p0', entityType: 'Omani Company',
+    advancePct: 0, paymentDays: 60,
+    discountPct: 0.025, discountApplied: true, discountText: '2.5% on order value above OMR 500,000',
+    warrantyMonths: 24, deliveryWeeks: 22, performanceBondPct: 10,
+    personnelInsured: true, insuranceText: 'CAR + Workmen’s Comp + Third Party — OMR 2,000,000',
+    escalationCapPct: 3, escalationExposure: 0.45,
+    ldText: '0.5% per week, capped at 10%', lolPct: 100,
+    currency: 'OMR', fxShare: 0, mobilisationPct: 0.055,
+    lcScorePct: 80, icvRetainedPct: 70,
+    submissionFails: [],
+    review: {
+      cr1: { status: 'compliant' }, cr2: { status: 'compliant' }, cr3: { status: 'compliant' }, cr4: { status: 'compliant' },
+      cr5: { status: 'compliant' }, cr6: { status: 'compliant' }, cr7: { status: 'compliant' }, cr8: { status: 'compliant' },
+    },
+    evidence: {
+      pricing:    cev('Schedule of Prices (Section E)', 4, 'Grand total carried forward from Sections E1 and E2; all rates in OMR, firm for the validity period.'),
+      discount:   cev('Commercial Proposal', 11, 'A discount of 2.5% shall apply to the order value in excess of OMR 500,000.'),
+      payment:    cev('Commercial Proposal', 12, 'Payment within 60 days of receipt of a certified invoice. No advance payment is required.'),
+      warranty:   cev('Commercial Proposal', 14, 'Defects liability period of 24 months from the date of acceptance.'),
+      delivery:   cev('Programme of Works', 3, 'Completion within 22 weeks of the Notice to Proceed.'),
+      bond:       cev('Form of Tender', 2, 'Performance bond of 10% of the contract value, valid until expiry of the defects liability period.'),
+      insurance:  cev('Insurance Certificate', 1, 'Contractor All Risks, Workmen’s Compensation and Third Party cover, limit OMR 2,000,000.'),
+      escalation: cev('Commercial Proposal', 15, 'Escalation linked to the published CPI and capped at 3% per annum.'),
+      lc:         cev('Local Content Plan', 2, 'Committed local content of 80% measured under the OLNG LC methodology.'),
+      icv:        cev('ICV Certificate', 1, 'Certified ICV retained value of 70% for the current certification year.'),
+    },
+  },
+  {
+    key: 'p1', entityType: 'International',
+    advancePct: 0, paymentDays: 45,
+    discountPct: 0, discountApplied: false, discountText: 'None offered',
+    warrantyMonths: 18, deliveryWeeks: 20, performanceBondPct: 10,
+    personnelInsured: true, insuranceText: 'CAR + Workmen’s Comp — USD 4,000,000',
+    escalationCapPct: 5, escalationExposure: 0.60,
+    ldText: '0.5% per week, capped at 10%', lolPct: 100,
+    currency: 'USD', fxShare: 0.55, mobilisationPct: 0.072,
+    lcScorePct: 60, icvRetainedPct: 50,
+    submissionFails: [],
+    review: {
+      cr1: { status: 'deviation', note: '45-day payment terms offered against the 60-day ITT standard.' },
+      cr2: { status: 'deviation', note: '18-month warranty offered against the 24-month requirement.' },
+      cr3: { status: 'compliant' }, cr4: { status: 'compliant' }, cr5: { status: 'compliant' },
+      cr6: { status: 'deviation', note: 'Escalation capped at 5% p.a. against the 3% ITT ceiling.' },
+      cr7: { status: 'compliant' }, cr8: { status: 'compliant' },
+    },
+    evidence: {
+      pricing:    cev('Schedule of Prices (Section E)', 5, 'Rates submitted in USD and converted at the tender-date reference rate; totals carried to the summary page.'),
+      discount:   cev('Commercial Proposal', 9, 'No unconditional discount is offered against the submitted schedule of prices.'),
+      payment:    cev('Commercial Proposal', 10, 'Payment terms of 45 days net from invoice date.'),
+      warranty:   cev('Commercial Proposal', 13, 'Warranty period of 18 months from delivery.'),
+      delivery:   cev('Programme of Works', 2, 'Completion within 20 weeks of the Notice to Proceed.'),
+      bond:       cev('Form of Tender', 2, 'Performance guarantee of 10% of contract value from a first-class bank.'),
+      insurance:  cev('Insurance Certificate', 1, 'Contractor All Risks and Workmen’s Compensation, limit USD 4,000,000.'),
+      escalation: cev('Commercial Proposal', 16, 'Annual escalation applied to labour and plant elements, capped at 5% per annum.'),
+      lc:         cev('Local Content Plan', 3, 'Local content commitment of 60% through Omani subcontracting and local hire.'),
+      icv:        cev('ICV Certificate', 1, 'ICV retained value certified at 50%.'),
+    },
+  },
+  {
+    key: 'p2', entityType: 'International',
+    advancePct: 0.30, paymentDays: 30,
+    discountPct: 0.015, discountApplied: false, discountText: '1.5% for payment within 15 days (outside OLNG terms — not applied)',
+    warrantyMonths: 24, deliveryWeeks: 30, performanceBondPct: 5,
+    personnelInsured: false, insuranceText: 'CAR only — USD 1,500,000 (no Workmen’s Comp evidenced)',
+    escalationCapPct: null, escalationExposure: 0.65,
+    ldText: '0.25% per week, capped at 5%', lolPct: 50,
+    currency: 'USD', fxShare: 0.70, mobilisationPct: 0.061,
+    lcScorePct: 35, icvRetainedPct: 25,
+    submissionFails: [],
+    review: {
+      cr1: { status: 'deviation', note: '30% advance payment requested and 30-day terms sought.' },
+      cr2: { status: 'compliant' },
+      cr3: { status: 'deviation', note: 'No Workmen’s Compensation cover evidenced; CAR limit below the OMR 2,000,000 minimum.' },
+      cr4: { status: 'deviation', note: 'Performance bond offered at 5% against the 10% requirement.' },
+      cr5: { status: 'deviation', note: '30-week programme against the 24-week ITT completion requirement.' },
+      cr6: { status: 'exception', note: 'Escalation clause is open-ended with no annual ceiling — a material exception to the ITT.' },
+      cr7: { status: 'deviation', note: 'LD rate of 0.25%/week capped at 5%, below the ITT position.' },
+      cr8: { status: 'exception', note: 'Liability capped at 50% of contract value against the 100% ITT minimum.' },
+    },
+    evidence: {
+      pricing:    cev('Schedule of Prices (Section E)', 6, 'Priced schedule submitted in USD with provisional sums carried at the tendered rates.'),
+      discount:   cev('Commercial Proposal', 8, 'A 1.5% early settlement discount applies where payment is made within 15 days.'),
+      payment:    cev('Commercial Proposal', 9, '30% advance payment on contract signature, balance at 30 days from invoice.'),
+      warranty:   cev('Commercial Proposal', 12, 'Warranty of 24 months from the date of practical completion.'),
+      delivery:   cev('Programme of Works', 4, 'Completion within 30 weeks of the Notice to Proceed.'),
+      bond:       cev('Form of Tender', 3, 'Performance bond of 5% of the contract value.'),
+      insurance:  cev('Insurance Certificate', 1, 'Contractor All Risks limit USD 1,500,000. No Workmen’s Compensation certificate attached.'),
+      escalation: cev('Commercial Proposal', 17, 'Rates subject to escalation in line with actual cost movement; no ceiling stated.'),
+      lc:         cev('Local Content Plan', 1, 'Local content commitment of 35%, primarily through local procurement.'),
+      icv:        cev('ICV Certificate', 1, 'ICV retained value certified at 25%.'),
+    },
+  },
+  {
+    key: 'p3', entityType: 'International',
+    advancePct: 0.25, paymentDays: 90,
+    discountPct: 0, discountApplied: false, discountText: 'None offered',
+    warrantyMonths: 12, deliveryWeeks: 26, performanceBondPct: 0,
+    personnelInsured: false, insuranceText: 'Not evidenced',
+    escalationCapPct: null, escalationExposure: 0.55,
+    ldText: 'Not accepted', lolPct: 30,
+    currency: 'USD', fxShare: 0.60, mobilisationPct: 0.028,
+    lcScorePct: 20, icvRetainedPct: 15,
+    submissionFails: ['cd2', 'cd13'],
+    review: {
+      cr1: { status: 'deviation', note: '25% advance requested with 90-day terms thereafter.' },
+      cr2: { status: 'exception', note: '12-month warranty only — half the ITT requirement.' },
+      cr3: { status: 'exception', note: 'No insurance certificates submitted.' },
+      cr4: { status: 'exception', note: 'No performance bond offered.' },
+      cr5: { status: 'deviation', note: '26-week programme against the 24-week requirement.' },
+      cr6: { status: 'exception', note: 'Escalation uncapped.' },
+      cr7: { status: 'exception', note: 'Liquidated damages not accepted.' },
+      cr8: { status: 'exception', note: 'Liability capped at 30% of contract value.' },
+    },
+    evidence: {
+      pricing:    cev('Schedule of Prices (Section E)', 3, 'Priced schedule submitted with several rates carried as lump sums rather than unit rates.'),
+      discount:   cev('Commercial Proposal', 7, 'No discount offered.'),
+      payment:    cev('Commercial Proposal', 8, '25% advance on award; remaining payments at 90 days from invoice.'),
+      warranty:   cev('Commercial Proposal', 10, 'Warranty limited to 12 months from delivery.'),
+      delivery:   cev('Programme of Works', 2, 'Completion within 26 weeks of the Notice to Proceed.'),
+      bond:       cev('Form of Tender', 2, 'No performance bond is offered against this tender.'),
+      insurance:  cev('Commercial Proposal', 20, 'Insurance certificates to be provided post-award.'),
+      escalation: cev('Commercial Proposal', 14, 'Prices subject to review in the event of market movement.'),
+      lc:         cev('Local Content Plan', 1, 'Local content commitment of 20%.'),
+      icv:        cev('ICV Certificate', 1, 'ICV retained value certified at 15%.'),
+    },
+  },
+]
+
+export const commercialProfileFor = (index) => commercialProfiles[index % commercialProfiles.length]
 
 // ── Pre-Qualification: ERP bidder master registry ──────────────────────────
 // Shaped after the real "Supplier Registration Template - Tendering Phase" —
