@@ -3,7 +3,7 @@ import { tenders as initialTenders } from '../data/mockData'
 
 const TenderContext = createContext()
 
-// The Supply Chain Manager (SCM) gates the flow three times: after technical
+// Supply Chain (SCM) gates the flow three times: after technical
 // evaluation, after commercial evaluation (where the award decision is taken),
 // and after the contract draft. Nothing skips a gate — each one returns to its
 // immediate predecessor when the SCM sends it back.
@@ -29,10 +29,39 @@ const NEXT_STATUS = {
 }
 
 // Where each SCM gate sends the tender back to when the manager returns it.
+// Gate 2 is the exception: it sits downstream of BOTH evaluations, so its target
+// is chosen on the review screen (technical / commercial / both) — a technical
+// concern has to reach the Contract Holder, not the Contract Engineer.
 const GATE_RETURN = {
   scm_gate1: { status: 'tech_eval', stage: 'Technical Evaluation',  evalProgress: 'in_progress' },
   scm_gate2: { status: 'comm_eval', stage: 'Commercial Evaluation', evalProgress: 'in_progress' },
   scm_gate3: { status: 'award',     stage: 'Contract Drafting' },
+}
+
+const SIDE_RETURN = {
+  tech: { status: 'tech_eval', stage: 'Technical Evaluation',  evalProgress: 'in_progress' },
+  comm: { status: 'comm_eval', stage: 'Commercial Evaluation', evalProgress: 'in_progress' },
+}
+
+// Resolves the state a returned tender lands in. Both evaluator queues filter on
+// status AND side, so a parallel tender must go back to `parallel_eval` with the
+// returned side(s) re-opened — leaving it on `comm_eval` with both sides 'done'
+// hides it from the technical evaluator entirely.
+function resolveGateReturn(tender, gate, target) {
+  if (gate !== 'scm_gate2') return GATE_RETURN[gate]
+  const side = target || 'comm'
+  if (tender.evaluationMode === 'parallel') {
+    return {
+      status: 'parallel_eval',
+      stage: 'Parallel Evaluation',
+      evalProgress: 'in_progress',
+      techSide: side === 'comm' ? (tender.techSide || 'done') : 'evaluating',
+      commSide: side === 'tech' ? (tender.commSide || 'done') : 'evaluating',
+    }
+  }
+  // Linear runs technical first, so "both" restarts there and walks forward
+  // through gate 1 into commercial again.
+  return side === 'both' ? SIDE_RETURN.tech : (SIDE_RETURN[side] ?? GATE_RETURN.scm_gate2)
 }
 
 
@@ -77,7 +106,14 @@ const TENDERS_KEY = 'atm_tenders'
 const TENDERS_VERSION_KEY = 'atm_tenders_v'
 // Bumped to 3 when the single Management Review step became the three SCM gates —
 // persisted tenders still carrying `mgmt_review` would have no screen to land on.
-const TENDERS_VERSION = '3'
+// Bumped to 4 when gate-2 returns became side-aware: parallel tenders returned
+// under the old rule are stranded on `comm_eval` with both sides already 'done',
+// a state no evaluator queue can reach.
+// Bumped to 5 when the three tenders seeded at the SCM gates gained their
+// `bidderList` and evaluator assignments. Without them a gate return set the
+// right status but the tender never appeared in any evaluator's queue, so
+// persisted copies of the old seeds have to be replaced.
+const TENDERS_VERSION = '5'
 
 function loadTenders() {
   try {
@@ -166,16 +202,20 @@ export function TenderProvider({ children }) {
   }
 
   // Returning a gate sends the tender back to the stage that submitted it. The
-  // comment is mandatory at the call site — the owner sees it on re-entry.
-  const returnGate = (tenderId, gate, comment) => {
+  // comment is mandatory at the call site — the owner reads it on re-entry from
+  // scmDecisions[gate]. `target` ('tech' | 'comm' | 'both') only applies to gate 2.
+  const returnGate = (tenderId, gate, comment, target) => {
     setTenders(prev => prev.map(t => {
       if (t.id !== tenderId) return t
-      const back = GATE_RETURN[gate]
+      const back = resolveGateReturn(t, gate, target)
       if (!back) return t
       return {
         ...t,
         ...back,
-        scmDecisions: { ...(t.scmDecisions || {}), [gate]: { decision: 'returned', comment, at: new Date().toISOString() } },
+        scmDecisions: {
+          ...(t.scmDecisions || {}),
+          [gate]: { decision: 'returned', comment, target: target || null, at: new Date().toISOString() },
+        },
       }
     }))
   }

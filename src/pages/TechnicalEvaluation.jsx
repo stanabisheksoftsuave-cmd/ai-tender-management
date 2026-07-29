@@ -9,7 +9,9 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useBackHandler, useDismissable, useNavigation } from '../context/NavigationContext'
 import { openHtmlDoc, scoreRationaleDoc, failReasonDoc, scoreNarrative, scoreEvidence } from '../utils/docGen'
+import { exportBidderFailReasonsPDF } from '../utils/exportPDF'
 import { useHomePath } from '../utils/permissions'
+import { canEvaluate, isUnassignedSide } from '../utils/evalAssignment'
 
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -39,7 +41,6 @@ const Shield         = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 
 const ScanSearch     = p => <Svg {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M18.5 18.5l2.5 2.5"/></Svg>
 const Download       = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
 const Clock          = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>
-const Upload         = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
 const Save           = p => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Svg>
 
 // ── Evaluation Metric Definitions ────────────────────────────────────────────
@@ -84,6 +85,11 @@ const SEED = {
     optional:  { o1: true, o2: true, o3: false, o4: true, o5: false },
   },
 }
+
+// A criterion scored at or below this (of 0–3) puts the bidder into the
+// clarification / re-upload round, whatever their weighted total says. Only a
+// full 3 clears it — a 2 is no longer treated as clean.
+const CLARIFY_AT_OR_BELOW = 2
 
 const FULLY_COMPLIANT = {
   mandatory: Object.fromEntries(MANDATORY.map(m => [m.id, true])),
@@ -286,6 +292,9 @@ export default function TechnicalEvaluation() {
   const [interimReEval,  setInterimReEval]  = useState({}) // { [bidderId]: { step, done } }
   const [draftSaved,     setDraftSaved]     = useState(false) // interim "Save as Draft" feedback
   const interimStageRef  = useRef(null)                    // desired tender.stage this render
+  // Hidden file inputs behind the matrix-header "Reupload Bidders Documents"
+  // pill — that button is a second entry point into the same interim loop.
+  const interimFileRefs  = useRef({})
 
   const AI_STEPS = [
     'Parsing bidder submission bundles…',
@@ -501,8 +510,12 @@ export default function TechnicalEvaluation() {
   }
 
   if (!tenderId) {
+    // canEvaluate, not a bare id match: a tender with no technical assignment
+    // (never went through ingestion, or an SCM return on a legacy tender) would
+    // otherwise be invisible to every user forever. The guard below uses the
+    // same call so nothing can be listed but unopenable.
     const assignedTenders = tenders.filter(
-      t => t.assignedTechEval?.id === user?.id && (
+      t => canEvaluate(t, 'tech', user) && (
         t.status === 'tech_eval' ||
         (t.status === 'parallel_eval' && t.techSide === 'evaluating')
       )
@@ -510,16 +523,17 @@ export default function TechnicalEvaluation() {
     return (
       <TenderSelectList
         tenders={assignedTenders}
-        status="tech_eval"
+        status={['tech_eval', 'parallel_eval']}
         basePath="/technical-eval"
         title="Technical Evaluation"
         description="Select a tender to begin compliance evaluation"
         emptyText="No tenders assigned to you for technical evaluation"
+        isUnassigned={t => isUnassignedSide(t, 'tech')}
       />
     )
   }
 
-  if (!tender || tender.assignedTechEval?.id !== user?.id) {
+  if (!tender || !canEvaluate(tender, 'tech', user)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
         <p className="text-sm">{!tender ? 'Tender not found.' : 'This tender is not assigned to you.'}</p>
@@ -721,12 +735,6 @@ export default function TechnicalEvaluation() {
     techCriteria.every(c => { const v = techScores[`${b.id}-${c.id}`]; return v !== undefined && v !== '' })
   )
 
-  // Per-criterion 0–3 band, used for the cell badge.
-  const getScoreCompliance = score => {
-    if (score >= 2) return { variant: 'compliant',         label: 'Acceptable' }
-    if (score >= 1) return { variant: 'partial_compliant', label: 'Marginal' }
-    return             { variant: 'non_compliant',     label: 'Unacceptable' }
-  }
   const HSE_BANDS = ['—', 'Red', 'Amber', 'Green']
   const hseCriterion = techCriteria.find(c => c.isHse)
   const hseBanding = bidderId => HSE_BANDS[rawScore(bidderId, hseCriterion?.id)] || '—'
@@ -738,11 +746,45 @@ export default function TechnicalEvaluation() {
   const techPassFail = bidderId =>
     mustFailures(bidderId).length === 0 && techTotalFor(bidderId) >= overallPass ? 'PASS' : 'FAIL'
 
+  // Criteria scored at or below the clarification threshold (2). A single one of
+  // these drags the bidder into the clarification round even when the weighted
+  // total passes and no Must failed — that criterion has to be corrected.
+  const belowBandFor = bidderId => techCriteria.filter(c => {
+    const v = techScores[`${bidderId}-${c.id}`]
+    return v !== undefined && v !== '' && Number(v) <= CLARIFY_AT_OR_BELOW
+  })
+
+  // Flat per-criterion failure list for a bidder — the payload behind the header
+  // "Export Reason" PDF. Musts under their minimum first, then the clarification
+  // criteria (a Must can be both; it is only listed once, as a Must).
+  const failureRowsFor = bidderId => {
+    const musts   = mustFailures(bidderId)
+    const mustIds = new Set(musts.map(c => c.id))
+    return [
+      ...musts.map(c => ({
+        criterion: c.criterion, type: c.type, kind: 'must',
+        score: rawScore(bidderId, c.id), maxScore: c.maxScore || 3, minScore: c.minScore,
+        band: c.bands?.[rawScore(bidderId, c.id)],
+      })),
+      ...belowBandFor(bidderId).filter(c => !mustIds.has(c.id)).map(c => ({
+        criterion: c.criterion, type: c.type, kind: 'clarify',
+        score: rawScore(bidderId, c.id), maxScore: c.maxScore || 3, minScore: c.minScore,
+        band: c.bands?.[rawScore(bidderId, c.id)],
+      })),
+    ]
+  }
+  const exportFailReasons = (bidder) => exportBidderFailReasonsPDF(tender, bidder, {
+    threshold: CLARIFY_AT_OR_BELOW,
+    summary: `Weighted total ${techTotalFor(bidder.id).toFixed(1)} / 100 against a pass mark of ${overallPass}. Result: ${techPassFail(bidder.id)}.`,
+    failures: failureRowsFor(bidder.id),
+  })
+
   // ── Interim (post-scoring re-upload) derivations ──
-  // Fully-scored eligible bidders whose result is FAIL — these are offered a
-  // document re-upload (same as the PQQ failed process).
+  // Fully-scored eligible bidders that either failed outright or carry a
+  // below-band criterion — these are offered a document re-upload (same as the
+  // PQQ failed process).
   const scoredFailedIds = eligibleBidders
-    .filter(b => techFullyScored(b.id) && techPassFail(b.id) === 'FAIL')
+    .filter(b => techFullyScored(b.id) && (techPassFail(b.id) === 'FAIL' || belowBandFor(b.id).length > 0))
     .map(b => b.id)
   // Bidders whose corrected document is being re-marked right now (scores cleared
   // while the AI re-assesses, so they aren't "fully scored" during this window).
@@ -751,14 +793,26 @@ export default function TechnicalEvaluation() {
     .map(Number)
   // Everyone still in the interim loop: failing, or being re-evaluated.
   const interimBidderIds = [...new Set([...scoredFailedIds, ...reEvaluatingIds])]
-  // Re-uploaded and now passing — the resolved (green) list.
-  const resolvedInterimIds = Object.keys(interimReEval)
-    .filter(id => interimReEval[id]?.done && !scoredFailedIds.includes(Number(id)))
-    .map(Number)
+  // Resolved (re-uploaded and now passing) is read per bidder in the matrix
+  // header — a re-eval that is done and no longer in interimBidderIds.
   const inInterim = interimBidderIds.length > 0
   const defaultStage = tender.evaluationMode === 'parallel' ? 'Parallel Evaluation' : 'Technical Evaluation'
   // Stash the stage the tender should show; the commit-time effect writes it.
   interimStageRef.current = inInterim ? 'Interim' : defaultStage
+
+  // Supply Chain can return a tender from gate 1 (technical) or gate 2 (award,
+  // targeted at the technical side). Either way the comment is the brief for
+  // this re-evaluation, so it has to be on screen.
+  const scmReturn = (() => {
+    if (submitted) return null
+    const d = tender.scmDecisions || {}
+    const found = (d.scm_gate2?.decision === 'returned' && d.scm_gate2.target !== 'comm')
+      ? { ...d.scm_gate2, gateLabel: 'Award Gate' }
+      : d.scm_gate1?.decision === 'returned' ? { ...d.scm_gate1, gateLabel: 'Technical Gate' } : null
+    // A return only stands until the evaluator answers it.
+    if (!found) return null
+    return tender.techEvalSubmittedAt && tender.techEvalSubmittedAt > found.at ? null : found
+  })()
 
   const handleNotifyPOF = (bidder) => {
     if (notifications.some(n => n.bidder.id === bidder.id)) return
@@ -810,6 +864,26 @@ export default function TechnicalEvaluation() {
     startInterimReEval(bidderId)
   }
 
+  // Submit the technical evaluation. The scores have to reach the tender itself:
+  // the SCM award gate and the contract stage both rank on bidderList.techScore,
+  // and a returned tender re-enters here with the previous submission on record.
+  // Parallel tenders converge on gate 2 via submitParallelEval — advanceTender
+  // has no transition for `parallel_eval` and would silently do nothing.
+  const submitTechnical = () => {
+    const scoredBidders = tenderBidders.map(b => ({ ...b, techScore: Math.round(techTotalFor(b.id)) }))
+    updateTender(tenderId, {
+      bidderList: scoredBidders,
+      techEvalSubmittedAt: new Date().toISOString(),
+      techEvalResult: {
+        scores: techScores, overallPass,
+        submittedBy: user?.name || 'Contract Holder',
+      },
+    })
+    if (tender.evaluationMode === 'parallel') submitParallelEval(tenderId, 'tech')
+    else advanceTender(tenderId)
+    setSubmitted(true)
+  }
+
   // Save the evaluation as a draft — useful in the Interim stage, where Submit is
   // blocked until re-uploads are re-evaluated. Persists the current scores and
   // keeps the tender in the evaluator's queue (stage stays Interim while pending).
@@ -839,17 +913,28 @@ export default function TechnicalEvaluation() {
         setTimeout(advance, 650)
       } else {
         // …then re-run AI marking on the corrected submission. Corrected docs
-        // usually clear the bar, but the AI genuinely re-assesses, so ~15% of the
-        // time a Must still falls below its minimum and the bidder stays failed.
+        // usually clear the bar, but the AI genuinely re-assesses: ~15% of the
+        // time a Must still falls below its minimum, and a further ~15% leaves
+        // one criterion at the clarification threshold — which keeps the bidder
+        // in the round for another re-upload. Every other criterion is marked a
+        // clean 3: under the at-or-below-2 rule a stray 2 would drag the bidder
+        // back in, so the dip has to be the only thing that can hold them.
         setTechScores(prev => {
           const next = { ...prev }
           const musts = techCriteria.filter(c => c.type === 'Must' && c.minScore != null)
-          const stillFails = musts.length > 0 && Math.random() < 0.15
-          const dipId = stillFails ? musts[Math.floor(Math.random() * musts.length)].id : null
+          const stillFails     = musts.length > 0 && Math.random() < 0.15
+          const stillClarifies = !stillFails && techCriteria.length > 0 && Math.random() < 0.15
+          const dipId = stillFails
+            ? musts[Math.floor(Math.random() * musts.length)].id
+            : stillClarifies
+              ? techCriteria[Math.floor(Math.random() * techCriteria.length)].id
+              : null
           techCriteria.forEach(c => {
-            next[`${bidderId}-${c.id}`] = c.id === dipId
-              ? Math.max(0, (c.minScore ?? 1) - 1)
-              : (Math.random() < 0.7 ? 3 : 2)
+            next[`${bidderId}-${c.id}`] = c.id !== dipId
+              ? 3
+              : stillFails
+                ? Math.max(0, (c.minScore ?? 1) - 1)
+                : CLARIFY_AT_OR_BELOW
           })
           return next
         })
@@ -1227,6 +1312,29 @@ export default function TechnicalEvaluation() {
           )}
         </div>
       </Card>
+
+      {/* ── Supply Chain sent this back — the comment is the whole brief ── */}
+      {scmReturn && (
+        <Card className="p-4 border border-amber-200 bg-amber-50/60">
+          <div className="flex items-start gap-3">
+            <RotateCcw size={15} className="text-amber-500 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-800">
+                Returned by Supply Chain for re-evaluation
+                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                  {scmReturn.gateLabel}
+                </span>
+              </p>
+              {scmReturn.comment
+                ? <p className="text-xs text-amber-700 mt-1 leading-relaxed italic">“{scmReturn.comment}”</p>
+                : <p className="text-xs text-amber-700 mt-1">No comment was recorded with the return.</p>}
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Returned {new Date(scmReturn.at).toLocaleString('en-GB')} · re-score the criteria below and submit again.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ── Tab Navigation ── */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
@@ -1677,12 +1785,66 @@ export default function TechnicalEvaluation() {
                   <th className="text-center px-2 py-3 text-xs font-semibold text-slate-500 w-12">Min</th>
                   {displayBidders.map(b => {
                     const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
+                    // Same treatment as the PQQ matrix: a failing bidder gets the
+                    // FAIL badge plus re-upload / export-reason pills in-column.
+                    const re = interimReEval[b.id]
+                    const reEvaluating = re && !re.done
+                    const failing = bStatus !== 'non_compliant' && !reEvaluating && interimBidderIds.includes(b.id)
+                    // Re-evaluation feedback lives here, in the bidder's own
+                    // column — it used to be the interim panel's job, and that
+                    // panel duplicated this re-upload button, so it was removed.
+                    const stillFailing = failing && !!re?.done
+                    const resolved = !!re?.done && !reEvaluating && !failing && bStatus !== 'non_compliant'
+                    const up = interimUploads[b.id]
                     return (
                       <th key={b.id} className="text-center px-3 py-3 text-xs font-semibold text-slate-500 min-w-32">
-                        <div>{b.name.split(' ')[0]}</div>
-                        {bStatus === 'non_compliant' && (
-                          <span className="block text-[9px] font-medium text-red-400 mt-0.5">Eliminated</span>
-                        )}
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <div className="flex items-center gap-1.5 flex-wrap justify-center mb-1">
+                            <span>{b.name.split(' ')[0]}</span>
+                            {failing && <Badge variant="error"><XCircle size={10} /> Fail</Badge>}
+                          </div>
+                          {reEvaluating && (
+                            <span className="flex items-center justify-center gap-1 text-[10px] font-semibold text-[var(--color-primary)] bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 rounded px-2 py-0.5 mt-1 w-full normal-case">
+                              <RotateCcw size={10} className="animate-spin shrink-0" />
+                              <span className="truncate">{RE_EVAL_STEPS[re.step]}</span>
+                            </span>
+                          )}
+                          {failing && (
+                            <>
+                              {stillFailing && (
+                                <span className="block text-[9px] font-semibold text-red-500 mt-1 leading-tight normal-case">
+                                  Re-evaluated — still not resolved
+                                </span>
+                              )}
+                              <button
+                                onClick={() => interimFileRefs.current[b.id]?.click()}
+                                className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors mt-1 font-semibold w-full"
+                              >
+                                Reupload Bidders Documents
+                              </button>
+                              <button
+                                onClick={() => exportFailReasons(b)}
+                                className="flex items-center justify-center gap-1 text-[10px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50 transition-colors mt-1 mb-1 font-semibold w-full"
+                              >
+                                <Download size={10} /> Export Reason
+                              </button>
+                              <input
+                                ref={el => { interimFileRefs.current[b.id] = el }}
+                                type="file" className="hidden"
+                                onChange={e => handleInterimUpload(b.id, e.target.files?.[0])}
+                              />
+                            </>
+                          )}
+                          {resolved && (
+                            <span className="flex items-center justify-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 mt-1 w-full normal-case"
+                              title={up ? `Re-evaluated · ${up.name}` : 'Re-evaluated'}>
+                              <CheckCircle size={10} className="shrink-0" /> Resolved
+                            </span>
+                          )}
+                          {bStatus === 'non_compliant' && (
+                            <span className="block text-[9px] font-medium text-red-400 mt-0.5">Eliminated</span>
+                          )}
+                        </div>
                       </th>
                     )
                   })}
@@ -1715,6 +1877,9 @@ export default function TechnicalEvaluation() {
                           const hasVal = val !== undefined && val !== ''
                           const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
                           const belowMin = c.type === 'Must' && c.minScore != null && hasVal && Number(val) < c.minScore
+                          // At or below the clarification threshold — triggers a
+                          // clarification round on its own, without a Must failure.
+                          const needsClarify = hasVal && !belowMin && Number(val) <= CLARIFY_AT_OR_BELOW
                           return (
                             <td key={b.id} className="px-3 py-3 text-center">
                               {bStatus === 'non_compliant' ? (
@@ -1733,11 +1898,12 @@ export default function TechnicalEvaluation() {
                                       }}
                                       className={`w-14 text-center text-sm font-semibold rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 placeholder:text-slate-300 ${
                                         belowMin ? 'border-2 border-red-300 bg-red-50'
+                                        : needsClarify ? 'border-2 border-amber-300 bg-amber-50'
                                         : aiScored && !aiModified[scoreKey] && hasVal ? 'border-2 border-blue-300 bg-blue-50/40'
                                         : 'border border-slate-200'
                                       }`}
                                     />
-                                    {aiScored && !aiModified[scoreKey] && hasVal && !belowMin && (
+                                    {aiScored && !aiModified[scoreKey] && hasVal && !belowMin && !needsClarify && (
                                       <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white">
                                         <Bot size={8} />
                                       </div>
@@ -1747,6 +1913,7 @@ export default function TechnicalEvaluation() {
                                     <span className="text-[10px] font-semibold text-slate-500">{techWeighted(b.id, c).toFixed(1)}<span className="text-slate-300">/{c.weight}</span></span>
                                   )}
                                   {belowMin && <span className="text-[9px] font-bold text-red-600">below min</span>}
+                                  {needsClarify && <span className="text-[9px] font-bold text-amber-600">clarification req.</span>}
                                   {hasVal && (
                                     <button
                                       type="button"
@@ -1822,7 +1989,7 @@ export default function TechnicalEvaluation() {
                 </tr>
                 {/* Pass / Fail */}
                 <tr className="bg-slate-50">
-                  <td colSpan={4} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Result <span className="text-slate-400 normal-case font-medium">(all Musts ≥ min · total ≥ {overallPass})</span></td>
+                  <td colSpan={4} className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Result <span className="text-slate-400 normal-case font-medium">(all Musts ≥ min · total ≥ {overallPass} · every criterion above {CLARIFY_AT_OR_BELOW} to skip clarification)</span></td>
                   {displayBidders.map(b => {
                     const scored = techFullyScored(b.id)
                     const bStatus = getEffectiveStatus(b.id, compliance[b.id] ?? FULLY_COMPLIANT)
@@ -1830,6 +1997,8 @@ export default function TechnicalEvaluation() {
                     if (!scored) return <td key={b.id} className="px-3 py-3 text-center"><span className="text-xs text-slate-300">—</span></td>
                     const result = techPassFail(b.id)
                     const fails = mustFailures(b.id)
+                    const mustIds = new Set(fails.map(c => c.id))
+                    const underBand = belowBandFor(b.id).filter(c => !mustIds.has(c.id))
                     return (
                       <td key={b.id} className="px-3 py-3 text-center">
                         {result === 'PASS'
@@ -1837,6 +2006,9 @@ export default function TechnicalEvaluation() {
                           : <Badge variant="non_compliant"><XCircle size={10} /> Fail</Badge>}
                         {result === 'FAIL' && fails.length > 0 && (
                           <p className="text-[9px] text-red-500 mt-1">Must below min: {fails.length}</p>
+                        )}
+                        {underBand.length > 0 && (
+                          <p className="text-[9px] text-amber-600 mt-1">{underBand.length} {underBand.length === 1 ? 'criterion' : 'criteria'} at or below {CLARIFY_AT_OR_BELOW} — clarification required</p>
                         )}
                         {result === 'FAIL' && (
                           <button
@@ -1867,82 +2039,6 @@ export default function TechnicalEvaluation() {
           </div>
         </Card>
 
-        {/* ── Interim — failed bidders re-upload documents, then re-evaluate ── */}
-        {!submitted && (interimBidderIds.length > 0 || resolvedInterimIds.length > 0) && (
-          <Card className="p-4 border border-amber-200">
-            <div className="flex items-center gap-2 flex-wrap">
-              <AlertTriangle size={15} className="text-amber-500 shrink-0" />
-              <h3 className="text-sm font-semibold text-slate-800">Interim — Document Re-upload</h3>
-              {interimBidderIds.length > 0 && (
-                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Interim</span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-              {interimBidderIds.length > 0
-                ? <>Bidders below did not pass the technical evaluation. Re-upload their corrected document to re-run the AI assessment — the same as the pre-qualification failed process. The tender stays in the <strong>Interim</strong> stage until every re-upload has been re-evaluated.</>
-                : <>All re-uploaded documents have been re-evaluated. The tender has returned to <strong>{defaultStage}</strong>.</>}
-            </p>
-
-            <div className="mt-3 space-y-2">
-              {/* Bidders currently failing → awaiting re-upload, or being re-evaluated */}
-              {interimBidderIds.map(id => {
-                const b = eligibleBidders.find(x => x.id === id)
-                const re = interimReEval[id]
-                const up = interimUploads[id]
-                const reEvaluating = re && !re.done
-                const stillFailed = re?.done // done but still failing → re-assessed short
-                return (
-                  <div key={id} className="flex items-center justify-between gap-4 rounded-lg border border-amber-100 bg-amber-50/50 px-4 py-2.5 flex-wrap">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center shrink-0">{b?.name?.[0]}</div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate">{b?.name}</p>
-                        <p className={`text-[11px] truncate ${reEvaluating ? 'text-[var(--color-primary)]' : 'text-red-500'}`}>
-                          {reEvaluating ? 'Re-evaluating corrected submission…'
-                            : stillFailed ? 'Re-evaluated — still below pass. Re-upload again.'
-                            : 'Failed — awaiting re-upload'}
-                          {up && !reEvaluating ? ` · ${up.name}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    {reEvaluating ? (
-                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--color-primary)] shrink-0">
-                        <RotateCcw size={13} className="animate-spin" /> {RE_EVAL_STEPS[re.step]}
-                      </span>
-                    ) : (
-                      <label className="flex items-center gap-1.5 text-xs font-medium border border-dashed border-amber-300 rounded-lg px-3 py-2 cursor-pointer hover:border-[var(--color-primary)] transition-colors text-slate-600 shrink-0">
-                        <Upload size={13} className="text-amber-500" />
-                        {up ? 'Re-upload again' : 'Re-upload document'}
-                        <input type="file" className="hidden" onChange={e => handleInterimUpload(id, e.target.files?.[0])} />
-                      </label>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Bidders that re-uploaded and passed on re-evaluation */}
-              {resolvedInterimIds.map(id => {
-                const b = eligibleBidders.find(x => x.id === id)
-                if (!b) return null
-                return (
-                  <div key={`res-${id}`} className="flex items-center justify-between gap-4 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 flex-wrap">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center shrink-0">{b.name?.[0]}</div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate">{b.name}</p>
-                        <p className="text-[11px] text-emerald-600 truncate">Re-evaluated{interimUploads[id] ? ` · ${interimUploads[id].name}` : ''}</p>
-                      </div>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
-                      <CheckCircle size={11} /> Passed after re-upload
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        )}
-
         {/* Submit / Export */}
         {!submitted ? (
           <Card className="p-4">
@@ -1954,7 +2050,7 @@ export default function TechnicalEvaluation() {
                     ? `Score all ${eligibleBidders.length} eligible bidder${eligibleBidders.length !== 1 ? 's' : ''} across all ${techCriteria.length} criteria.`
                     : interimBidderIds.length > 0
                     ? `Interim: ${interimBidderIds.length} bidder${interimBidderIds.length !== 1 ? 's' : ''} must re-upload and be re-evaluated before you can submit.`
-                    : 'All criteria scored. Submit to generate the evaluation report.'}
+                    : `All criteria scored and every criterion is above the clarification threshold (${CLARIFY_AT_OR_BELOW}). Submit to generate the evaluation report.`}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1967,7 +2063,7 @@ export default function TechnicalEvaluation() {
                   <Save size={13} /> Save as Draft
                 </Button>
                 <Button size="sm" disabled={!allTechScored || interimBidderIds.length > 0}
-                  onClick={() => { advanceTender(tenderId); setSubmitted(true) }}>
+                  onClick={submitTechnical}>
                   <Send size={13} /> Submit & Export Report
                 </Button>
               </div>
@@ -1975,7 +2071,7 @@ export default function TechnicalEvaluation() {
             {interimBidderIds.length > 0 ? (
               <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <AlertTriangle size={12} />
-                Tender is in the <strong className="mx-1">Interim</strong> stage — resolve the {interimBidderIds.length} re-upload{interimBidderIds.length !== 1 ? 's' : ''} above before submitting.
+                Tender is in the <strong className="mx-1">Interim</strong> stage — {interimBidderIds.length} bidder{interimBidderIds.length !== 1 ? 's' : ''} still to resolve (failed result, or a criterion at or below {CLARIFY_AT_OR_BELOW}). Use <strong className="mx-1">Reupload Bidders Documents</strong> in each flagged bidder’s column above, then re-evaluate, before submitting.
               </div>
             ) : !allTechScored && (
               <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -1991,13 +2087,15 @@ export default function TechnicalEvaluation() {
               <div>
                 <p className="text-sm font-semibold text-emerald-800">Technical Evaluation Submitted</p>
                 <p className="text-xs text-emerald-700 mt-0.5">
-                  Download the evaluation report and hand it to the <strong>Contract Engineer</strong> for upload to unlock Commercial Evaluation.
+                  The scores are recorded on the tender. Download the report for your records.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
               <Clock size={13} className="shrink-0" />
-              <span>Tender is now <strong className="mx-1">Awaiting Contract Engineer Upload</strong> — the Contract Engineer must upload this report to advance to Commercial Evaluation.</span>
+              {tender.evaluationMode === 'parallel'
+                ? <span>Parallel evaluation — the tender moves to the <strong className="mx-1">SCM Award Gate</strong> once the Contract Engineer also submits the commercial side.</span>
+                : <span>Tender is now with <strong className="mx-1">Supply Chain — Technical Gate</strong>, which releases Commercial Evaluation on approval.</span>}
             </div>
             <Button className="w-full justify-center" onClick={() => {
               const win = window.open('', '_blank')

@@ -1,20 +1,16 @@
 import { useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
-import ErrorBoundary from '../components/ErrorBoundary'
-import SectionFillStep from '../components/itt/SectionFillStep'
-import B2ClassEditor from '../components/itt/B2ClassEditor'
-import { resolveFlow } from '../components/itt/sectionFlow'
-import { bidders as seedBidders } from '../data/mockData'
+import SectionTemplateModal from '../components/contract/SectionTemplateModal'
+import { contractSections } from '../components/itt/sectionFlow'
 import { useAuth } from '../context/AuthContext'
 import { useHomePath } from '../utils/permissions'
 import { useTenders } from '../context/TenderContext'
 import { useBackHandler } from '../context/NavigationContext'
-import { openHtmlDoc, rejectionLetterDoc } from '../utils/docGen'
+import { awardOutcome, openRegretLetter } from '../utils/contractDocs'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -33,6 +29,7 @@ const BarChart3     = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/>
 const Award         = p => <Svg {...p}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></Svg>
 const ShieldOff     = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></Svg>
 const FileText      = p => <Svg {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></Svg>
+const RotateCcw     = p => <Svg {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.1"/></Svg>
 
 // ── Stage breadcrumb ──────────────────────────────────────────────────────────
 const flowStages = [
@@ -44,18 +41,6 @@ const flowStages = [
   { label: 'Contract Draft', done: false, active: true },
 ]
 
-// ── Combined score helper ─────────────────────────────────────────────────────
-// Simple average of the technical and commercial results, out of 100.
-const combined = b => Math.round(((b.techScore ?? 75) + (b.commScore ?? 70)) / 2)
-
-// The ITT sections a contract can be drafted against — the very same section
-// templates the ITT was filled in against, so "Review Template" opens the real
-// document rather than a stand-in. Section 1 (Instructions to Tenderers) is not
-// listed: it governs how tenderers submit their bids, not the contract that
-// follows.
-const contractSections = (b1Category) =>
-  resolveFlow(b1Category).filter(s => s.id !== 'section1')
-
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ContractTemplate() {
   const { tenderId } = useParams()
@@ -66,7 +51,6 @@ export default function ContractTemplate() {
   const tender       = tenders.find(t => t.id === tenderId)
 
   const [sent,        setSent]        = useState(false)
-  const [sentLetters, setSentLetters] = useState(false)
   // The section id being drafted against / reviewed. Defaults to the first in
   // the list, so the page always has a drafting reference selected.
   const [sectionId,   setSectionId]   = useState('sectionA')
@@ -122,18 +106,9 @@ export default function ContractTemplate() {
     </div>
   )
 
-  // ── Derive bidder list ──
-  const tenderBidders = Array.isArray(tender.bidderList)
-    ? tender.bidderList
-    : seedBidders.slice(0, tender.bidders || 4)
-
-  // Winner: prefer the one management approved, else fallback to highest combined score
-  const awardedBidder = tender.mgmtWinnerId
-    ? tenderBidders.find(b => b.id === tender.mgmtWinnerId) ?? [...tenderBidders].sort((a, b) => combined(b) - combined(a))[0]
-    : [...tenderBidders].sort((a, b) => combined(b) - combined(a))[0]
-
-  // All bidders ranked (for the overview)
-  const ranked = [...tenderBidders].sort((a, b) => combined(b) - combined(a))
+  // Winner + regret list — shared with Contract Management, so both pages name
+  // the same award outcome.
+  const { bidders: tenderBidders, ranked, awarded: awardedBidder, unsuccessful: failedBidders } = awardOutcome(tender)
 
   // Commercial hands over a recommendation (a bidder), not a score. Use the
   // recorded recommendation; fall back to the strongest commercial bidder for
@@ -142,25 +117,24 @@ export default function ContractTemplate() {
   const commRecId = commRec?.bidderId
     ?? [...tenderBidders].sort((a, b) => (b.commScore ?? 0) - (a.commScore ?? 0))[0]?.id ?? null
 
-  // Unsuccessful bidders — everyone except the awarded party — get a regret letter.
-  const failedBidders = ranked.filter(b => awardedBidder && b.id !== awardedBidder.id)
-  const letterDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
   // The reviewed section is the ITT's own section, so an edit made here writes
   // back to the same keys ITT creation uses — no separate copy of the answers.
   const handleAnswersChange = (id, values) =>
     updateTender(tender.id, { sectionAnswers: { ...(tender.sectionAnswers || {}), [id]: values } })
   const handleProseChange = (id, edits) =>
     updateTender(tender.id, { sectionProse: { ...(tender.sectionProse || {}), [id]: edits } })
+  // B2 shares its clause classes with ITT creation via the tender itself.
   const handleB2Change = (next) =>
     updateTender(tender.id, { sectionB2Classes: next })
 
-  const openRejectionLetter = (b) => {
-    const d = rejectionLetterDoc({
-      tenderId: tender.id, tenderTitle: tender.title, bidderName: b.name,
-      department: tender.department, awardedTo: awardedBidder?.name, dateStr: letterDate,
-    })
-    openHtmlDoc(d.title, d.content)
-  }
+  // Gate 3 sends the draft back here with a comment; it stands until the draft is
+  // re-submitted (contractDraftReady is cleared on submit-for-approval below).
+  const scmReturn = (() => {
+    const d = tender.scmDecisions?.scm_gate3
+    return d?.decision === 'returned' && !sent ? d : null
+  })()
+
+  const openRejectionLetter = (b) => openRegretLetter(tender, b, awardedBidder?.name)
 
   return (
     <div className="space-y-5">
@@ -181,6 +155,24 @@ export default function ContractTemplate() {
           </div>
         </div>
       </Card>
+
+      {/* ── Supply Chain returned the draft — the gate comment is the brief ── */}
+      {scmReturn && (
+        <Card className="p-4 border border-amber-200 bg-amber-50/60">
+          <div className="flex items-start gap-3">
+            <RotateCcw size={15} className="text-amber-500 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-800">Returned by Supply Chain for redraft</p>
+              {scmReturn.comment
+                ? <p className="text-xs text-amber-700 mt-1 leading-relaxed italic">“{scmReturn.comment}”</p>
+                : <p className="text-xs text-amber-700 mt-1">No comment was recorded with the return.</p>}
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Returned {new Date(scmReturn.at).toLocaleString('en-GB')} · redraft below and submit again. Nothing has been issued to any bidder.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ── Stage breadcrumb ── */}
       <div className="flex items-center gap-0 overflow-x-auto pb-1">
@@ -381,7 +373,7 @@ export default function ContractTemplate() {
                     Contract drafted for {awardedBidder.name}.
                   </div>
                   <p className="text-xs text-slate-500">
-                    Draft the contract for the winner and prepare the regret letters below, then submit the draft to the Supply Chain Manager. Nothing is issued until the SCM approves — on approval the winner’s contract and every regret letter are released together.
+                    Draft the contract for the winner and review the regret letters below, then submit the draft to Supply Chain. Nothing is issued until the SCM approves — on approval the winner’s contract and every regret letter are released together, and the letters are sent from Contract Management.
                   </p>
                   <Button onClick={() => { updateTender(tender.id, { status: 'scm_gate3', stage: 'SCM Review — Contract Draft', contractDraftReady: true }); navigate('/tenders') }}>
                     <CheckCircle size={14} /> Submit Draft for SCM Approval <ChevronRight size={14} />
@@ -393,16 +385,18 @@ export default function ContractTemplate() {
         </Card>
       )}
 
-      {/* ── Unsuccessful bidder notifications (after the contract is drafted) ── */}
+      {/* ── Regret letters — preview only ──
+           Read-only by design: nothing may be issued before SCM gate 3. Sending
+           lives in Contract Management, next to the issued documents. */}
       {sent && awardedBidder && failedBidders.length > 0 && (
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <FileText size={16} className="text-[var(--color-primary)]" />
-            <h3 className="font-semibold text-slate-800 text-sm">Notify Unsuccessful Bidders</h3>
+            <h3 className="font-semibold text-slate-800 text-sm">Regret Letters — Preview</h3>
             <Badge variant="non_compliant">{failedBidders.length} not selected</Badge>
           </div>
           <p className="text-xs text-slate-500 mb-4">
-            Generate a regret letter for each bidder who was not awarded, then send the notifications so the outcome is communicated.
+            Check each letter before submitting the draft. Nothing is sent from this screen — the letters are released with the contract once Supply Chain approves.
           </p>
           <div className="space-y-2">
             {failedBidders.map(b => (
@@ -414,110 +408,37 @@ export default function ContractTemplate() {
                     <p className="text-[11px] text-slate-400">Technical {b.techScore ?? 75}/100 · Not selected</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {sentLetters && (
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                      <CheckCircle size={12} /> Sent
-                    </span>
-                  )}
-                  <Button variant="secondary" size="sm" onClick={() => openRejectionLetter(b)}>
-                    <Eye size={12} /> View Letter
-                  </Button>
-                </div>
+                <Button variant="secondary" size="sm" className="shrink-0" onClick={() => openRejectionLetter(b)}>
+                  <Eye size={12} /> View Letter
+                </Button>
               </div>
             ))}
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-[11px] text-slate-400">
-              {sentLetters
-                ? 'Regret letters have been sent to all unsuccessful bidders.'
-                : 'Each letter carries the tender outcome and a courteous regret message.'}
-            </p>
-            <Button disabled={sentLetters} onClick={() => setSentLetters(true)}>
-              <Send size={13} /> {sentLetters ? 'Notifications Sent' : `Send Regret Letters (${failedBidders.length})`}
-            </Button>
-          </div>
+          <p className="text-[11px] text-slate-400 mt-4">
+            Each letter carries the tender outcome and a courteous regret message.
+          </p>
         </Card>
       )}
 
       {/* ── ITT Template Review Modal ──
-           The selected section's real template, rendered by the same components
-           the ITT section route uses, so it behaves identically here: AI-filled
-           fields can be overwritten and any text — a field or the template's own
-           wording — can be selected and edited with AI.
-
-           Portalled to <body>: this page renders inside <main>, whose fade-in
-           animation gives it a stacking context. <main> is not positioned, so
-           everything inside it paints below the fixed header (z-50) and sidebar
-           (z-40) no matter what z-index the modal is given — it would sit under
-           the chrome with only the page area dimmed. On <body> it is a real
-           overlay, centred in the viewport and clipped by nothing. */}
-      {reviewOpen && section && createPortal(
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4"
-          onClick={() => setReviewOpen(false)}>
-          {/* Scrolled internally, so the title and the approve buttons stay put
-              however long the template runs. */}
-          <div className="w-full max-w-4xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <Card className="flex flex-col min-h-0 overflow-hidden">
-              <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100 shrink-0">
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-slate-800">ITT Template Review</h3>
-                  <p className="text-xs text-slate-400 truncate">{ittSection} · {tender.id}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" onClick={() => { setIttApproved(true); setReviewOpen(false) }}>
-                    <CheckCircle size={13} /> Approve ITT Template
-                  </Button>
-                  <button onClick={() => setReviewOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">✕</button>
-                </div>
-              </div>
-
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-slate-50/60">
-                <ErrorBoundary>
-                  {section.kind === 'b1-chooser' ? (
-                    /* B1's template is whichever General Conditions tier the ITT
-                       picked — without that choice there is nothing to show. */
-                    <Card className="p-8 text-center">
-                      <FileText size={26} className="mx-auto mb-2 text-slate-300" />
-                      <p className="text-sm font-medium text-slate-600">No General Conditions tier was selected on this ITT.</p>
-                      <p className="text-xs text-slate-400 mt-1">Section B1's template is chosen during ITT creation.</p>
-                    </Card>
-                  ) : section.id === 'sectionB2' ? (
-                    /* B2 is authored as clause classes → sub-classes rather than
-                       as template fields, exactly as in the ITT route. */
-                    <B2ClassEditor
-                      key={section.id}
-                      section={section}
-                      classes={tender.sectionB2Classes || []}
-                      onChange={handleB2Change}
-                      onNext={() => setReviewOpen(false)}
-                      onBack={() => setReviewOpen(false)}
-                    />
-                  ) : (
-                    <SectionFillStep
-                      key={section.id}
-                      section={section}
-                      answers={tender.sectionAnswers?.[section.id]}
-                      proseEdits={tender.sectionProse?.[section.id] || {}}
-                      onAnswersChange={handleAnswersChange}
-                      onProseChange={handleProseChange}
-                      onNext={() => setReviewOpen(false)}
-                      onBack={() => setReviewOpen(false)}
-                      isFirst={false}
-                      isLast={false}
-                      nextLabel="Save & Close"
-                      // Sized so the section card fits the panel without a second
-                      // scrollbar appearing outside the document itself.
-                      bodyMaxHeight="max(200px, calc(100vh - 32rem))"
-                    />
-                  )}
-                </ErrorBoundary>
-              </div>
-
-            </Card>
-          </div>
-        </div>,
-        document.body,
+           The selected section's real template, rendered by the same component
+           Contract Management uses for the issued contract, so the drafted and
+           the issued document can never diverge. */}
+      {reviewOpen && (
+        <SectionTemplateModal
+          tender={tender}
+          section={section}
+          title="ITT Template Review"
+          onClose={() => setReviewOpen(false)}
+          onAnswersChange={handleAnswersChange}
+          onProseChange={handleProseChange}
+          onB2Change={handleB2Change}
+          headerAction={
+            <Button size="sm" onClick={() => { setIttApproved(true); setReviewOpen(false) }}>
+              <CheckCircle size={13} /> Approve ITT Template
+            </Button>
+          }
+        />
       )}
 
     </div>

@@ -8,6 +8,7 @@ import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
+import { returnRecipient } from '../utils/evalAssignment'
 
 // ── Inline SVG icons (matching the rest of the app) ──────────────────────────
 const Svg = ({ size = 16, sw = 1.6, style, className = '', children }) => (
@@ -31,7 +32,7 @@ const scoreBar = (val, max = 100) => (
   </div>
 )
 
-// Each gate describes what the Supply Chain Manager is clearing and where the
+// Each gate describes what Supply Chain is clearing and where the
 // tender goes next. Gate 2 (the award decision) has its own richer screen in
 // AwardRecommendation — this component covers gates 1 and 3.
 const SCM_GATES = {
@@ -39,6 +40,9 @@ const SCM_GATES = {
   scm_gate2: { short: 'Award Review',     path: '/scm-review' },
   scm_gate3: { short: 'Contract Review',  path: '/scm-contract-review' },
 }
+
+// Which step a return re-opens, so the panel can name the person it reaches.
+const GATE_RETURN_SIDE = { scm_gate1: 'tech', scm_gate3: 'draft' }
 
 const GATE_COPY = {
   scm_gate1: {
@@ -48,14 +52,16 @@ const GATE_COPY = {
     approveLabel: 'Approve — Release Commercial Evaluation',
     approvedText: 'Commercial Evaluation is now open to the Contract Engineer.',
     returnHint: 'Returning sends this tender back to Technical Evaluation with your comment.',
+    returnStep: 'Technical Evaluation',
   },
   scm_gate3: {
     title: 'SCM Review — Contract Draft',
     description: 'Review the drafted contract, then approve to issue the winner’s contract and the regret letters, or return it for redraft',
     empty: 'No contract drafts awaiting review',
     approveLabel: 'Approve — Issue Contract & Regret Letters',
-    approvedText: 'The winner’s contract has been issued and regret letters generated for the unsuccessful bidders.',
+    approvedText: 'The winner’s contract has been issued and regret letters generated for the unsuccessful bidders. The Contract Engineer can export both from Contract Management.',
     returnHint: 'Returning sends this tender back to Contract Drafting with your comment.',
+    returnStep: 'Contract Drafting',
   },
 }
 
@@ -79,7 +85,7 @@ export default function ScmGateReview({ gate }) {
       </div>
       <div className="text-center">
         <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
-        <p className="text-xs text-slate-400 mt-1">This review is only accessible to the Supply Chain Manager.</p>
+        <p className="text-xs text-slate-400 mt-1">This review is only accessible to Supply Chain.</p>
       </div>
       <Button variant="secondary" size="sm" onClick={() => navigate('/dashboard')}>
         <ArrowLeft size={13} /> Back to Dashboard
@@ -126,6 +132,10 @@ export default function ScmGateReview({ gate }) {
 
   const handleApprove = () => { approveGate(tender.id, gate, comment.trim()); setOutcome('approved') }
   const handleReturn  = () => { returnGate(tender.id, gate, comment.trim());  setOutcome('returned') }
+
+  // Name the destination before the manager commits — a return used to land
+  // silently, with nothing on screen confirming who picks the tender up.
+  const recipient = returnRecipient(tender, GATE_RETURN_SIDE[gate])
 
   return (
     <div className="space-y-5">
@@ -233,7 +243,7 @@ export default function ScmGateReview({ gate }) {
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle size={14} className="text-[var(--color-primary)]" />
-            <h3 className="text-sm font-semibold text-slate-800">Supply Chain Manager Decision</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Supply Chain Decision</h3>
           </div>
           <p className="text-xs text-slate-500 mb-4">{copy.returnHint}</p>
 
@@ -251,6 +261,20 @@ export default function ScmGateReview({ gate }) {
               A comment is required to return this tender. Approving without one is allowed.
             </div>
           )}
+
+          {/* Where a return lands, resolved from the tender's own assignment */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-3">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Returning sends this tender to</p>
+            <p className="text-xs text-slate-800 font-semibold mt-1">
+              {recipient.name}
+              <span className="text-slate-400 font-normal ml-1.5">· {recipient.roleLabel} · {copy.returnStep}</span>
+            </p>
+            {recipient.unassigned && (
+              <p className="text-[11px] text-amber-700 mt-1">
+                No named owner recorded on this tender — it lands in the {recipient.roleLabel} queue for any {recipient.roleLabel} to pick up.
+              </p>
+            )}
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
             <Button variant="secondary" className="flex-1 justify-center" disabled={!comment.trim()} onClick={handleReturn}>
@@ -273,7 +297,9 @@ export default function ScmGateReview({ gate }) {
                 {outcome === 'approved' ? 'Approved' : 'Returned for Rework'}
               </p>
               <p className={`text-xs mt-0.5 ${outcome === 'approved' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {outcome === 'approved' ? copy.approvedText : copy.returnHint}
+                {outcome === 'approved'
+                  ? copy.approvedText
+                  : <>Sent back to <strong>{copy.returnStep}</strong> with <strong>{recipient.name}</strong> ({recipient.roleLabel}).</>}
               </p>
               {comment.trim() && (
                 <p className={`text-xs mt-2 italic ${outcome === 'approved' ? 'text-emerald-600' : 'text-amber-600'}`}>“{comment.trim()}”</p>

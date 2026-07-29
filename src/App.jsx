@@ -47,7 +47,7 @@ import StrategyTemplatesDashboard from './pages/StrategyTemplatesDashboard'
 import PsfStrategy from './pages/PsfStrategy'
 import ExcelViewer from './pages/ExcelViewer'
 import DocxViewer from './pages/DocxViewer'
-import { canAccess, isKnownRoute, landingPath } from './utils/permissions'
+import { isKnownRoute, useAccess } from './utils/permissions'
 
 // Both /create-itt (picker) and /create-itt/:tenderId (a specific ITT) render
 // ITTCreation. Keying it by the tender id forces a fresh mount when you switch
@@ -59,20 +59,21 @@ function CreateIttRoute() {
 }
 
 /*
- * Every protected route is authorised here, against the shared ROUTE_ROLES map
- * in utils/permissions — the same map the sidebar filters its menu with. The
- * check runs on the URL itself, so it applies equally to a click, a typed-in
- * address, a refresh and a deep link; unknown paths fall through to the
- * catch-all below. Denied users go to the landing page their own role can open.
+ * Every protected route is authorised here through useAccess() — the same helper
+ * the sidebar filters its menu with, reading the same live Access Control matrix,
+ * so a menu item and the route behind it can never disagree. The check runs on
+ * the URL itself, so it applies equally to a click, a typed-in address, a refresh
+ * and a deep link; unknown paths fall through to the catch-all below. Denied
+ * users go to the landing page their own role can currently open, which is
+ * recomputed from the matrix and so is never a page that bounces them again.
  */
 function ProtectedRoutes() {
   const { user } = useAuth()
   const { pathname } = useLocation()
+  const { can, home } = useAccess()
   if (!user) return <Navigate to="/login" replace />
 
-  const roleId = user.role?.id
-  const home = landingPath(roleId)
-  if (isKnownRoute(pathname) && !canAccess(roleId, pathname)) {
+  if (isKnownRoute(pathname) && !can(pathname)) {
     return <Navigate to={home} replace />
   }
 

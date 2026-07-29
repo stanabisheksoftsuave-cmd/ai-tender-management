@@ -93,7 +93,86 @@ export const tenders = [
     assignedCommEval: { id: 2, name: 'John Smith' },
   },
 
+  // ── Commercial Evaluation — the three real evaluation shapes ──────────────
+  // Each one names its `evaluationType` and the priced dataset behind it
+  // (src/data/ceScenarios.js). They sit in the normal flow at `comm_eval`,
+  // assigned to the Contract Engineer exactly like any other tender.
+  {
+    id: 'ITT-2025-021',
+    title: 'Turnaround & Shutdown Services Call-Off Contract',
+    department: 'Maintenance',
+    budget: 'OMR 27,820,707',
+    status: 'comm_eval',
+    stage: 'Commercial Evaluation',
+    evalProgress: 'not_started',
+    created: '2024-11-04',
+    deadline: '2025-01-20',
+    tenderType: 'Services',
+    evaluationType: 'competitive-complex',
+    commercialScenarioId: 'ce-ex1',
+    bidders: 3,
+    aiScore: 91,
+    bidderList: [
+      { id: 201, name: 'Bidder B2', country: 'Oman', techScore: 86, commScore: 92, isLocal: true },
+      { id: 204, name: 'Bidder B4', country: 'Oman', techScore: 79, commScore: 61, isLocal: true },
+      { id: 206, name: 'Bidder B6', country: 'UAE',  techScore: 83, commScore: 74 },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
+  },
+  {
+    id: 'ITT-2025-022',
+    title: 'Printing, Branding & Media Services Call-Off Contract',
+    department: 'Supply Chain',
+    budget: 'OMR 89,104',
+    status: 'comm_eval',
+    stage: 'Commercial Evaluation',
+    evalProgress: 'not_started',
+    created: '2025-01-12',
+    deadline: '2025-03-05',
+    tenderType: 'Goods',
+    evaluationType: 'competitive-simple',
+    commercialScenarioId: 'ce-ex2',
+    bidders: 2,
+    aiScore: 88,
+    bidderList: [
+      { id: 301, name: 'Bidder C1', country: 'Oman', techScore: 84, commScore: 93, isLocal: true },
+      { id: 302, name: 'Bidder C2', country: 'Oman', techScore: 76, commScore: 48, isLocal: true },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
+  },
+  {
+    id: 'ITT-2025-023',
+    title: 'TM-24-1345 Thermal Spray Cladding Services — Train 3 Shutdown',
+    department: 'Operations',
+    budget: 'USD 1,059,332',
+    status: 'comm_eval',
+    stage: 'Commercial Evaluation',
+    evalProgress: 'not_started',
+    created: '2024-12-02',
+    deadline: '2025-01-28',
+    tenderType: 'Services',
+    evaluationType: 'single-source',
+    commercialScenarioId: 'ce-ex3',
+    // Single source — the technical and commercial evaluation ran in parallel.
+    evaluationMode: 'parallel',
+    techSide: 'done',
+    commSide: 'evaluating',
+    bidders: 1,
+    aiScore: 85,
+    bidderList: [
+      { id: 401, name: 'Integrated Global Services (Single Source)', country: 'United States', techScore: 88, commScore: 90 },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
+  },
+
   // ── SCM approval gates (one tender parked at each gate) ───────────────────
+  // A tender at a gate has already been through ingestion, so it carries the same
+  // `bidderList` + evaluator assignments any other evaluated tender does. Without
+  // them a gate return lands in the right status but is invisible to the
+  // evaluator queues, which filter on the assignment.
   {
     id: 'ITT-2025-013',
     title: 'Oman National Railway Signalling & Control System',
@@ -106,6 +185,14 @@ export const tenders = [
     deadline: '2025-03-25',
     bidders: 4,
     aiScore: 93,
+    bidderList: [
+      { id: 1, name: 'TechSolutions Ltd',   country: 'Oman',         techScore: 93, commScore: 84, totalBid: 'OMR 2,690,000', isLocal: true },
+      { id: 2, name: 'InfraCore Systems',   country: 'UAE',          techScore: 88, commScore: 90, totalBid: 'OMR 2,540,000' },
+      { id: 3, name: 'CloudNexus Corp',     country: 'India',        techScore: 81, commScore: 86, totalBid: 'OMR 2,820,000' },
+      { id: 4, name: 'DataVault Solutions', country: 'Saudi Arabia', techScore: 74, commScore: 79, totalBid: 'OMR 2,410,000' },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-014',
@@ -119,6 +206,13 @@ export const tenders = [
     deadline: '2025-04-05',
     bidders: 3,
     aiScore: 86,
+    bidderList: [
+      { id: 1, name: 'TechSolutions Ltd', country: 'Oman',  techScore: 86, commScore: 81, totalBid: 'OMR 1,690,000', isLocal: true },
+      { id: 2, name: 'InfraCore Systems', country: 'UAE',   techScore: 82, commScore: 89, totalBid: 'OMR 1,584,000' },
+      { id: 3, name: 'CloudNexus Corp',   country: 'India', techScore: 77, commScore: 84, totalBid: 'OMR 1,742,000' },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
   {
     id: 'ITT-2025-015',
@@ -133,10 +227,18 @@ export const tenders = [
     bidders: 3,
     aiScore: 90,
     // Already through gate 2 — the award decision is recorded, so gate 3 can
-    // show exactly what approving will issue.
+    // show exactly what approving will issue. The winner id must exist in
+    // `bidderList` or the gate has nothing to name.
     mgmtWinnerId: 1,
     mgmtRemarks: 'Strongest technical response and within budget envelope.',
     contractDraftReady: true,
+    bidderList: [
+      { id: 1, name: 'TechSolutions Ltd', country: 'Oman',  techScore: 90, commScore: 85, totalBid: 'OMR 668,000', isLocal: true },
+      { id: 2, name: 'InfraCore Systems', country: 'UAE',   techScore: 83, commScore: 88, totalBid: 'OMR 702,000' },
+      { id: 3, name: 'CloudNexus Corp',   country: 'India', techScore: 76, commScore: 80, totalBid: 'OMR 715,000' },
+    ],
+    assignedTechEval: { id: 8, name: 'Fatima Al-Ali' },
+    assignedCommEval: { id: 2, name: 'John Smith' },
   },
 
   // ── Other Stages ───────────────────────────────────────────────────────────

@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import {
+  emptyModuleLevels, loadStoredMatrix, persistMatrix,
+  MATRIX_STORAGE_KEY, MATRIX_VERSION_KEY,
+} from '../utils/permissionMatrix'
 
 const AuthContext = createContext()
 
@@ -9,7 +13,7 @@ export const roles = [
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#1B4F8A' },
   { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
-  { id: 'scm',         label: 'Supply Chain Manager', color: '#0F766E' },
+  { id: 'scm',         label: 'Supply Chain',         color: '#0F766E' },
   { id: 'legal_review',label: 'Legal Reviewer',       color: '#B45309' },
   { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
   { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
@@ -43,6 +47,19 @@ const migrateRoleId = (id) => LEGACY_ROLE_IDS[id] ?? id
 const migrateUsers = (list) => list.map(u =>
   LEGACY_ROLE_IDS[u.roleId] ? { ...u, roleId: LEGACY_ROLE_IDS[u.roleId] } : u)
 
+// Roles the IT Admin created at runtime in Access Control, persisted alongside
+// the built-ins. They have to be resolvable here too, otherwise a user assigned
+// to a custom role signs in to a session with no role and is bounced back out.
+const readCustomRoles = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('atm_roles') || '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(r => r?.id && !roles.some(b => b.id === r.id))
+  } catch { return [] }
+}
+const resolveRole = (id) =>
+  roles.find(r => r.id === id) || readCustomRoles().find(r => r.id === id) || null
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
@@ -52,7 +69,7 @@ export function AuthProvider({ children }) {
       // A renamed role is migrated in place; only genuinely removed roles
       // (e.g. the old 'admin') invalidate the session.
       const migratedId = migrateRoleId(parsed?.role?.id)
-      const roleInfo = roles.find(r => r.id === migratedId)
+      const roleInfo = resolveRole(migratedId)
       if (!roleInfo) {
         localStorage.removeItem(STORAGE_KEY)
         return null
@@ -76,7 +93,7 @@ export function AuthProvider({ children }) {
         const parsed = existing ? migrateUsers(JSON.parse(existing)) : []
         // Keep custom users, but drop any whose role no longer exists (e.g. the
         // removed tech_eval / comm_eval evaluators).
-        const validRoleIds = new Set(roles.map(r => r.id))
+        const validRoleIds = new Set([...roles, ...readCustomRoles()].map(r => r.id))
         const customUsers = parsed.filter(u => !INITIAL_USERS.find(i => i.id === u.id) && validRoleIds.has(u.roleId))
         const merged = [...INITIAL_USERS, ...customUsers]
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(merged))
@@ -85,7 +102,7 @@ export function AuthProvider({ children }) {
         const session = localStorage.getItem(STORAGE_KEY)
         if (session) {
           const s = JSON.parse(session)
-          if (!roles.find(r => r.id === s?.role?.id)) localStorage.removeItem(STORAGE_KEY)
+          if (!resolveRole(s?.role?.id)) localStorage.removeItem(STORAGE_KEY)
         }
         return merged
       }
@@ -108,6 +125,37 @@ export function AuthProvider({ children }) {
   })
   const [itAdminLogs, setItAdminLogs] = useState([])
 
+  /*
+   * Access Control matrix (role -> module -> permission level).
+   *
+   * It lives here rather than inside the User Management page because it is the
+   * gate the router and the sidebar consult through utils/permissions. Holding it
+   * in shared state is what makes an admin's grant reach the target role's
+   * session — while it was page-local state it could only ever be decorative.
+   */
+  const [permissionMatrix, setMatrixState] = useState(loadStoredMatrix)
+
+  const setPermissionMatrix = (updater) =>
+    setMatrixState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      persistMatrix(next)
+      return next
+    })
+
+  /** Grant/revoke a single module for a single role. */
+  const setModuleLevel = (roleId, moduleKey, level) =>
+    setPermissionMatrix(prev => ({
+      ...prev,
+      [roleId]: { ...(prev[roleId] || emptyModuleLevels()), [moduleKey]: level },
+    }))
+
+  const removeRolePermissions = (roleId) =>
+    setPermissionMatrix(prev => {
+      const next = { ...prev }
+      delete next[roleId]
+      return next
+    })
+
   const addAuditLog = (entry) => {
     setItAdminLogs(prev => [{
       id: Date.now() + prev.length,
@@ -127,7 +175,7 @@ export function AuthProvider({ children }) {
     if (byEmail.mustSetPassword) return 'must_set_password'
     const match = byEmail.password === password ? byEmail : null
     if (!match) return 'invalid'
-    const roleInfo = roles.find(r => r.id === migrateRoleId(match.roleId))
+    const roleInfo = resolveRole(migrateRoleId(match.roleId))
     // Without a resolvable role the session is discarded on the next mount, so
     // fail here rather than appearing to sign in and bouncing straight back.
     if (!roleInfo) return 'invalid'
@@ -141,7 +189,8 @@ export function AuthProvider({ children }) {
     setUser(null)
     const usersData    = localStorage.getItem(USERS_STORAGE_KEY)
     const rolesData    = localStorage.getItem('atm_roles')
-    const matrixData   = localStorage.getItem('atm_matrix')
+    const matrixData   = localStorage.getItem(MATRIX_STORAGE_KEY)
+    const matrixVer    = localStorage.getItem(MATRIX_VERSION_KEY)
     // Tenders + their version and the dropdown config must survive a logout, so
     // work done under one role (e.g. an ITT the Contract Holder generated) is
     // still there when the next role logs in.
@@ -152,7 +201,11 @@ export function AuthProvider({ children }) {
 
     if (usersData)    localStorage.setItem(USERS_STORAGE_KEY, usersData)
     if (rolesData)    localStorage.setItem('atm_roles',  rolesData)
-    if (matrixData)   localStorage.setItem('atm_matrix', matrixData)
+    // The matrix has to outlive a logout together with its version stamp —
+    // without the stamp the next load would treat it as a pre-v2 blob and reset
+    // every built-in role, discarding the admin's grants.
+    if (matrixData)   localStorage.setItem(MATRIX_STORAGE_KEY, matrixData)
+    if (matrixVer)    localStorage.setItem(MATRIX_VERSION_KEY, matrixVer)
     if (tendersData)  localStorage.setItem('atm_tenders', tendersData)
     if (tendersVer)   localStorage.setItem('atm_tenders_v', tendersVer)
     if (dropdownData) localStorage.setItem('atm_dropdown_config', dropdownData)
@@ -185,7 +238,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(next))
       return next
     })
-    const roleInfo = roles.find(r => r.id === match.roleId)
+    const roleInfo = resolveRole(migrateRoleId(match.roleId))
     const userData = { id: match.id, name: match.name, email: match.username, role: roleInfo }
     setUser(userData)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(userData))
@@ -211,7 +264,7 @@ export function AuthProvider({ children }) {
     })
     setUser(prev => {
       if (!prev) return prev
-      const roleInfo = roles.find(r => r.id === migrateRoleId(prev?.role?.id))
+      const roleInfo = resolveRole(migrateRoleId(prev?.role?.id))
       if (!roleInfo) {
         localStorage.removeItem(STORAGE_KEY)
         return null
@@ -224,7 +277,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, users, login, logout, roles, itAdminLogs, addAuditLog, updateUser, addUser, removeUser, setFirstPassword }}>
+    <AuthContext.Provider value={{
+      user, users, login, logout, roles, itAdminLogs, addAuditLog,
+      updateUser, addUser, removeUser, setFirstPassword,
+      permissionMatrix, setPermissionMatrix, setModuleLevel, removeRolePermissions,
+    }}>
       {children}
     </AuthContext.Provider>
   )

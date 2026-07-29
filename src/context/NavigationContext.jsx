@@ -1,7 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from './AuthContext'
-import { canAccess, landingPath } from '../utils/permissions'
+import { useAccess } from '../utils/permissions'
 
 /*
  * Back navigation.
@@ -86,7 +85,7 @@ function historyIndex() {
 export function NavigationProvider({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { can, home } = useAccess()
 
   // 0 means this is the first entry we own, so navigate(-1) would leave the app.
   const [depth, setDepth] = useState(historyIndex)
@@ -113,13 +112,11 @@ export function NavigationProvider({ children }) {
   }, [])
 
   // Top-level pages hang off the Dashboard, which not every role may open. When
-  // the logical parent is closed to this role, fall back to its own landing page
-  // rather than a route the router would only bounce them out of.
-  const roleId = user?.role?.id
+  // the logical parent is closed to this role — statically, or because an admin
+  // just revoked the module — fall back to its own landing page rather than a
+  // route the router would only bounce them out of.
   const rawParent = parentPathOf(location.pathname)
-  const parent = rawParent && !canAccess(roleId, rawParent)
-    ? landingPath(roleId)
-    : rawParent
+  const parent = rawParent && !can(rawParent) ? home : rawParent
 
   const goBack = useCallback(() => {
     // Topmost overlay first — a modal must never let Back tear down the page

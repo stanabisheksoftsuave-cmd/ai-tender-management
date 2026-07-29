@@ -5,7 +5,8 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useTenders } from '../../context/TenderContext'
 import { useDismissable } from '../../context/NavigationContext'
-import { canAccess } from '../../utils/permissions'
+import { useAccess, staticRouteAllows } from '../../utils/permissions'
+import { MODULES } from '../../utils/permissionMatrix'
 import Badge from '../ui/Badge'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
@@ -109,6 +110,33 @@ const navByRole = {
   ],
 }
 
+// Menu entries for the Access Control modules that own a route. navByRole above
+// stays the curated menu each built-in role ships with; this table is the
+// fallback used when the IT Admin grants a module that a role's hardcoded menu
+// never listed, so the grant becomes a visible item rather than a URL you have to
+// know. Custom roles have no navByRole entry at all and are built entirely from
+// here. Modules with no route (task_assignment, tender_export) are absent by
+// design — there is nothing to navigate to.
+const MODULE_NAV = {
+  user_management:   [{ to: '/users',           icon: '/src/assets/icons/users.svg',       labelKey: 'nav.users'      }],
+  audit_log:         [{ to: '/audit-log',       icon: '/src/assets/icons/audit-log.svg',   labelKey: 'nav.auditLog'   }],
+  itt_creation:      [{ to: '/create-itt',      icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft'   }],
+  ingestion:         [{ to: '/upload',          icon: '/src/assets/icons/ingestion.svg',   labelKey: 'nav.ingestion'  }],
+  tech_eval:         [{ to: '/technical-eval',  icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.techEval'   }],
+  comm_eval:         [{ to: '/commercial-eval', icon: '/src/assets/icons/comm-eval.svg',   labelKey: 'nav.commEval'   }],
+  // One grant covers all three SCM gates, so all three get an entry.
+  scm_review: [
+    { to: '/scm-tech-review',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview'     },
+    { to: '/scm-review',          icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview'    },
+    { to: '/scm-contract-review', icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
+  ],
+  contract_creation: [{ to: '/contract',        icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.contract'   }],
+}
+
+// Open to every signed-in role and the last resort of landingPath(), so a role
+// with no curated menu is never left staring at an empty sidebar.
+const TENDERS_ITEM = { to: '/tenders', icon: '/src/assets/icons/tenders.svg', labelKey: 'nav.tenderTrack' }
+
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const { lang, setLang, t } = useLanguage()
@@ -117,8 +145,27 @@ export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const roleId = user?.role?.id
-  const navItems = (navByRole[roleId] || []).filter(item => canAccess(roleId, item.to))
+  const { can } = useAccess()
   const isRtl = lang === 'ar'
+
+  /*
+   * The menu is the curated navByRole list minus anything Access Control has
+   * revoked, plus an entry for every module granted *beyond* the role's static
+   * ROUTE_ROLES defaults. Filtering on staticRouteAllows is what keeps the
+   * shipping menus byte-identical: with DEFAULT_MATRIX untouched every granted
+   * module is already statically allowed, so nothing is synthesised. `can` is
+   * re-created whenever the live matrix changes, which is what makes an admin's
+   * grant redraw this menu without a reload.
+   */
+  const navItems = useMemo(() => {
+    const curated = (navByRole[roleId] || []).filter(item => can(item.to))
+    const seen = new Set(curated.map(i => i.to))
+    const granted = MODULES.flatMap(m => MODULE_NAV[m.key] || [])
+      .filter(item => !seen.has(item.to) && !staticRouteAllows(roleId, item.to) && can(item.to))
+    granted.forEach(i => seen.add(i.to))
+    const fallback = !navByRole[roleId] && !seen.has(TENDERS_ITEM.to) ? [TENDERS_ITEM] : []
+    return [...curated, ...granted, ...fallback]
+  }, [roleId, can])
 
   // Tender id from the current URL (/…/:tenderId) drives which strategy sub-items appear.
   const pathParts = location.pathname.split('/')

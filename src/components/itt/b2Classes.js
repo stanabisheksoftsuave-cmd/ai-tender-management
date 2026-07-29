@@ -3,162 +3,292 @@
  *
  * B2 exists to amend, add to or disapply clauses of the B1 General Conditions.
  * It is organised as CLASSES (the clause families of the General Conditions)
- * containing SUB-CLASSES (the individual special conditions). Each sub-class
- * records which B1 clause it acts on, how it deviates, and the drafted text.
+ * containing SUB-CLASSES — one sub-class is one drafting entry, i.e. one row of
+ * the client's "Section B2 Template.xlsx":
  *
- * This is the seed set the AI produces on first open; the Contract Engineer can
- * add, edit and delete classes and sub-classes, and rewrite any clause text.
+ *   A  Target B2 Clause No.            -> code
+ *   B  Source Clause No.               -> sourceClauseNo        (B1 drop list)
+ *   C  Source Clause Title             -> sourceClauseTitle     (auto-linked from B)
+ *   D  Source Sub-clause · Level 1     -> sourceLevel1          (optional)
+ *   E  Source Sub-clause · Level 2     -> sourceLevel2          (optional)
+ *   F  Source Sub-clause · Level 3     -> sourceLevel3          (optional)
+ *   G  Source Sub-Clause Title         -> sourceSubclauseTitle  (auto-linked from D/E/F)
+ *   H  Type of Action                  -> actionType            (controlled list)
+ *   I  Action Object                   -> actionObject          (controlled list)
+ *   J  Source / Evidence for Drafting  -> evidenceSource + evidenceFile (upload)
+ *   K  Drafting Instruction to AI      -> instruction           (Contract Engineer)
+ *   L  Generated Clause/Sub-clause Text-> content               (AI drafts from K + J)
+ *
+ * The sheet labels the three optional levels "from Section B1 / B2 / B3"; there
+ * is no Section B3 in this ITT, so they are read as the nesting depth of the
+ * source sub-clause (40.1 -> 40.1.2 -> 40.1.2(a)) and their options come from
+ * B1_CLAUSE_CATALOGUE below.
+ *
+ * The seed set is the clause text of the client's own "Section B2 - Special
+ * Conditions.docx" — copied verbatim, including clause numbering, percentages
+ * and the defined terms in CAPS. It must not be reworded here; only the new
+ * metadata columns were back-filled onto it. The Contract Engineer can add,
+ * edit and delete classes and sub-classes per tender, and those edits persist
+ * on the tender (sectionB2Classes).
+ *
+ * This module is the single source for B2 in both flows: ITT creation
+ * (ITTCreation.jsx) and contract drafting (ContractTemplate.jsx) seed the
+ * B2ClassEditor from cloneB2Classes() and read/write the same tender key.
  */
 
-export const B2_DEVIATIONS = {
-  as_b1:   { label: 'As B1 — no change', badge: 'closed',            hint: 'The General Conditions clause applies unamended.' },
-  amended: { label: 'Amended',           badge: 'warning',           hint: 'The General Conditions clause applies as modified by this special condition.' },
-  added:   { label: 'Additional',        badge: 'info',              hint: 'A new obligation with no equivalent in the General Conditions.' },
-  deleted: { label: 'Disapplied',        badge: 'error',             hint: 'The General Conditions clause is deleted and does not apply to this contract.' },
-}
+import { applyAiInstruction } from '../../utils/aiTextEdit'
 
-export const B2_DEVIATION_ORDER = ['as_b1', 'amended', 'added', 'deleted']
+// Shown wherever B2 carries no special conditions at all — the wording
+// Section A prescribes for an inapplicable section.
+export const B2_NOT_USED_NOTE =
+  'NOT USED — Section B1 General Conditions of Contract apply without modification.'
 
 let uid = 0
 export const newId = (prefix) => `${prefix}-${Date.now().toString(36)}-${(uid++).toString(36)}`
 
-const sc = (code, title, b1Ref, deviation, content) => ({
-  id: `b2-${code.replace(/\./g, '-')}`, code, title, b1Ref, deviation, content,
+/* ────────────────────── Controlled dropdown values ──────────────────────
+ * Verbatim from rows 4-18 of the client's template — the single source of
+ * truth for every B2 dropdown in the editor. */
+
+export const B2_ACTION_TYPES = ['ADD', 'AMEND', 'DELETE', 'DELETE_AND_REPLACE', 'RENUMBER']
+
+export const B2_ACTION_OBJECTS = [
+  'Clause', 'Subclause', 'Definition', 'Cross-Reference', 'Value', 'Schedule', 'Appendix', 'Table',
+]
+
+export const B2_EVIDENCE_SOURCES = [
+  'Section B2 Existing Amendment',
+  'Scope of Work (Section D)',
+  'Schedule of Prices (Section E)',
+  'HSE Requirement',
+  'ICV Requirement',
+  'Risk Assessment',
+  'Technical Evaluation',
+  'Negotiation Outcome',
+  'Bidder Clarification',
+  'Legal Review',
+  'Tender Board Decision',
+  'Policy / Procedure',
+  'Previous Contract',
+  'Lessons Learned',
+  'Other',
+]
+
+// Trailing options on the clause / sub-clause drop lists: picking one lets the
+// engineer type a number the General Conditions catalogue doesn't carry.
+export const ADD_NEW_CLAUSE = 'Add New Clause'
+export const ADD_NEW_SUBCLAUSE = 'Add New Sub-Clause'
+
+/* ────────────────────── Section B1 clause catalogue ──────────────────────
+ * The selectable Source Clause / Sub-clause numbers and the titles columns C
+ * and G auto-link to. B1 itself ships as four .docx tiers (b1Categories.js),
+ * so its clause list is not machine-readable anywhere in the app — this is a
+ * representative General Conditions structure covering the clause families the
+ * seed uses plus the common ones a Contract Engineer amends. */
+
+const cl = (no, title, subclauses = []) => ({ no, title, subclauses })
+const sub = (no, title, children = []) => ({ no, title, children })
+
+export const B1_CLAUSE_CATALOGUE = [
+  cl('1', 'DEFINITIONS', [
+    sub('1.1', 'Defined Terms'),
+    sub('1.2', 'Rules of Interpretation'),
+  ]),
+  cl('2', 'SCOPE OF THE CONTRACT', [
+    sub('2.1', 'The WORK'),
+    sub('2.2', 'Order of Precedence of Documents'),
+  ]),
+  cl('3', 'CONTRACT PERIOD', [sub('3.1', 'Commencement'), sub('3.2', 'Extension of the CONTRACT')]),
+  cl('4', 'CALL-OFF PROCEDURE', [
+    sub('4.1', 'Issue of a CALL-OFF'),
+    sub('4.2', 'Acceptance of a CALL-OFF'),
+    sub('4.3', 'CALL-OFF Value and Limits'),
+  ]),
+  cl('5', "CONTRACTOR'S GENERAL OBLIGATIONS"),
+  cl('6', "COMPANY'S GENERAL OBLIGATIONS"),
+  cl('7', 'CONTRACT HOLDER AND REPRESENTATIVES'),
+  cl('8', 'PERSONNEL', [sub('8.1', 'Key Personnel'), sub('8.2', 'Removal of Personnel'), sub('8.3', 'Omanisation')]),
+  cl('9', 'SUBCONTRACTING', [sub('9.1', 'COMPANY Consent'), sub('9.2', 'Liability for SUBCONTRACTORS')]),
+  cl('10', 'HEALTH, SAFETY AND ENVIRONMENT', [
+    sub('10.1', 'HSE Management System'),
+    sub('10.2', 'HSE Performance and Reporting'),
+    sub('10.3', 'Life Saving Rules'),
+  ]),
+  cl('11', 'QUALITY ASSURANCE AND QUALITY CONTROL'),
+  cl('12', 'INSPECTION AND TESTING'),
+  cl('13', 'VARIATIONS', [sub('13.1', 'Right to Vary'), sub('13.2', 'Valuation of a VARIATION')]),
+  cl('14', 'CONTRACT PRICE', [sub('14.1', 'Price Basis'), sub('14.2', 'Price Adjustment')]),
+  cl('15', 'INVOICING AND PAYMENT', [
+    sub('15.1', 'Submission of Invoices'),
+    sub('15.2', 'Payment Terms', [
+      sub('15.2.1', 'Payment Period'),
+      sub('15.2.2', 'Disputed Invoices'),
+    ]),
+    sub('15.3', 'Retention'),
+  ]),
+  cl('16', 'TAXES AND DUTIES'),
+  cl('17', 'IN-COUNTRY VALUE', [sub('17.1', 'ICV Commitments'), sub('17.2', 'ICV Reporting')]),
+  cl('18', 'WARRANTY AND DEFECTS'),
+  cl('19', 'TITLE AND RISK'),
+  cl('20', 'COMPANY PROVIDED ITEMS'),
+  cl('21', 'INSURANCE', [sub('21.1', 'Required Policies'), sub('21.2', 'Evidence of Insurance')]),
+  cl('22', 'INDEMNITIES'),
+  cl('23', 'LIMITATION OF LIABILITY', [sub('23.1', 'Consequential Loss'), sub('23.2', 'Aggregate Cap')]),
+  cl('24', 'CONFIDENTIALITY'),
+  cl('25', 'INTELLECTUAL PROPERTY'),
+  cl('26', 'BUSINESS ETHICS AND ANTI-BRIBERY'),
+  cl('27', 'CONFLICT OF INTEREST'),
+  cl('28', 'DATA PROTECTION'),
+  cl('29', 'AUDIT AND RECORDS'),
+  cl('30', 'FORCE MAJEURE'),
+  cl('31', 'SUSPENSION'),
+  cl('32', 'TERMINATION', [
+    sub('32.1', 'Termination for Convenience'),
+    sub('32.2', 'Termination for Default'),
+    sub('32.3', 'Consequences of Termination'),
+  ]),
+  cl('33', 'ASSIGNMENT AND NOVATION'),
+  cl('34', 'PERFORMANCE GUARANTEE'),
+  cl('35', 'NOTICES'),
+  cl('36', 'GOVERNING LAW'),
+  cl('37', 'DISPUTE RESOLUTION', [sub('37.1', 'Amicable Settlement'), sub('37.2', 'Arbitration')]),
+  cl('38', 'SITE ACCESS AND SECURITY'),
+  cl('39', 'IMPORT, EXPORT AND CUSTOMS'),
+  cl('40', 'DELAYS TO COMPLETION', [
+    sub('40.1', 'Delay in Completion of Fixed Lump Sum WORK', [
+      sub('40.1.1', 'Rate of Liquidated Damages'),
+      sub('40.1.2', 'Partial Completion'),
+    ]),
+    sub('40.2', 'Delay in Completion of Unit Priced WORK'),
+    sub('40.3', 'Delay in Mobilization'),
+    sub('40.4', 'Aggregate Cap on Delay Liquidated Damages'),
+  ]),
+  cl('41', 'ENTIRE AGREEMENT'),
+]
+
+export const b1ClauseNumbers = () => B1_CLAUSE_CATALOGUE.map(c => c.no)
+
+export const b1ClauseTitle = (no) =>
+  B1_CLAUSE_CATALOGUE.find(c => c.no === no)?.title || ''
+
+/*
+ * Options for one of the three optional Source Sub-clause levels. Level 1 lists
+ * the chosen clause's sub-clauses; levels 2 and 3 list the children of the
+ * level above, so an unselected parent yields an empty (disabled) drop list.
+ */
+export function b1SubclauseOptions(clauseNo, level1, level2, level = 1) {
+  const clause = B1_CLAUSE_CATALOGUE.find(c => c.no === clauseNo)
+  if (!clause) return []
+  if (level === 1) return clause.subclauses
+  const l1 = clause.subclauses.find(s => s.no === level1)
+  if (level === 2) return l1?.children || []
+  const l2 = (l1?.children || []).find(s => s.no === level2)
+  return l2?.children || []
+}
+
+// The title column G auto-links to: the deepest level the engineer selected.
+export function b1SubclauseTitle(clauseNo, level1, level2, level3) {
+  if (level3) return b1SubclauseOptions(clauseNo, level1, level2, 3).find(s => s.no === level3)?.title || ''
+  if (level2) return b1SubclauseOptions(clauseNo, level1, null, 2).find(s => s.no === level2)?.title || ''
+  if (level1) return b1SubclauseOptions(clauseNo, null, null, 1).find(s => s.no === level1)?.title || ''
+  return ''
+}
+
+// The deepest source reference a sub-class points at, phrased for clause text.
+export const sourceRef = (s) => {
+  const no = s.sourceLevel3 || s.sourceLevel2 || s.sourceLevel1
+  if (no) return `Sub-Clause ${no}`
+  return s.sourceClauseNo ? `Clause ${s.sourceClauseNo}` : ''
+}
+
+/*
+ * One-line summary of the structured source columns (B-G). Replaces the old
+ * free-text b1Ref field — legacy sub-classes persisted in localStorage still
+ * carry b1Ref, so fall back to it rather than showing nothing.
+ */
+export function sourceRefLabel(s) {
+  const ref = sourceRef(s)
+  if (!ref) return s.b1Ref || ''
+  const title = (s.sourceLevel1 ? s.sourceSubclauseTitle : s.sourceClauseTitle) || ''
+  return title ? `${ref} — ${title}` : ref
+}
+
+/* ────────────────────────── The drafting entry ────────────────────────── */
+
+// Blank spreadsheet row: every column exists on every entry so the editor never
+// has to guard for undefined and a saved tender keeps a stable shape.
+export const newSubclass = (code, patch = {}) => ({
+  id: newId('b2s'),
+  code,
+  title: 'New Special Condition',
+  sourceClauseNo: '',
+  sourceClauseTitle: '',
+  sourceLevel1: '',
+  sourceLevel2: '',
+  sourceLevel3: '',
+  sourceSubclauseTitle: '',
+  actionType: '',
+  actionObject: '',
+  evidenceSource: '',
+  evidenceFile: '',
+  instruction: '',
+  content: '',
+  ...patch,
 })
+
+const sc = (code, title, meta, content) =>
+  newSubclass(code, { ...meta, title, content, id: `b2-${code.replace(/\./g, '-')}` })
 
 export const B2_DEFAULT_CLASSES = [
   {
-    id: 'b2c-1', code: '1', title: 'Definitions & Interpretation',
-    description: 'Contract-specific definitions and the order of precedence between the tender documents.',
+    id: 'b2c-1', code: '1', title: 'DEFINITIONS', status: 'generated',
+    description: 'Contract-specific definitions added to Article 1 of the General Conditions.',
     subclasses: [
-      sc('1.1', 'Contract-Specific Definitions', 'GCC 1.1', 'amended',
-        'The definitions in Clause 1.1 of the General Conditions shall apply, save that:\n\n• "SITE" means the locations identified in Section D — Statement of Work, together with any laydown, fabrication or storage area made available by the COMPANY in writing.\n• "WORKING DAY" means Sunday to Thursday inclusive, excluding public holidays declared in the Sultanate of Oman.\n• "COMPANY REPRESENTATIVE" means the person notified to the CONTRACTOR in writing under Clause 3.2, and any authorised delegate of that person.'),
-      sc('1.2', 'Order of Precedence', 'GCC 1.4', 'amended',
-        'Clause 1.4 of the General Conditions is deleted and replaced with the following order of precedence, highest first:\n\n1. The Form of Agreement (Section A)\n2. These Special Conditions of Contract (Section B2)\n3. The General Conditions of Contract (Section B1)\n4. The Statement of Work (Section D)\n5. The QHSSE Requirements (Section C)\n6. The Schedule of Prices (Section E)\n7. All other tender documents\n\nWhere a conflict remains after applying this order, the CONTRACTOR shall seek the COMPANY\'s written direction before proceeding.'),
+      sc('1.1', 'CALL-OFF VALUE', {
+        sourceClauseNo: '1', sourceClauseTitle: 'DEFINITIONS',
+        actionType: 'ADD', actionObject: 'Definition',
+        evidenceSource: 'Previous Contract',
+        instruction: 'Add a CALL-OFF VALUE definition to Article 1 fixing the authorised ceiling COMPANY approves per call-off and the maximum CONTRACTOR may invoice against it.',
+      },
+        'Article 1 is hereby amended to include the following definition:\n\n“CALL-OFF VALUE” means the total monetary amount authorized by COMPANY for a specific call-off or purchase order under this CONTRACT. Such amount shall be separately identified in the relevant call-off documentation and is the maximum sum CONTRACTOR is entitled to invoice for that particular scope of services or WORK, unless otherwise agreed in writing by the COMPANY.'),
     ],
   },
   {
-    id: 'b2c-2', code: '2', title: 'Scope & Performance of the Work',
-    description: 'Contract-specific obligations on how the work is planned, executed and reported.',
+    id: 'b2c-40', code: '40', title: 'DELAYS TO COMPLETION', status: 'generated',
+    description: 'Liquidated damages for delayed completion and delayed mobilization, and the aggregate cap on them.',
     subclasses: [
-      sc('2.1', "Contractor's General Obligations", 'GCC 4.1', 'amended',
-        'In addition to Clause 4.1 of the General Conditions, the CONTRACTOR shall:\n\n• Provide a dedicated Contract Manager based in the Sultanate of Oman for the full duration of the CONTRACT.\n• Submit a monthly progress report by the fifth WORKING DAY of each month, covering progress against the programme, HSSE performance, ICV performance and any anticipated deviation.\n• Attend a monthly contract review meeting with the COMPANY REPRESENTATIVE at a location nominated by the COMPANY.'),
-      sc('2.2', "Company's Obligations", 'GCC 5.1', 'as_b1',
-        'Clause 5.1 of the General Conditions applies without amendment.'),
-      sc('2.3', 'Programme & Milestones', 'GCC 6.2', 'amended',
-        'The CONTRACTOR shall submit a detailed baseline programme within fourteen (14) days of the Notice to Proceed, showing all milestones identified in Section D. The programme shall not be revised without the COMPANY\'s prior written acceptance, and progress shall be measured against the accepted baseline throughout.'),
-      sc('2.4', 'Subcontracting', 'GCC 7.3', 'amended',
-        'No part of the WORK shall be subcontracted without the COMPANY\'s prior written consent. The CONTRACTOR remains fully responsible for the acts and omissions of every subcontractor, and shall flow down these Special Conditions in full.'),
-    ],
-  },
-  {
-    id: 'b2c-3', code: '3', title: 'Contract Price & Payment',
-    description: 'Pricing basis, invoicing, payment terms and price adjustment for this contract.',
-    subclasses: [
-      sc('3.1', 'Contract Price Basis', 'GCC 12.1', 'amended',
-        'The CONTRACT PRICE is a firm, fixed lump sum as set out in Section E — Schedule of Prices, and is not subject to adjustment except as expressly provided in these Special Conditions.'),
-      sc('3.2', 'Invoicing Procedure', 'GCC 12.4', 'amended',
-        'Invoices shall be submitted monthly in arrears, quoting the CONTRACT number and the relevant purchase order line, and supported by:\n\n• A progress statement certified by the COMPANY REPRESENTATIVE\n• Timesheets or delivery notes for all reimbursable elements\n• A current ICV certificate\n\nInvoices not meeting these requirements will be returned and will not start the payment period.'),
-      sc('3.3', 'Payment Terms', 'GCC 12.5', 'amended',
-        'Payment shall be made within sixty (60) days of receipt of a correctly submitted and certified invoice. No advance payment shall be made under this CONTRACT.'),
-      sc('3.4', 'Currency & Exchange Rate', 'GCC 12.7', 'added',
-        'All payments shall be made in Omani Rial (OMR). Where any element of the CONTRACT PRICE is quoted in another currency, it shall be converted at the Central Bank of Oman reference rate prevailing on the tender closing date, and that rate shall be fixed for the duration of the CONTRACT.'),
-      sc('3.5', 'Price Escalation', 'GCC 12.9', 'amended',
-        'Escalation shall be applied annually on the anniversary of the Notice to Proceed, linked to the published Oman Consumer Price Index and capped at three percent (3%) per annum. Escalation shall apply only to the labour element of the CONTRACT PRICE.'),
-      sc('3.6', 'Retention', 'GCC 12.11', 'amended',
-        'The COMPANY shall retain five percent (5%) of each certified invoice, up to a ceiling of five percent (5%) of the CONTRACT PRICE. Half of the retention shall be released on issue of the Completion Certificate and the balance on expiry of the Defects Liability Period.'),
-    ],
-  },
-  {
-    id: 'b2c-4', code: '4', title: 'Duration, Delay & Liquidated Damages',
-    description: 'Commencement, completion, extensions of time and the consequences of delay.',
-    subclasses: [
-      sc('4.1', 'Commencement & Completion', 'GCC 9.1', 'amended',
-        'The CONTRACTOR shall commence the WORK on the date stated in the Notice to Proceed and shall achieve completion within twenty-four (24) weeks of that date.'),
-      sc('4.2', 'Extension of Time', 'GCC 9.4', 'as_b1',
-        'Clause 9.4 of the General Conditions applies without amendment.'),
-      sc('4.3', 'Liquidated Damages for Delay', 'GCC 10.1', 'amended',
-        'Liquidated damages shall accrue at zero point five percent (0.5%) of the CONTRACT PRICE for each completed week of delay, up to an aggregate ceiling of ten percent (10%) of the CONTRACT PRICE. The parties agree this is a genuine pre-estimate of the COMPANY\'s loss and not a penalty.'),
-      sc('4.4', 'Force Majeure', 'GCC 11.1', 'as_b1',
-        'Clause 11.1 of the General Conditions applies without amendment.'),
-    ],
-  },
-  {
-    id: 'b2c-5', code: '5', title: 'Security, Guarantees & Warranty',
-    description: 'Performance security and the defects liability regime for this contract.',
-    subclasses: [
-      sc('5.1', 'Performance Bond', 'GCC 14.1', 'amended',
-        'The CONTRACTOR shall provide, within fourteen (14) days of the Notice to Proceed, an unconditional and irrevocable performance bond for ten percent (10%) of the CONTRACT PRICE, issued by a bank licensed in the Sultanate of Oman and valid until twenty-eight (28) days after expiry of the Defects Liability Period.'),
-      sc('5.2', 'Parent Company Guarantee', 'GCC 14.4', 'added',
-        'Where the CONTRACTOR is a subsidiary, a parent company guarantee in the COMPANY\'s standard form shall be provided before the Notice to Proceed is issued.'),
-      sc('5.3', 'Warranty & Defects Liability', 'GCC 15.2', 'amended',
-        'The Defects Liability Period shall be twenty-four (24) months from the date of the Completion Certificate. Any element repaired or replaced during that period shall carry a fresh twenty-four (24) month period from the date of rectification.'),
-    ],
-  },
-  {
-    id: 'b2c-6', code: '6', title: 'Insurance, Indemnity & Liability',
-    description: 'Minimum cover, indemnities and the liability cap applying to this contract.',
-    subclasses: [
-      sc('6.1', "Contractor's Insurances", 'GCC 17.1', 'amended',
-        'The CONTRACTOR shall maintain, for the duration of the CONTRACT and the Defects Liability Period:\n\n• Contractor All Risks cover for not less than OMR 2,000,000 per occurrence\n• Workmen\'s Compensation cover for all personnel, in accordance with Omani law\n• Third Party Liability cover for not less than OMR 2,000,000 per occurrence\n• Motor Third Party cover for all vehicles used in connection with the WORK\n\nCertificates of cover shall be provided before mobilisation and on each renewal.'),
-      sc('6.2', 'Indemnities', 'GCC 18.1', 'as_b1',
-        'Clause 18.1 of the General Conditions applies without amendment.'),
-      sc('6.3', 'Limitation of Liability', 'GCC 19.1', 'amended',
-        'The CONTRACTOR\'s aggregate liability under this CONTRACT shall not exceed one hundred percent (100%) of the CONTRACT PRICE, save that no limit shall apply to liability arising from death or personal injury, gross negligence, wilful misconduct, breach of confidentiality, or the CONTRACTOR\'s indemnities in respect of its own personnel.'),
-    ],
-  },
-  {
-    id: 'b2c-7', code: '7', title: 'Health, Safety, Security & Environment',
-    description: 'HSSE obligations specific to this contract, read with Section C.',
-    subclasses: [
-      sc('7.1', 'HSSE Compliance', 'GCC 21.1', 'amended',
-        'The CONTRACTOR shall comply with Section C — QHSSE Requirements, the COMPANY\'s Life Saving Rules and all applicable Omani HSE legislation. A breach of a Life Saving Rule is a material breach of this CONTRACT.'),
-      sc('7.2', 'Permit to Work', 'GCC 21.4', 'added',
-        'No work shall commence on the SITE without a valid permit issued under the COMPANY\'s Permit to Work system. All CONTRACTOR supervisors shall hold current permit-receiver certification.'),
-      sc('7.3', 'Incident Reporting', 'GCC 21.6', 'amended',
-        'All incidents, near misses and unsafe conditions shall be reported to the COMPANY REPRESENTATIVE immediately and confirmed in writing within twenty-four (24) hours. A full investigation report shall follow within seven (7) days.'),
-    ],
-  },
-  {
-    id: 'b2c-8', code: '8', title: 'Personnel, Omanisation & Local Content',
-    description: 'Manpower, Omanisation and In-Country Value obligations, read with Sections H, J, K and L.',
-    subclasses: [
-      sc('8.1', 'Key Personnel', 'GCC 22.1', 'amended',
-        'The personnel named in the CONTRACTOR\'s tender as Key Personnel shall not be replaced without the COMPANY\'s prior written consent. Any replacement shall be of equal or better qualification and experience.'),
-      sc('8.2', 'Omanisation', 'GCC 22.4', 'amended',
-        'The CONTRACTOR shall achieve and maintain the Omanisation percentage committed in its tender, and shall report actual Omanisation monthly. Shortfalls shall be remedied within sixty (60) days of notification.'),
-      sc('8.3', 'Minimum Salaries', 'GCC 22.6', 'added',
-        'The CONTRACTOR shall pay all Omani personnel not less than the minimum salaries set out in Section L, and shall make payslips available for audit on request.'),
-      sc('8.4', 'ICV Commitments', 'GCC 23.1', 'amended',
-        'The CONTRACTOR shall deliver the In-Country Value commitments made in its tender and reported under Section H, and shall submit an audited ICV certificate annually and on completion.'),
-    ],
-  },
-  {
-    id: 'b2c-9', code: '9', title: 'Variations, Suspension & Termination',
-    description: 'Change control and the grounds and consequences of suspension or termination.',
-    subclasses: [
-      sc('9.1', 'Variation Orders', 'GCC 25.1', 'amended',
-        'No variation shall be valid unless issued as a written Variation Order signed by the COMPANY REPRESENTATIVE. The CONTRACTOR shall not act on a verbal instruction and shall have no claim in respect of work performed without a Variation Order.'),
-      sc('9.2', 'Valuation of Variations', 'GCC 25.4', 'amended',
-        'Variations shall be valued using the rates in Section E where applicable. Where no rate applies, the parties shall agree a rate before the work proceeds, failing which the COMPANY shall determine a fair valuation.'),
-      sc('9.3', 'Suspension', 'GCC 27.1', 'as_b1',
-        'Clause 27.1 of the General Conditions applies without amendment.'),
-      sc('9.4', 'Termination for Convenience', 'GCC 28.1', 'amended',
-        'The COMPANY may terminate this CONTRACT for convenience on thirty (30) days written notice. The CONTRACTOR shall be paid for work properly executed to the date of termination, together with reasonable, evidenced demobilisation costs, but shall have no claim for loss of profit or anticipated earnings.'),
-    ],
-  },
-  {
-    id: 'b2c-10', code: '10', title: 'Confidentiality, Disputes & Governing Law',
-    description: 'Confidentiality, intellectual property and how disputes are resolved.',
-    subclasses: [
-      sc('10.1', 'Confidentiality', 'GCC 30.1', 'amended',
-        'The confidentiality obligations in Clause 30.1 of the General Conditions shall survive expiry or termination of this CONTRACT for a period of five (5) years.'),
-      sc('10.2', 'Intellectual Property', 'GCC 31.1', 'as_b1',
-        'Clause 31.1 of the General Conditions applies without amendment.'),
-      sc('10.3', 'Governing Law', 'GCC 33.1', 'amended',
-        'This CONTRACT shall be governed by and construed in accordance with the laws of the Sultanate of Oman.'),
-      sc('10.4', 'Dispute Resolution', 'GCC 33.3', 'amended',
-        'The parties shall first attempt to resolve any dispute by good-faith negotiation between senior representatives within thirty (30) days. Failing resolution, the dispute shall be finally settled by arbitration in Muscat under the rules of the Oman Commercial Arbitration Centre, before a single arbitrator, in the English language.'),
+      sc('40.1', 'Delay in Completion of Fixed Lump Sum WORK', {
+        sourceClauseNo: '40', sourceClauseTitle: 'DELAYS TO COMPLETION',
+        sourceLevel1: '40.1', sourceSubclauseTitle: 'Delay in Completion of Fixed Lump Sum WORK',
+        actionType: 'DELETE_AND_REPLACE', actionObject: 'Subclause',
+        evidenceSource: 'Schedule of Prices (Section E)',
+        instruction: 'Replace the standard delay damages wording with 0.5% of the CALL-OFF VALUE per day of delay for lump sum WORK under Schedule 1, capped at 10%, and pro-rate the damages where only part of the CALL-OFF is late.',
+      },
+        'Sub-Clause 40.1 is hereby deleted and replaced by the following:\n\nIf CONTRACTOR fails to complete the WORK under a lump sum CALL-OFF, Schedule 1 of Section E (or any part thereof) within the period specified, or within any extension granted in writing by the CONTRACT HOLDER, CONTRACTOR shall pay COMPANY liquidated damages at a rate of zero-point five percent (0.5%) of the CALL-OFF VALUE for each day of delay beyond the agreed completion date of that CALL-OFF, up to a maximum of ten percent (10%) of the CALL-OFF VALUE.\n\nIf only a portion or sub-task of the WORK under a CALL-OFF is delayed, liquidated damages shall be calculated based on the portion of the CALL-OFF VALUE attributable to the delayed work, as reasonably determined by the breakdown or schedule of rates.'),
+      sc('40.2', 'Delay in Completion of Unit Priced WORK', {
+        sourceClauseNo: '40', sourceClauseTitle: 'DELAYS TO COMPLETION',
+        sourceLevel1: '40.2', sourceSubclauseTitle: 'Delay in Completion of Unit Priced WORK',
+        actionType: 'DELETE_AND_REPLACE', actionObject: 'Subclause',
+        evidenceSource: 'Schedule of Prices (Section E)',
+        instruction: 'Replace the sub-clause with a 1% per day liquidated damages rate on the CALL-OFF VALUE for unit priced WORK under Schedules 2, 3, 4 and TPM/TPS, capped at 10%, pro-rated for partial delay.',
+      },
+        'Sub-Clause 40.2 is hereby deleted and replaced by the following:\n\nIf CONTRACTOR fails to complete the WORK covered by Schedules 2, 3, and 4 and TPM/TPS of Section E (or any part thereof) within the period specified, or within any extension granted in writing by the CONTRACT HOLDER, CONTRACTOR shall pay COMPANY liquidated damages at a rate of one percent (1%) of the CALL-OFF VALUE for each day of delay beyond the agreed completion date of that CALL-OFF, up to a maximum of ten percent (10%) of the CALL-OFF VALUE.\n\nIf only a portion or sub-task of the WORK under a CALL-OFF is delayed, liquidated damages shall be calculated based on the portion of the CALL-OFF VALUE attributable to the delayed work, as reasonably determined by the breakdown or schedule of rates.'),
+      sc('40.3', 'Delay in Mobilization', {
+        sourceClauseNo: '40', sourceClauseTitle: 'DELAYS TO COMPLETION',
+        sourceLevel1: '40.3', sourceSubclauseTitle: 'Delay in Mobilization',
+        actionType: 'DELETE_AND_REPLACE', actionObject: 'Subclause',
+        evidenceSource: 'Scope of Work (Section D)',
+        instruction: 'Replace the sub-clause so late mobilization against the Clause 3 Section D duration attracts 1% of the CALL-OFF VALUE per day capped at 10%, excluding force majeure and COMPANY GROUP default.',
+      },
+        'Sub-Clause 40.3 is hereby deleted and replaced by the following:\n\nIf CONTRACTOR fails to commence the WORK in accordance within the mobilization duration stipulated in Clause 3 of Section D, and such failure is neither attributable to force majeure (as defined in Section B1) nor due to a default by COMPANY GROUP, CONTRACTOR shall pay COMPANY liquidated damages at a rate of one percent (1%) of the CALL-OFF VALUE for each day of delay beyond the mobilization duration stipulated in Section D, up to a maximum of ten percent (10%) of the CALL-OFF VALUE unless otherwise specified in SECTION E Schedule of Prices.'),
+      sc('40.4', 'Aggregate Cap on Delay Liquidated Damages', {
+        sourceClauseNo: '40', sourceClauseTitle: 'DELAYS TO COMPLETION',
+        sourceLevel1: '40.4', sourceSubclauseTitle: 'Aggregate Cap on Delay Liquidated Damages',
+        actionType: 'AMEND', actionObject: 'Value',
+        evidenceSource: 'Schedule of Prices (Section E)',
+        instruction: 'Amend the aggregate cap on all Clause 40 delay liquidated damages to fifteen percent (15%) of the CALL-OFF VALUE and give COMPANY a discretionary right to terminate once it is exceeded.',
+      },
+        'Sub-Clause 40.4 is hereby amended as the following:\n\nIn no event shall the sum of CONTRACTOR\'s liability to COMPANY under any CALL-OFF for all delay liquidated damages assessed further to this Clause 40 exceed, in the aggregate, fifteen percent (15%) of the CALL-OFF VALUE unless otherwise specified in SECTION E Schedule of Prices. In the event that CONTRACTOR\'s liability for delay liquidated damages under any CALL-OFF exceeds this fifteen percent (15%) threshold, the COMPANY shall have the right, at its absolute discretion, to terminate the CONTRACT.'),
     ],
   },
 ]
@@ -169,24 +299,99 @@ export const cloneB2Classes = () => B2_DEFAULT_CLASSES.map(c => ({
   subclasses: c.subclasses.map(s => ({ ...s })),
 }))
 
-export const countSubclasses = (classes) => classes.reduce((n, c) => n + c.subclasses.length, 0)
-export const countDeviations = (classes) =>
-  classes.reduce((n, c) => n + c.subclasses.filter(s => s.deviation !== 'as_b1').length, 0)
+export const countSubclasses = (classes) => (classes || []).reduce((n, c) => n + c.subclasses.length, 0)
+
+/* ────────────────────── Per-class approval lifecycle ──────────────────────
+ * draft -> generated -> approved. A class must have its template drafted and
+ * that draft reviewed before Section B2 as a whole can be approved, so the
+ * status rides on the class object and persists in tender.sectionB2Classes. */
+
+/*
+ * Classes saved before the lifecycle existed carry no status. They cannot be
+ * assumed approved (nobody reviewed them) and must not be stuck either, so a
+ * class whose sub-classes all already carry clause text is read as "generated"
+ * — one review away — and anything else falls back to draft.
+ */
+export function classStatus(cls) {
+  if (cls?.status) return cls.status
+  const subs = cls?.subclasses || []
+  return subs.length && subs.every(s => (s.content || '').trim()) ? 'generated' : 'draft'
+}
+
+// Classes still blocking the section-level approval.
+export const classesPendingApproval = (classes) =>
+  (classes || []).filter(c => classStatus(c) !== 'approved')
+
+/* ────────────────────────── Column L: the AI draft ────────────────────────── */
+
+const LEAD_IN = {
+  ADD: (ref, obj) => `${ref} is hereby amended to include the following ${obj.toLowerCase()}:`,
+  AMEND: (ref) => `${ref} is hereby amended as the following:`,
+  DELETE: (ref) => `${ref} is hereby deleted in its entirety.`,
+  DELETE_AND_REPLACE: (ref) => `${ref} is hereby deleted and replaced by the following:`,
+  RENUMBER: (ref) => `${ref} is hereby renumbered as follows:`,
+}
+
+/*
+ * Mock draft of column L from the Drafting Instruction (K) and evidence (J).
+ * It reuses applyAiInstruction — the same mock engine behind every
+ * select-to-edit-with-AI surface — so there is one place to swap in a real LLM.
+ */
+export function draftB2Clause(s) {
+  const instruction = (s.instruction || '').trim()
+  if (!instruction) return s.content || ''
+  const object = s.actionObject || 'Clause'
+  const ref = sourceRef(s) || `Clause ${s.code}`
+  const lead = (LEAD_IN[s.actionType] || LEAD_IN.AMEND)(ref, object)
+  if (s.actionType === 'DELETE') return lead
+
+  const seed = `CONTRACTOR shall comply with the requirements of this ${object.toLowerCase()} in accordance with the CONTRACT.`
+  const body = applyAiInstruction(seed, instruction).trim()
+  const provenance = s.evidenceSource
+    ? `\n\nThis ${object.toLowerCase()} is drafted on the basis of ${s.evidenceSource}${s.evidenceFile ? ` (${s.evidenceFile})` : ''}.`
+    : ''
+  return `${lead}\n\n${body}${provenance}`
+}
+
+/* ────────────────────────── Export to the ITT ────────────────────────── */
+
+/*
+ * One clause class as a document: its heading and one entry per sub-class, in
+ * export order. The on-screen Section B2 template (B2ClassEditor) and
+ * renderB2Text() below both build from this, so the template the engineer
+ * reviews and approves cannot drift from the text that is exported.
+ */
+export function b2ClassDocument(cls) {
+  const tagsOf = (s) => [
+    [s.actionType, s.actionObject].filter(Boolean).join(' '),
+    sourceRefLabel(s) && `Source: ${sourceRefLabel(s)}`,
+  ].filter(Boolean).join(' · ')
+
+  return {
+    heading: `${cls?.code ? `${cls.code}. ` : ''}${cls?.title || ''}`,
+    entries: (cls?.subclasses || []).map(s => ({
+      id: s.id,
+      heading: `${s.code || ''} ${s.title || ''}`.trim(),
+      tags: tagsOf(s),
+      text: (s.content || '').trim(),
+    })),
+  }
+}
 
 // Flatten the classes to the plain text that fills the B2 template's
-// "clauses where deviate from B1" field on export.
+// "clauses where deviate from B1" field on export. The metadata columns ride
+// along in a single bracketed tag so the exported section still reads as prose.
 export function renderB2Text(classes) {
   const lines = []
-  classes.forEach(c => {
-    const deviating = c.subclasses.filter(s => s.deviation !== 'as_b1')
-    if (!deviating.length) return
-    lines.push(`${c.code}. ${c.title}`)
-    deviating.forEach(s => {
-      lines.push(`${s.code} ${s.title} [${B2_DEVIATIONS[s.deviation].label}${s.b1Ref ? ` · ${s.b1Ref}` : ''}]`)
-      lines.push(s.content.trim())
+  const list = classes || []
+  list.forEach(c => {
+    if (!c.subclasses.length) return
+    const doc = b2ClassDocument(c)
+    lines.push(doc.heading)
+    doc.entries.forEach(e => {
+      lines.push(`${e.heading}${e.tags ? ` [${e.tags}]` : ''}`)
+      lines.push(e.text)
     })
   })
-  return lines.length
-    ? lines.join('\n')
-    : 'NOT USED — Section B1 General Conditions of Contract apply without modification.'
+  return lines.length ? lines.join('\n') : B2_NOT_USED_NOTE
 }

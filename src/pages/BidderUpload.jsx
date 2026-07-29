@@ -49,7 +49,6 @@ export default function BidderUpload() {
   const paramTender = tenderId ? tenders.find(t => t.id === tenderId) : null
   const [selectedTender, setSelectedTender] = useState(paramTender || null)
   const [bidders, setBidders] = useState([])
-  const [dragging, setDragging] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [showTracker, setShowTracker] = useState(false)
   const [logEntries, setLogEntries] = useState([])
@@ -83,13 +82,6 @@ export default function BidderUpload() {
   const [reassignTender,  setReassignTender]  = useState(null)
   const [reassignForm,    setReassignForm]    = useState({ techEval: '', commEval: '' })
   const [reassignErrors,  setReassignErrors]  = useState({})
-
-  // Assign Document modal (when a file is dropped on the zone)
-  const [pendingFile, setPendingFile] = useState(null)
-  const [assignTo, setAssignTo] = useState('')
-  const [assignDocType, setAssignDocType] = useState('technical') // 'technical' | 'commercial'
-  const [newBidderForm, setNewBidderForm] = useState({ company: '', contact: '', phone: '' })
-  const [assignErrors, setAssignErrors] = useState({})
 
   const biddersRef = useRef(bidders)
   useEffect(() => { biddersRef.current = bidders }, [bidders])
@@ -184,7 +176,6 @@ export default function BidderUpload() {
   useDismissable(showTracker, () => setShowTracker(false))
   useDismissable(showAssignModal, () => setShowAssignModal(false))
   useDismissable(showAddBidder, () => setShowAddBidder(false))
-  useDismissable(pendingFile, () => setPendingFile(null))
 
   // Shared Back unwinds in-page state first. With a :tenderId param the detail
   // IS the route, so we decline and let route-level back run.
@@ -221,42 +212,6 @@ export default function BidderUpload() {
       const complete = mode === 'parallel' ? !!(b.techDoc && b.commDoc) : !!b.techDoc
       return { ...b, status: complete ? 'queued' : 'no_document' }
     }))
-  }
-
-  const openAssignModal = (incoming) => {
-    const file = Array.from(incoming)[0]
-    if (!file) return
-    setPendingFile({ name: file.name, size: fmtSize(file.size) })
-    const unassigned = bidders.find(b => b.status !== 'not_participating' && !docsComplete(b))
-    setAssignTo(unassigned ? String(unassigned.id) : 'new')
-    // Linear collects only the Technical document at ingestion.
-    setAssignDocType(evalMode === 'parallel' && unassigned && unassigned.techDoc && !unassigned.commDoc ? 'commercial' : 'technical')
-    setNewBidderForm({ company: '', contact: '', phone: '' })
-    setAssignErrors({})
-  }
-
-  const confirmAssign = () => {
-    if (!pendingFile) return
-    const docKey = assignDocType === 'commercial' ? 'commDoc' : 'techDoc'
-    const doc = { name: pendingFile.name, size: pendingFile.size }
-    if (assignTo === 'new') {
-      const errs = {}
-      if (!newBidderForm.company.trim()) errs.company = 'Required'
-      if (!newBidderForm.contact.trim()) errs.contact = 'Required'
-      if (Object.keys(errs).length) { setAssignErrors(errs); return }
-      const newId = Math.max(0, ...bidders.map(b => b.id)) + 1
-      setBidders(prev => [...prev, withStatus({
-        id: newId, company: newBidderForm.company.trim(), contact: newBidderForm.contact.trim(),
-        phone: newBidderForm.phone.trim(),
-        techDoc: null, commDoc: null, [docKey]: doc,
-        status: 'no_document', extracted: 0, _max: 120,
-      })])
-    } else {
-      setBidders(prev => prev.map(b =>
-        b.id === Number(assignTo) ? withStatus({ ...b, [docKey]: doc }) : b
-      ))
-    }
-    setPendingFile(null)
   }
 
   const attachDocToBidder = (bidderId, docType, incoming) => {
@@ -1089,51 +1044,10 @@ export default function BidderUpload() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left: Upload zone + AI info */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card
-            className={`border-2 border-dashed transition-all cursor-pointer ${dragging ? 'border-[var(--color-primary)] bg-blue-50' : 'border-slate-200 hover:border-[var(--color-primary)]/50'}`}
-            onDragOver={e => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={e => { e.preventDefault(); setDragging(false); openAssignModal(e.dataTransfer.files) }}
-          >
-            <div className="p-8 text-center">
-              <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center ${dragging ? 'bg-[var(--color-primary)]' : 'bg-slate-100'}`}>
-                <Upload size={24} className={dragging ? 'text-white' : 'text-slate-400'} />
-              </div>
-              <p className="text-sm font-medium text-slate-700 mb-1">Drop a bidder document here</p>
-              <p className="text-xs text-slate-400 mb-4">{evalMode === 'parallel' ? 'Technical or Commercial' : 'Technical'} · PDF, DOCX, XLSX, ZIP</p>
-              <label className="cursor-pointer">
-                <span className="px-4 py-2 bg-[var(--color-primary)] text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">{t('ing.browseFiles')}</span>
-                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" className="hidden" onChange={e => { openAssignModal(e.target.files); e.target.value = '' }} />
-              </label>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Bot size={14} style={{ color: 'var(--color-primary)' }} />
-              <h3 className="text-sm font-semibold text-slate-800">{t('ing.aiEngine')}</h3>
-            </div>
-            <div className="space-y-2 text-xs text-slate-600">
-              {[
-                { label: 'Documents Processed', value: '260 pages' },
-                { label: 'Events Mapped', value: '327 items' },
-                { label: 'Avg. Accuracy', value: '96.4%' },
-                { label: 'Processing Time', value: '~4 min/bundle' },
-              ].map(s => (
-                <div key={s.label} className="flex justify-between">
-                  <span className="text-slate-400">{s.label}</span>
-                  <span className="font-medium text-slate-700">{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* Right: Bidder list */}
-        <div className="lg:col-span-2 space-y-3">
+      <div className="grid grid-cols-1 gap-5">
+        {/* Bidder list — documents are attached per bidder, in each bidder's own
+            Technical / Commercial slot below. */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">{t('ing.bidderCount')} ({bidders.length})</h3>
             <div className="flex items-center gap-2">
@@ -1362,113 +1276,6 @@ export default function BidderUpload() {
             <div className="flex gap-2 px-5 pb-5">
               <Button variant="secondary" className="flex-1 justify-center" onClick={() => setShowAddBidder(false)}>{t('common.cancel')}</Button>
               <Button className="flex-1 justify-center" onClick={submitAddBidder}><Save size={13} /> {t('ing.register')}</Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* ── Assign Document Modal ── */}
-      {pendingFile && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 fade-in">
-          <Card className="w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <FileArchive size={14} className="text-[var(--color-primary)]" /> {t('ing.assignTitle')}
-              </h3>
-              <button onClick={() => setPendingFile(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400"><X size={15} /></button>
-            </div>
-            <div className="px-5 py-4 space-y-4">
-              {/* File info */}
-              <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2.5">
-                <FileArchive size={16} className="text-slate-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{pendingFile.name}</p>
-                  <p className="text-[10px] text-slate-400">{pendingFile.size}</p>
-                </div>
-              </div>
-
-              {/* Document type — Commercial only offered in parallel (linear uploads it later) */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1.5">Document type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'technical',  Icon: Wrench, label: 'Technical' },
-                    ...(evalMode === 'parallel' ? [{ key: 'commercial', Icon: Wallet, label: 'Commercial' }] : []),
-                  ].map(({ key, Icon, label }) => (
-                    <button key={key} type="button" onClick={() => setAssignDocType(key)}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors
-                        ${assignDocType === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                      <Icon size={13} /> {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bidder selector — searchable dropdown of eligible bidders + add-company */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1.5">{t('ing.assignTo')}</label>
-                <SearchableSelect
-                  value={assignTo}
-                  onChange={v => setAssignTo(v === '' ? '' : String(v))}
-                  options={[
-                    ...bidders
-                      .filter(b => b.status !== 'not_participating' && !docsComplete(b))
-                      .map(b => ({ id: String(b.id), name: b.company, sub: b.contact })),
-                    { id: 'new', name: t('ing.newBidder'), sub: 'Create a new company entry' },
-                  ]}
-                  getValue={o => o.id}
-                  getLabel={o => o.name}
-                  getSubLabel={o => o.sub}
-                  placeholder="— Select bidder —"
-                  searchPlaceholder="Search bidders…"
-                  emptyText="No bidders yet — register a new company"
-                  ariaLabel="Assign to bidder"
-                />
-              </div>
-
-              {/* New bidder inline form */}
-              {assignTo === 'new' && (
-                <div className="space-y-2 pl-6">
-                  <div>
-                    <input
-                      value={newBidderForm.company}
-                      onChange={e => { setNewBidderForm(f => ({ ...f, company: e.target.value })); setAssignErrors(er => ({ ...er, company: '' })) }}
-                      placeholder="Company name *"
-                      list={qualifiedCompanies.length ? 'qualified-bidder-companies' : undefined}
-                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 ${assignErrors.company ? 'border-red-300' : 'border-slate-200'}`}
-                    />
-                    {qualifiedCompanies.length > 0 && (
-                      <datalist id="qualified-bidder-companies">
-                        {qualifiedCompanies.map(name => <option key={name} value={name} />)}
-                      </datalist>
-                    )}
-                    {assignErrors.company && <p className="text-[10px] text-red-500 mt-0.5">{assignErrors.company}</p>}
-                  </div>
-                  <div>
-                    <input
-                      value={newBidderForm.contact}
-                      onChange={e => { setNewBidderForm(f => ({ ...f, contact: e.target.value })); setAssignErrors(er => ({ ...er, contact: '' })) }}
-                      placeholder="Contact person *"
-                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 ${assignErrors.contact ? 'border-red-300' : 'border-slate-200'}`}
-                    />
-                    {assignErrors.contact && <p className="text-[10px] text-red-500 mt-0.5">{assignErrors.contact}</p>}
-                  </div>
-                  <div className="relative">
-                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={newBidderForm.phone}
-                      onChange={e => setNewBidderForm(f => ({ ...f, phone: e.target.value }))}
-                      placeholder="Contact number (optional)"
-                      type="tel"
-                      className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2 px-5 pb-5">
-              <Button variant="secondary" className="flex-1 justify-center" onClick={() => setPendingFile(null)}>{t('common.cancel')}</Button>
-              <Button className="flex-1 justify-center" onClick={confirmAssign}><CheckCircle size={13} /> {t('ing.assign')}</Button>
             </div>
           </Card>
         </div>

@@ -51,10 +51,19 @@ import {
   COMMERCIAL_PAF_NOTE, omaniEligibleTypes, commercialNegotiationRules,
   commercialClarificationStatuses, commercialClarificationReplies, commercialProfileFor,
 } from '../data/mockData'
+import {
+  EVALUATION_TYPES, ceScenarioFor, ceStepsFor, ceSummary, ceFormat,
+} from '../data/ceScenarios'
+import {
+  CeNormalizationPanel, ComplexPricedPanel, SimplePricedPanel, SensitivityCasesPanel,
+  OptimizationPanel, CeOptimizationPanel, NegotiationRoundsPanel, BenchmarkPanel,
+  ScopeMergePanel, TenderBoardPanel, EvaluationTypeBadge,
+} from '../components/commercial/CeScenarioPanels'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation, useBackHandler } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
+import { canEvaluate, isUnassignedSide } from '../utils/evalAssignment'
 import { openHtmlDoc, clarificationRequestDoc } from '../utils/docGen'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
@@ -71,6 +80,15 @@ const REVIEW_TONE = {
   deviation: { label: 'Deviation', cls: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',        Icon: AlertTriangle },
   exception: { label: 'Exception', cls: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100',                Icon: XCircle },
 }
+// Staged AI messages for the per-document re-check, mirroring the technical
+// screen's RE_EVAL_STEPS — the evaluation restarts at compliance for that bidder.
+const DOC_RECHECK_STEPS = [
+  'Receiving the re-submitted commercial document…',
+  'Validating issuer, reference and validity date…',
+  'Re-running the mandatory submission check…',
+  'Recomputing commercial responsiveness…',
+  'Compliance re-check complete',
+]
 const RATING_BADGE = { High: 'error', Medium: 'warning', Low: 'info' }
 const RATING_BAR   = { High: 'bg-red-400', Medium: 'bg-amber-400', Low: 'bg-blue-400' }
 const BAND_BADGE   = { High: 'error', Medium: 'warning', Low: 'info', Minimal: 'compliant' }
@@ -102,6 +120,23 @@ export default function CommercialEvaluation() {
   const [recId, setRecId]             = useState(null)   // step 9
   const [note, setNote]               = useState('')
   const [submitted, setSubmitted]     = useState(false)
+  const [optPicked, setOptPicked]     = useState({})     // scenario optimization targets
+  // ── Step 2 document round ──
+  // A missing or failing mandatory document raises a request against the bidder
+  // instead of dropping them. Keyed `${bidderId}:${docId}` so a request survives
+  // the re-check that clears it — the evaluator keeps the trail on screen.
+  const [docRounds, setDocRounds]     = useState({})
+
+  // ── Evaluation shape ──
+  // A tender that names a priced scenario is evaluated with the panels for its
+  // declared `evaluationType`; everything else keeps the generic nine-step flow.
+  const scenario   = ceScenarioFor(tender)
+  const evalType   = tender?.evaluationType || scenario?.type || null
+  const typeMeta   = evalType ? EVALUATION_TYPES[evalType] : null
+  const isSingleSource = evalType === 'single-source'
+  const summary    = scenario ? ceSummary(scenario) : null
+  const sFmt       = ceFormat(scenario?.currency)
+  const steps      = scenario ? ceStepsFor(scenario.type) : commercialSteps
 
   const tenderBidders = Array.isArray(tender?.bidderList) && tender.bidderList.length
     ? tender.bidderList
@@ -122,24 +157,24 @@ export default function CommercialEvaluation() {
   const profOf = (id) => rowOf(id)?.p ?? commercialProfileFor(0)
 
   // ── Step navigation ──
-  const stepIdx  = Math.max(0, commercialSteps.findIndex(s => s.id === step))
-  const stepDef  = commercialSteps[stepIdx]
+  const stepIdx  = Math.max(0, steps.findIndex(s => s.id === step))
+  const stepDef  = steps[stepIdx]
   const run      = runs[step] || { running: false, step: 0, done: false }
   const isDone    = (id) => runs[id]?.done === true
   const isSkipped = (id) => skipped[id] === true
   // A step is settled once it has run, or once an optional step has been skipped.
   const isSettled = (id) => isDone(id) || isSkipped(id)
   // Award Recommendation only opens once every preceding step is settled.
-  const priorStepsDone = commercialSteps.slice(0, -1).every(s => isSettled(s.id))
-  const goNext = () => { const n = commercialSteps[stepIdx + 1]; if (n) setStep(n.id) }
-  const goPrev = () => { const p = commercialSteps[stepIdx - 1]; if (p) setStep(p.id) }
+  const priorStepsDone = steps.slice(0, -1).every(s => isSettled(s.id))
+  const goNext = () => { const n = steps[stepIdx + 1]; if (n) setStep(n.id) }
+  const goPrev = () => { const p = steps[stepIdx - 1]; if (p) setStep(p.id) }
   // Optional steps can be skipped — the step is recorded as skipped in the audit
   // trail and its adjustments are simply not applied to this tender.
   const skipStep = () => { setSkipped(prev => ({ ...prev, [step]: true })); goNext() }
   const includeStep = () => setSkipped(prev => ({ ...prev, [step]: false }))
 
   useBackHandler(() => {
-    const p = commercialSteps[stepIdx - 1]
+    const p = steps[stepIdx - 1]
     if (p) { setStep(p.id); return true }
     return false
   }, [step])
@@ -161,10 +196,28 @@ export default function CommercialEvaluation() {
   const itemVarPct   = (bidderId, it) => estItemTotal(it) ? ((bidItemTotal(bidderId, it) - estItemTotal(it)) / estItemTotal(it)) * 100 : 0
 
   // ── STEP 1 — extracted commercial record ──
+  // A scenario tender reports the priced dataset's own total (and currency)
+  // rather than the generic pricing model's.
+  const codeOfId = scenario ? Object.fromEntries(scenario.bidders.map(b => [b.id, b.code])) : {}
+  const scenarioLineCount = scenario
+    ? (scenario.rollup
+        ? scenario.rollup.length
+        : scenario.schedules.reduce((s, x) => s + x.items.length, 0))
+    : 0
+  const scenarioPricingOf = (id) => {
+    if (!scenario) return null
+    if (isSingleSource) {
+      const r = scenario.rounds[scenario.rounds.length - 1]
+      return `${sFmt.money2(summary.totals.final.total)} · ${scenarioLineCount} priced lines (${r.label.toLowerCase()})`
+    }
+    const total = summary.totals.bids[codeOfId[id]]
+    const unit = scenario.rollup ? 'priced Section E schedules' : 'priced lines'
+    return total == null ? '—' : `${sFmt.money2(total)} · ${scenarioLineCount} ${unit}`
+  }
   const extractionOf = (id) => {
     const p = profOf(id)
     return {
-      pricing:    `${fmtMoney(bidGrand(id))} · ${commercialEstimate.length} priced lines`,
+      pricing:    scenario ? scenarioPricingOf(id) : `${fmtMoney(bidGrand(id))} · ${commercialEstimate.length} priced lines`,
       discount:   p.discountText,
       payment:    p.advancePct > 0 ? `${(p.advancePct * 100).toFixed(0)}% advance · ${p.paymentDays} days net` : `${p.paymentDays} days net · no advance`,
       warranty:   `${p.warrantyMonths} months`,
@@ -199,6 +252,52 @@ export default function CommercialEvaluation() {
     }))
   }
   const failedDocs   = (id) => commercialComplianceDocs.filter(d => docStatus(id, d.id) === 'fail')
+
+  // ── Step 2 document round — request → upload → AI re-check → resolved ──
+  // Same shape as the technical Interim loop and the PQQ re-upload round: the
+  // bidder is asked for the document, the upload re-runs the compliance check
+  // for that bidder, and the outcome is recomputed rather than just flipped.
+  const docKey     = (bidderId, docId) => `${bidderId}:${docId}`
+  const docRound   = (bidderId, docId) => docRounds[docKey(bidderId, docId)]
+  const setRound   = (key, changes) => setDocRounds(prev => ({ ...prev, [key]: { ...(prev[key] || {}), ...changes } }))
+  const requestDoc = (bidderId, docId) =>
+    setRound(docKey(bidderId, docId), { bidderId, docId, requestedAt: new Date().toLocaleString('en-GB'), step: null, done: false })
+
+  const handleDocUpload = (bidderId, docId, file, e) => {
+    if (!file) return
+    if (e?.target) e.target.value = ''   // let the same file be picked again
+    const key = docKey(bidderId, docId)
+    setRound(key, { bidderId, docId, fileName: file.name, step: 0, done: false })
+    let step = 0
+    const advance = () => {
+      step++
+      if (step < DOC_RECHECK_STEPS.length) {
+        setRound(key, { step })
+        setTimeout(advance, 620)
+        return
+      }
+      // The AI genuinely re-assesses the replacement, so ~20% of the time the
+      // document still does not satisfy the requirement and the bidder is asked
+      // for another one — the same "still not resolved" path the tech screen has.
+      const passed = Math.random() >= 0.2
+      setDocChecks(prev => ({ ...prev, [bidderId]: { ...(prev[bidderId] || {}), [docId]: passed ? 'pass' : 'fail' } }))
+      setRound(key, { step: DOC_RECHECK_STEPS.length - 1, done: true })
+    }
+    setTimeout(advance, 620)
+  }
+
+  const isRechecking  = (bidderId, docId) => { const r = docRound(bidderId, docId); return !!r && r.step != null && !r.done }
+  // A bidder blocks the gate while any mandatory document is still failing, or
+  // while a re-check is still running.
+  const outstandingOf = (id) => failedDocs(id).filter(d => !isRechecking(id, d.id))
+  const blockedRows   = rows.filter(r => failedDocs(r.id).length > 0 ||
+    commercialComplianceDocs.some(d => isRechecking(r.id, d.id)))
+  const docRoundOpen  = blockedRows.length > 0
+  const docRoundRows  = rows.filter(r =>
+    commercialComplianceDocs.some(d => docStatus(r.id, d.id) === 'fail' || docRound(r.id, d.id)))
+  const docBlockHint  = docRoundOpen
+    ? `Outstanding commercial documents: ${blockedRows.map(r => `${r.short} (${outstandingOf(r.id).length || 'in re-check'})`).join(' · ')}. Request and re-check each one, or override the cell in the matrix above.`
+    : null
   const deviationsOf = (id) => commercialReviewItems.filter(i => reviewCell(id, i.id).status === 'deviation')
   const exceptionsOf = (id) => commercialReviewItems.filter(i => reviewCell(id, i.id).status === 'exception')
   // Responsiveness is driven by the mandatory submission matrix alone; deviations
@@ -360,6 +459,22 @@ export default function CommercialEvaluation() {
       deviationsOf(r.id).forEach(i => add(r, 'deviation', i.name,
         `Your submission deviates from the ITT requirement for ${i.name} (${i.requirement}). Please confirm whether you will comply without price change.`))
     })
+    if (scenario) {
+      // Straight from the workbook: every tenderer is approached to confirm the
+      // basis of their offer and to explain the significant variance elements
+      // that feed the optimization and negotiation approach.
+      eligibleRows.forEach(r => {
+        add(r, 'pricing', 'Basis of offer & significant variances',
+          'Please confirm compliance and no deviation to the tender requirements, including the basis of your offer submission, and provide your assumptions and rate build-up for the significant variance elements against the Company Estimate.')
+      })
+      if (isSingleSource) {
+        eligibleRows.forEach(r => {
+          add(r, 'pricing', 'Non-priced lines & Schedule 3 deviation',
+            'Please confirm which lines are carried as "included" within another rate, confirm the lines you have not quoted where OLNG is to provide the resource, and explain the equipment hire build-up for the vacuum-truck line on Schedule 3.')
+        })
+      }
+      return out
+    }
     eligibleRows.forEach(r => {
       const ab = abnormalityOf(r.id)
       if (ab.key !== 'normal') add(r, 'pricing', `${ab.label} bid`,
@@ -398,9 +513,15 @@ export default function CommercialEvaluation() {
 
   // ── STEP 9 — award recommendation ──
   const ranked = [...eligibleRows].sort((a, b) => evaluatedPriceOf(a.id) - evaluatedPriceOf(b.id))
-  const aiRecId = ranked[0]?.id ?? null
+  // In scenario mode the recommendation comes from the priced dataset, not from
+  // the generic pricing model — a single-source tender has nothing to rank.
+  const scenarioAwardId = scenario
+    ? (isSingleSource ? scenario.bidder.id
+      : scenario.bidders.find(b => b.code === scenario.award.awardeeCode)?.id ?? scenario.bidders[0]?.id)
+    : null
+  const aiRecId = scenario ? scenarioAwardId : (ranked[0]?.id ?? null)
   const effectiveRecId = recId ?? aiRecId
-  const recBidder = rows.find(b => b.id === effectiveRecId) || null
+  const recBidder = rows.find(b => b.id === effectiveRecId) || (scenario ? rows[0] : null) || null
 
   // ── The generic step runner — one AI pass per step, same as the old flow ──
   useEffect(() => {
@@ -414,7 +535,8 @@ export default function CommercialEvaluation() {
   useEffect(() => {
     const r = runs[step]
     if (!r?.running) return
-    const def = commercialSteps.find(s => s.id === step)
+    const def = steps.find(s => s.id === step)
+    if (!def) return
     if (r.step >= def.steps.length) {
       // Each step writes its first-pass result when it finishes; the evaluator
       // can then override anything on screen.
@@ -457,8 +579,11 @@ export default function CommercialEvaluation() {
   }
 
   if (!tenderId) {
+    // canEvaluate, not a bare id match: an unassigned commercial side falls back
+    // to the Contract Engineer so a returned tender can never be invisible. The
+    // guard below uses the same call, so listed and openable stay in step.
     const assignedTenders = tenders.filter(
-      t => t.assignedCommEval?.id === user?.id && (
+      t => canEvaluate(t, 'comm', user) && (
         t.status === 'comm_eval' ||
         (t.status === 'parallel_eval' && t.commSide === 'evaluating')
       )
@@ -466,16 +591,17 @@ export default function CommercialEvaluation() {
     return (
       <TenderSelectList
         tenders={assignedTenders}
-        status="comm_eval"
+        status={['comm_eval', 'parallel_eval']}
         basePath="/commercial-eval"
         title="Commercial Evaluation"
         description="Select a tender to begin or continue commercial evaluation"
         emptyText="No tenders assigned to you for commercial evaluation"
+        isUnassigned={t => isUnassignedSide(t, 'comm')}
       />
     )
   }
 
-  if (!tender || tender.assignedCommEval?.id !== user?.id) {
+  if (!tender || !canEvaluate(tender, 'comm', user)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
         <p className="text-sm">{!tender ? 'Tender not found.' : 'This tender is not assigned to you.'}</p>
@@ -488,45 +614,100 @@ export default function CommercialEvaluation() {
 
   const isParallel = tender.evaluationMode === 'parallel'
 
+  // Supply Chain returned this tender for commercial rework — the gate comment is
+  // the brief, so it has to be on screen. It stands until the CE answers it.
+  const scmReturn = (() => {
+    if (submitted) return null
+    const d = tender.scmDecisions?.scm_gate2
+    if (d?.decision !== 'returned' || d.target === 'tech') return null
+    return tender.commEvalSubmittedAt && tender.commEvalSubmittedAt > d.at ? null : d
+  })()
+
   const handleSubmit = () => {
     if (!recBidder) return
-    const pafRec = preferenceOn ? pafOf(recBidder.id) : null
+    const pafRec = !scenario && preferenceOn ? pafOf(recBidder.id) : null
+    const runRecord = {
+      steps: steps.map(s => ({
+        no: s.no, id: s.id, name: s.name,
+        status: isSkipped(s.id) ? 'skipped' : isDone(s.id) ? 'complete' : 'not_run',
+      })),
+      responsiveness: rows.map(r => ({ id: r.id, name: r.name, result: commercialResponsiveness[responsivenessOf(r.id)].label })),
+      risksHigh: allRisks.filter(k => k.rating === 'High').length,
+      clarifications: clarifications.map(c => ({ ref: c.ref, bidder: c.bidderName, subject: c.subject, status: c.status })),
+    }
+    // The scenario recommendation carries the priced dataset's own figures so
+    // the SCM award gate reads the client's real numbers, not the generic model.
+    const recommendation = scenario
+      ? {
+          bidderId: recBidder.id,
+          bidderName: scenario.award.awardeeName,
+          evaluationType: scenario.type,
+          currency: scenario.currency,
+          total: Math.round(summary.awardTotal),
+          estimate: Math.round(summary.ceTotal),
+          variancePct: Number((summary.awardPct ?? 0).toFixed(1)),
+          evaluatedTotal: Math.round(scenario.award.value),
+          acv: scenario.award.acv,
+          acvLabel: scenario.award.acvLabel,
+          duration: scenario.award.duration,
+          basis: summary.ranked
+            ? 'Lowest evaluated total against the normalized Company Estimate (L1)'
+            : 'Single source — negotiated position against the optimized Company Estimate',
+          awardNote: scenario.award.text,
+          conditions: scenario.award.conditions,
+          noteBlocks: scenario.notes,
+          commercialModel: scenario.commercialModel,
+          optimizationTargets: Object.keys(optPicked).filter(k => optPicked[k]),
+          note: note.trim(),
+          recommendedBy: user?.name || 'Commercial Evaluator',
+          ranking: summary.ranked
+            ? summary.totals.ranked.map((r, i) => ({
+                id: scenario.bidders.find(b => b.code === r.code)?.id ?? i,
+                name: scenario.bidders.find(b => b.code === r.code)?.name ?? r.code,
+                total: Math.round(r.total),
+                evaluated: Math.round(r.total),
+                variancePct: Number(r.pct.toFixed(1)),
+              }))
+            : scenario.rounds.map(r => ({
+                id: r.id, name: r.label,
+                total: Math.round(summary.totals.rounds[r.id].total),
+                evaluated: Math.round(summary.totals.rounds[r.id].total),
+                variancePct: Number(summary.totals.rounds[r.id].pct.toFixed(1)),
+              })),
+          excluded: excludedRows.map(b => ({ id: b.id, name: b.name })),
+        }
+      : {
+          bidderId: recBidder.id,
+          bidderName: recBidder.name,
+          total: Math.round(bidGrand(recBidder.id)),
+          estimate: Math.round(estGrand),
+          variancePct: Number(variancePct(recBidder.id).toFixed(1)),
+          normalizedTotal: Math.round(normPrice(recBidder.id)),
+          evaluatedTotal: Math.round(evaluatedPriceOf(recBidder.id)),
+          pafPct: pafRec ? Number((pafRec.totalPaf * 100).toFixed(2)) : null,
+          basis: rankingBasis,
+          awardNote: COMMERCIAL_PAF_NOTE,
+          note: note.trim(),
+          recommendedBy: user?.name || 'Commercial Evaluator',
+          // The rest of the field, ranked lowest → highest evaluated price.
+          ranking: ranked.map(b => ({
+            id: b.id, name: b.name,
+            total: Math.round(bidGrand(b.id)),
+            evaluated: Math.round(evaluatedPriceOf(b.id)),
+            variancePct: Number(variancePct(b.id).toFixed(1)),
+          })),
+          excluded: excludedRows.map(b => ({ id: b.id, name: b.name })),
+        }
     updateTender(tenderId, {
       commercialDocChecks: docChecks,
-      commercialEvalRun: {
-        steps: commercialSteps.map(s => ({
-          no: s.no, id: s.id, name: s.name,
-          status: isSkipped(s.id) ? 'skipped' : isDone(s.id) ? 'complete' : 'not_run',
-        })),
-        responsiveness: rows.map(r => ({ id: r.id, name: r.name, result: commercialResponsiveness[responsivenessOf(r.id)].label })),
-        risksHigh: allRisks.filter(k => k.rating === 'High').length,
+      commEvalSubmittedAt: new Date().toISOString(),
+      commercialEvalRun: scenario ? runRecord : {
+        ...runRecord,
         stability: commercialStability[stability().key].label,
         pafConfig: isSkipped('preference') ? null : paf,
         negotiationSavings: isSkipped('negotiation') ? null : Math.round(pickedSavings),
-        clarifications: clarifications.map(c => ({ ref: c.ref, bidder: c.bidderName, subject: c.subject, status: c.status })),
       },
-      commercialRecommendation: {
-        bidderId: recBidder.id,
-        bidderName: recBidder.name,
-        total: Math.round(bidGrand(recBidder.id)),
-        estimate: Math.round(estGrand),
-        variancePct: Number(variancePct(recBidder.id).toFixed(1)),
-        normalizedTotal: Math.round(normPrice(recBidder.id)),
-        evaluatedTotal: Math.round(evaluatedPriceOf(recBidder.id)),
-        pafPct: pafRec ? Number((pafRec.totalPaf * 100).toFixed(2)) : null,
-        basis: rankingBasis,
-        awardNote: COMMERCIAL_PAF_NOTE,
-        note: note.trim(),
-        recommendedBy: user?.name || 'Commercial Evaluator',
-        // The rest of the field, ranked lowest → highest evaluated price.
-        ranking: ranked.map(b => ({
-          id: b.id, name: b.name,
-          total: Math.round(bidGrand(b.id)),
-          evaluated: Math.round(evaluatedPriceOf(b.id)),
-          variancePct: Number(variancePct(b.id).toFixed(1)),
-        })),
-        excluded: excludedRows.map(b => ({ id: b.id, name: b.name })),
-      },
+      commercialRecommendation: recommendation,
     })
     if (isParallel) submitParallelEval(tenderId, 'comm')
     else advanceTender(tenderId)
@@ -539,6 +720,24 @@ export default function CommercialEvaluation() {
       return id === 'preference'
         ? 'Skipped — no Local Content, ICV, PAF or Omani Preference adjustment applied to this tender.'
         : 'Skipped — commercial negotiation is not permitted under this tendering strategy.'
+    }
+    // Scenario-specific steps report against the priced dataset.
+    if (scenario) {
+      switch (id) {
+        case 'ceNormalization': return isSingleSource
+          ? `Approved Company Estimate ${sFmt.money2(scenario.ceOptimization.approved)} re-baselined to ${sFmt.money2(scenario.ceOptimization.optimized)} across ${scenario.ceOptimization.items.length} adjustments.`
+          : `Approved Company Estimate ${sFmt.money2(scenario.normalization.approved)} normalized to ${sFmt.money2(scenario.normalization.normalized)} across ${scenario.normalization.items.length} adjustments.`
+        case 'priced': return summary.ranked
+          ? `${summary.totals.ranked[0].code} is L1 at ${sFmt.money2(summary.totals.ranked[0].total)} (${sFmt.pct(summary.totals.ranked[0].pct, 0)}) · L1 to L2 gap ${summary.totals.gapPct.toFixed(0)}%.`
+          : ''
+        case 'rounds': return `${scenario.rounds.length} negotiation rounds · the offer moved to ${sFmt.pct(summary.totals.final.pct, 0)} against the optimized Company Estimate. No L1 / L2 ranking — single source.`
+        case 'benchmarkRates': return `${scenario.benchmark.rows.length} line(s) benchmarked against ${scenario.benchmark.sources.length} external rate sources and prior contract ${scenario.benchmark.priorContract} · ${scenario.sensitivityCases.length} sensitivity cases.`
+        case 'scopeMerge': return `Scope merge (Tr-2 & Tr-3) — Company Estimate ${sFmt.money2(scenario.scopeMerge.ceTotal)} against a bidder total of ${sFmt.money2(scenario.scopeMerge.bidTotal)}.`
+        case 'sensitivityCases': return `${scenario.sensitivityCases.length} cases modelled · ${scenario.sensitivityCases.filter(c => c.changed).length} changed the outcome.`
+        case 'optimization': return `${Object.values(optPicked).filter(Boolean).length} of ${scenario.optimizationTargets.length} items selected as the negotiation mandate with L1.`
+        case 'tbAward': return `Award recommendation: ${scenario.award.awardeeName} · ${scenario.award.acvLabel} ${sFmt.money2(scenario.award.acv)}.`
+        default: break
+      }
     }
     switch (id) {
       case 'extraction':    return `${commercialExtractionFields.length} data points extracted per bidder, each with a document / page evidence reference.`
@@ -568,20 +767,25 @@ export default function CommercialEvaluation() {
               <span className="text-slate-300">/</span>
               <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
               <Badge variant="evaluation">Commercial Evaluation</Badge>
+              <EvaluationTypeBadge meta={typeMeta} />
               {isParallel && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Parallel</span>}
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{tender.department} · Deadline: {tender.deadline} · {stepDef.purpose}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {tender.department} · Deadline: {tender.deadline}
+              {scenario && <> · {scenario.tenderRef} · {scenario.currency} · {scenario.duration}</>}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">{stepDef.purpose}</p>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-            <BarChart3 size={13} className="text-slate-400" /> Step {stepDef.no} of {commercialSteps.length}
+            <BarChart3 size={13} className="text-slate-400" /> Step {stepDef.no} of {steps.length}
           </div>
         </div>
       </Card>
 
       {/* Step indicator — the nine steps share the row, so it never scrolls */}
       <div className="flex items-center gap-1">
-        {commercialSteps.map((s, i) => {
+        {steps.map((s, i) => {
           const active = step === s.id
           const wasSkipped = isSkipped(s.id)
           const done = !wasSkipped && i < stepIdx
@@ -602,13 +806,36 @@ export default function CommercialEvaluation() {
                 </span>
                 <span className={`text-[11px] font-semibold truncate ${wasSkipped ? 'line-through' : ''}`}>{s.short}</span>
               </span>
-              {i < commercialSteps.length - 1 && (
+              {i < steps.length - 1 && (
                 <span className={`shrink-0 w-1.5 h-px ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
               )}
             </Fragment>
           )
         })}
       </div>
+
+      {/* ── Supply Chain sent this back — the comment is the whole brief ── */}
+      {scmReturn && (
+        <Card className="p-4 border border-amber-200 bg-amber-50/60">
+          <div className="flex items-start gap-3">
+            <RotateCcw size={15} className="text-amber-500 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-800">
+                Returned by Supply Chain for re-evaluation
+                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                  Award Gate
+                </span>
+              </p>
+              {scmReturn.comment
+                ? <p className="text-xs text-amber-700 mt-1 leading-relaxed italic">“{scmReturn.comment}”</p>
+                : <p className="text-xs text-amber-700 mt-1">No comment was recorded with the return.</p>}
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                Returned {new Date(scmReturn.at).toLocaleString('en-GB')} · rework the steps below and submit the recommendation again.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ══════════ Upload gate (linear evaluations) ══════════ */}
       {!commercialDocsReady ? (
@@ -636,8 +863,11 @@ export default function CommercialEvaluation() {
             <div>
               <p className="text-sm font-semibold text-emerald-800">Commercial Recommendation Submitted</p>
               <p className="text-xs text-emerald-700 mt-0.5">
-                You recommended <strong>{recBidder.name}</strong> — evaluated at {fmtMoney(evaluatedPriceOf(recBidder.id))}, to be awarded at the submitted bid price of {fmtMoney(bidGrand(recBidder.id))}.
-                {isParallel ? ' Once the technical side is also submitted, the tender moves to Management Review.' : ' The tender has advanced to Management Review.'}
+                {scenario
+                  ? <>You recommended <strong>{scenario.award.awardeeName}</strong> — {scenario.award.acvLabel} {sFmt.money2(scenario.award.acv)}
+                      {summary.ranked ? ' (L1, lowest evaluated total).' : ' (single source — negotiated position, no ranking applies).'}</>
+                  : <>You recommended <strong>{recBidder.name}</strong> — evaluated at {fmtMoney(evaluatedPriceOf(recBidder.id))}, to be awarded at the submitted bid price of {fmtMoney(bidGrand(recBidder.id))}.</>}
+                {isParallel ? ' Once the technical side is also submitted, the tender moves to SCM review.' : ' The tender has advanced to SCM review.'}
               </p>
             </div>
           </div>
@@ -779,7 +1009,7 @@ export default function CommercialEvaluation() {
               {step === 'compliance' && (
                 <>
                   <AiStrip>
-                    <strong>AI compliance check complete.</strong> {eligibleRows.length} of {rows.length} bidder{rows.length !== 1 ? 's' : ''} cleared the mandatory submission gate · {deviationRegister.length} deviation{deviationRegister.length !== 1 ? 's' : ''} · {exceptionsLog.length} exception{exceptionsLog.length !== 1 ? 's' : ''}. Click a cell to override the AI. Only responsive bidders move to the price comparison.
+                    <strong>AI compliance check complete.</strong> {eligibleRows.length} of {rows.length} bidder{rows.length !== 1 ? 's' : ''} cleared the mandatory submission gate · {deviationRegister.length} deviation{deviationRegister.length !== 1 ? 's' : ''} · {exceptionsLog.length} exception{exceptionsLog.length !== 1 ? 's' : ''}. Click a cell to override the AI. A missing or failing mandatory document raises a document request below — the bidder is not dropped, and the compliance check re-runs on the replacement.
                   </AiStrip>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -913,17 +1143,99 @@ export default function CommercialEvaluation() {
                     <Register title="Commercial Exceptions Log"     prefix="EXC" tone="red"   entries={exceptionsLog}     empty="No exceptions recorded." />
                   </div>
 
-                  {excludedRows.length > 0 && (
-                    <div className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                      <XCircle size={13} className="text-red-400 shrink-0 mt-0.5" />
-                      <span><strong>Non-Responsive — excluded from the price comparison:</strong>{' '}
-                        {excludedRows.map(r => `${r.name} (${failedDocs(r.id).map(d => d.name).join(', ')})`).join(' · ')}</span>
-                    </div>
+                  {/* ── Document request round ──
+                      A missing or failing mandatory submission raises a request
+                      against the bidder rather than dropping them. The upload
+                      restarts the compliance check for that bidder. */}
+                  {docRoundRows.length > 0 && (
+                    <Card className={`overflow-hidden border ${docRoundOpen ? 'border-amber-200' : 'border-emerald-200'}`}>
+                      <PanelHead icon={UploadCloud} title="Document Request Round"
+                        hint={docRoundOpen
+                          ? 'A bidder with a missing or failing submission is asked for the document — they are not dropped'
+                          : 'All requested documents re-checked and cleared'} />
+                      <div className="divide-y divide-slate-50">
+                        {docRoundRows.map(r => {
+                          const openDocs = commercialComplianceDocs.filter(d =>
+                            docStatus(r.id, d.id) === 'fail' || docRound(r.id, d.id))
+                          return (
+                            <div key={r.id} className="px-4 py-3">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                <span className="text-xs font-semibold text-slate-700">{r.name}</span>
+                                {outstandingOf(r.id).length > 0
+                                  ? <Chip tone="red">{outstandingOf(r.id).length} outstanding</Chip>
+                                  : commercialComplianceDocs.some(d => isRechecking(r.id, d.id))
+                                    ? <Chip tone="amber">Re-checking</Chip>
+                                    : <Chip tone="green">Cleared</Chip>}
+                              </div>
+                              <div className="space-y-2">
+                                {openDocs.map(d => {
+                                  const round     = docRound(r.id, d.id)
+                                  const running   = isRechecking(r.id, d.id)
+                                  const failing   = docStatus(r.id, d.id) === 'fail'
+                                  const requested = !!round
+                                  return (
+                                    <div key={d.id} className={`rounded-lg border px-3 py-2.5
+                                      ${running ? 'border-blue-200 bg-blue-50/50'
+                                        : failing ? 'border-amber-100 bg-amber-50/50'
+                                        : 'border-emerald-100 bg-emerald-50/50'}`}>
+                                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        <div className="min-w-0">
+                                          <p className="text-[12px] font-medium text-slate-700 flex items-center gap-1.5">
+                                            <FileText size={12} className="text-slate-400 shrink-0" />{d.name}
+                                          </p>
+                                          <p className={`text-[11px] mt-0.5 ${running ? 'text-blue-700' : failing ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                            {running ? DOC_RECHECK_STEPS[round.step]
+                                              : failing && round?.done ? 'Re-checked — still does not satisfy the requirement. Request another copy.'
+                                              : failing && requested ? `Requested ${round.requestedAt} — awaiting upload`
+                                              : failing ? 'Missing or failing — raise a document request'
+                                              : 'Re-checked and cleared'}
+                                            {round?.fileName && !running ? ` · ${round.fileName}` : ''}
+                                          </p>
+                                        </div>
+                                        {running ? (
+                                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-700 shrink-0">
+                                            <div className="w-3 h-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                                            Re-checking
+                                          </span>
+                                        ) : failing ? (
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            {!requested && (
+                                              <Button variant="secondary" size="sm" onClick={() => requestDoc(r.id, d.id)}>
+                                                <Send size={11} /> Request document
+                                              </Button>
+                                            )}
+                                            {requested && (
+                                              <label className="inline-flex">
+                                                <input type="file" className="hidden"
+                                                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                                  onChange={e => handleDocUpload(r.id, d.id, e.target.files?.[0], e)} />
+                                                <span className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-dashed border-amber-300 text-slate-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] bg-white transition-colors whitespace-nowrap">
+                                                  <Upload size={11} /> {round?.done ? 'Upload again' : 'Upload document'}
+                                                </span>
+                                              </label>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
+                                            <CheckCircle size={11} /> Cleared on re-check
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </Card>
                   )}
 
                   <StepFooter onBack={goPrev} backLabel="Data Extraction" onNext={goNext} nextLabel="Continue to Risk"
-                    nextDisabled={eligibleRows.length === 0}
-                    block={eligibleRows.length === 0 ? 'No responsive bidders — at least one bidder must clear every mandatory submission requirement to continue.' : null}
+                    nextDisabled={eligibleRows.length === 0 || docRoundOpen}
+                    block={docBlockHint
+                      ?? (eligibleRows.length === 0 ? 'No responsive bidders — at least one bidder must clear every mandatory submission requirement to continue.' : null)}
                     hint="Responsive and conditionally responsive bidders both continue past this gate." />
                 </>
               )}
@@ -1009,8 +1321,143 @@ export default function CommercialEvaluation() {
                     )}
                   </Card>
 
-                  <StepFooter onBack={goPrev} backLabel="Compliance" onNext={goNext} nextLabel="Continue to Normalization"
+                  <StepFooter onBack={goPrev} backLabel="Compliance"
+                    onNext={goNext} nextLabel={scenario ? `Continue to ${steps[3].short}` : 'Continue to Normalization'}
                     hint="Findings carry into the negotiation strategy and the recommendation package." />
+                </>
+              )}
+
+              {/* ══════════════════════════════════════════════════════════════
+                  SCENARIO STEPS — which panels appear is driven entirely by the
+                  tender's evaluation type. A single-source evaluation never
+                  shows a ranking, an L1/L2 chip or a multi-bidder comparison.
+                 ══════════════════════════════════════════════════════════════ */}
+              {scenario && step === 'ceNormalization' && (
+                <>
+                  {isSingleSource
+                    ? <CeOptimizationPanel scenario={scenario} />
+                    : <CeNormalizationPanel scenario={scenario} />}
+                  <StepFooter onBack={goPrev} backLabel="Risk" onNext={goNext} nextLabel={`Continue to ${steps[4].short}`}
+                    hint="Every proposal is compared against this figure — not against the approved estimate." />
+                </>
+              )}
+
+              {scenario && step === 'priced' && (
+                <>
+                  {scenario.type === 'competitive-complex'
+                    ? <ComplexPricedPanel scenario={scenario} />
+                    : <SimplePricedPanel scenario={scenario} />}
+                  <StepFooter onBack={goPrev} backLabel={steps[3].short} onNext={goNext} nextLabel={`Continue to ${steps[5].short}`}
+                    hint="Ranking is by lowest evaluated total — L1 is the lowest, L2 the second lowest." />
+                </>
+              )}
+
+              {scenario && step === 'sensitivityCases' && (
+                <>
+                  <SensitivityCasesPanel scenario={scenario} />
+                  <StepFooter onBack={goPrev} backLabel={steps[4].short} onNext={goNext} nextLabel={`Continue to ${steps[6].short}`}
+                    hint="Each case is recorded with its result and an outcome-changed verdict for the Tender Board note." />
+                </>
+              )}
+
+              {scenario && step === 'optimization' && (
+                <>
+                  <OptimizationPanel scenario={scenario} picked={optPicked}
+                    onToggle={(ref) => setOptPicked(prev => ({ ...prev, [ref]: !prev[ref] }))} />
+                  <StepFooter onBack={goPrev} backLabel={steps[5].short} onNext={goNext} nextLabel="Continue to Clarifications"
+                    hint="Selected items form the negotiation mandate carried into the Tender Board submission." />
+                </>
+              )}
+
+              {scenario && step === 'rounds' && (
+                <>
+                  <NegotiationRoundsPanel scenario={scenario} />
+                  <StepFooter onBack={goPrev} backLabel={steps[3].short} onNext={goNext} nextLabel={`Continue to ${steps[5].short}`}
+                    hint="Single source — value is evidenced by the movement across the rounds, not by a ranking." />
+                </>
+              )}
+
+              {scenario && step === 'benchmarkRates' && (
+                <>
+                  <BenchmarkPanel scenario={scenario} />
+                  <StepFooter onBack={goPrev} backLabel={steps[4].short} onNext={goNext} nextLabel={`Continue to ${steps[6].short}`}
+                    hint="External rate sources stand in for the competitive tension a second bidder would provide." />
+                </>
+              )}
+
+              {scenario && step === 'scopeMerge' && (
+                <>
+                  <ScopeMergePanel scenario={scenario} />
+                  <StepFooter onBack={goPrev} backLabel={steps[5].short} onNext={goNext} nextLabel="Continue to Clarifications"
+                    hint="The merged option is the basis of the award recommendation." />
+                </>
+              )}
+
+              {scenario && step === 'tbAward' && (
+                <>
+                  {!priorStepsDone ? (
+                    <Card className="p-6 text-center">
+                      <Lock size={22} className="text-slate-300 mx-auto" />
+                      <p className="text-sm font-semibold text-slate-700 mt-2">Tender Board submission is locked</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Every preceding step must complete first — still open: {steps.slice(0, -1).filter(s => !isSettled(s.id)).map(s => `${s.no} · ${s.short}`).join(', ')}.
+                      </p>
+                    </Card>
+                  ) : (
+                    <>
+                      <TenderBoardPanel scenario={scenario} summary={summary} note={note} onNote={setNote} />
+
+                      <Card className="overflow-hidden">
+                        <PanelHead icon={FileText} title="Evaluation Audit Trail" hint="What each step contributed to this recommendation" />
+                        <div className="divide-y divide-slate-50">
+                          {steps.map(s => {
+                            const done = isDone(s.id)
+                            return (
+                              <div key={s.id} className="px-4 py-3 flex items-start gap-3">
+                                <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold
+                                  ${done ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{s.no}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[12px] font-semibold text-slate-700">{s.name}</span>
+                                    {done ? <Badge variant="compliant"><CheckCircle size={10} /> Complete</Badge> : <Badge variant="warning">Not run</Badge>}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 mt-0.5">{auditLine(s.id)}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </Card>
+
+                      <Card className="p-4">
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-800">Submit Commercial Recommendation</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Recommending <strong>{scenario.award.awardeeName}</strong> — {scenario.award.acvLabel} {sFmt.money2(scenario.award.acv)}.
+                              {' '}This recommendation (not a score) is sent to Supply Chain's commercial &amp; award gate.
+                            </p>
+                            {openClarifications.length > 0 && (
+                              <p className="text-xs text-amber-700 mt-1.5 flex items-center gap-1.5">
+                                <AlertTriangle size={12} /> {openClarifications.length} clarification{openClarifications.length !== 1 ? 's' : ''} still open — close them in the clarifications step before submitting.
+                              </p>
+                            )}
+                            {docBlockHint && (
+                              <p className="text-xs text-amber-700 mt-1.5 flex items-start gap-1.5">
+                                <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {docBlockHint}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="secondary" size="sm" onClick={goPrev}><ArrowLeft size={13} /> Clarifications</Button>
+                            <Button size="sm" disabled={openClarifications.length > 0 || docRoundOpen} onClick={handleSubmit}>
+                              <Send size={13} /> Submit Recommendation
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1715,8 +2162,8 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                     )}
                   </Card>
 
-                  <StepFooter onBack={goPrev} backLabel="Negotiation"
-                    onNext={goNext} nextLabel="Continue to Award Recommendation"
+                  <StepFooter onBack={goPrev} backLabel={scenario ? steps[6].short : 'Negotiation'}
+                    onNext={goNext} nextLabel={`Continue to ${scenario ? steps[8].short : 'Award Recommendation'}`}
                     hint={openClarifications.length > 0
                       ? `${openClarifications.length} clarification${openClarifications.length !== 1 ? 's' : ''} still outstanding — close them before submitting the recommendation.`
                       : 'All clarifications closed.'} />
@@ -1731,7 +2178,7 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                       <Lock size={22} className="text-slate-300 mx-auto" />
                       <p className="text-sm font-semibold text-slate-700 mt-2">Award Recommendation is locked</p>
                       <p className="text-xs text-slate-400 mt-1">
-                        Every preceding step must complete first — still open: {commercialSteps.slice(0, -1).filter(s => !isDone(s.id)).map(s => `${s.no} · ${s.short}`).join(', ')}.
+                        Every preceding step must complete first — still open: {steps.slice(0, -1).filter(s => !isDone(s.id)).map(s => `${s.no} · ${s.short}`).join(', ')}.
                       </p>
                     </Card>
                   ) : (
@@ -1846,7 +2293,7 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                       <Card className="overflow-hidden">
                         <PanelHead icon={FileText} title="Evaluation Audit Trail" hint="What each step contributed to this recommendation" />
                         <div className="divide-y divide-slate-50">
-                          {commercialSteps.map(s => {
+                          {steps.map(s => {
                             const wasSkipped = isSkipped(s.id)
                             const done = !wasSkipped && isDone(s.id)
                             return (
@@ -1875,7 +2322,7 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                             <h3 className="text-sm font-semibold text-slate-800">Submit Commercial Recommendation</h3>
                             <p className="text-xs text-slate-400 mt-0.5">
                               {recBidder
-                                ? <>Recommending <strong>{recBidder.name}</strong> — evaluated at {fmtMoney(evaluatedPriceOf(recBidder.id))}, awarded at the submitted bid price of {fmtMoney(bidGrand(recBidder.id))}. This recommendation (not a score) is sent to Management Review.</>
+                                ? <>Recommending <strong>{recBidder.name}</strong> — evaluated at {fmtMoney(evaluatedPriceOf(recBidder.id))}, awarded at the submitted bid price of {fmtMoney(bidGrand(recBidder.id))}. This recommendation (not a score) is sent to Supply Chain's commercial &amp; award gate.</>
                                 : 'Select a bidder to recommend.'}
                             </p>
                             {openClarifications.length > 0 && (
@@ -1883,10 +2330,15 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                                 <AlertTriangle size={12} /> {openClarifications.length} clarification{openClarifications.length !== 1 ? 's' : ''} still open — close them in the clarifications step before submitting.
                               </p>
                             )}
+                            {docBlockHint && (
+                              <p className="text-xs text-amber-700 mt-1.5 flex items-start gap-1.5">
+                                <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {docBlockHint}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Button variant="secondary" size="sm" onClick={goPrev}><ArrowLeft size={13} /> Clarifications</Button>
-                            <Button size="sm" disabled={!recBidder || openClarifications.length > 0} onClick={handleSubmit}>
+                            <Button size="sm" disabled={!recBidder || openClarifications.length > 0 || docRoundOpen} onClick={handleSubmit}>
                               <Send size={13} /> Submit Recommendation
                             </Button>
                           </div>

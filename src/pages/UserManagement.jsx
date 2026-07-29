@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Button from '../components/ui/Button'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import { useAuth } from '../context/AuthContext'
+import { MODULES, MODULE_ROUTES, emptyModuleLevels, levelOf } from '../utils/permissionMatrix'
 import { useTenders } from '../context/TenderContext'
 import { useTheme } from '../context/ThemeContext'
 import { useDismissable, useBackHandler } from '../context/NavigationContext'
@@ -89,37 +90,26 @@ const DEFAULT_ROLES = [
   { id: 'biz_admin',   label: 'Business Admin',       color: '#0F766E' },
   { id: 'pof',         label: 'Contract Engineer',    color: '#0089cf' },
   { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
-  { id: 'scm',         label: 'Supply Chain Manager', color: '#0F766E' },
+  { id: 'scm',         label: 'Supply Chain',         color: '#0F766E' },
   { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
   { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
 ]
 
-const MODULES = [
-  { key: 'user_management',   label: 'User Management'       },
-  { key: 'task_assignment',   label: 'Task Assignment'        },
-  { key: 'audit_log',         label: 'Audit Log'             },
-  { key: 'itt_creation',      label: 'ITT Creation'          },
-  { key: 'tender_export',     label: 'Tender Export'         },
-  { key: 'ingestion',         label: 'Bid Ingestion'         },
-  { key: 'tech_eval',         label: 'Technical Evaluation'  },
-  { key: 'comm_eval',         label: 'Commercial Evaluation' },
-  { key: 'scm_review',        label: 'SCM Approval Gates'    },
-  { key: 'contract_creation', label: 'Contract Creation'     },
+// MODULES / DEFAULT_MATRIX now live in utils/permissionMatrix, because the router
+// and the sidebar gate on them too — see the Access Control tab below.
+
+const LEVEL_OPTIONS = [
+  { val: 'READ',   label: 'Read Only',     activeColor: '#64748B' },
+  { val: 'ACTION', label: 'Read + Action', activeColor: 'var(--color-primary)' },
+  { val: 'CRUD',   label: 'Full Access',   activeColor: '#059669' },
 ]
 
-const DEFAULT_MATRIX = {
-  it_admin:    { user_management:'CRUD', task_assignment:'CRUD', audit_log:'CRUD', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
-  biz_admin:   { user_management:'NONE', task_assignment:'CRUD', audit_log:'READ', itt_creation:'READ', tender_export:'READ', ingestion:'READ', tech_eval:'READ', comm_eval:'READ', scm_review:'READ', contract_creation:'READ' },
-  // Contract Engineer owns commercial evaluation; Contract Holder owns technical.
-  pof:         { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'READ', comm_eval:'CRUD', scm_review:'READ', contract_creation:'CRUD' },
-  contract_holder: { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'READ', scm_review:'NONE', contract_creation:'NONE' },
-  // The Supply Chain Manager acts on all three approval gates but authors nothing.
-  scm:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'READ', comm_eval:'READ', scm_review:'ACTION', contract_creation:'READ' },
-  hse:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
-  icv:         { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE', contract_creation:'NONE' },
-}
+const TABS = [
+  { id: 'users',     label: 'Users' },
+  { id: 'access',    label: 'Access Control' },
+  { id: 'dropdowns', label: 'Dropdowns' },
+]
 
-const emptyModule   = () => Object.fromEntries(MODULES.map(m => [m.key, 'NONE']))
 const emptyUser     = { name: '', email: '', role: 'pof', status: 'active', password: '' }
 const emptyRoleForm = { label: '', color: '#0089cf', description: '' }
 
@@ -135,12 +125,16 @@ function RolePill({ role }) {
   )
 }
 
-function Toggle({ on, onChange, locked }) {
+// `locked` = permanently on and un-revokable; `readOnly` = shows the real state
+// but this viewer may not change it.
+function Toggle({ on, onChange, locked, readOnly }) {
+  const frozen = locked || readOnly
   return (
-    <button type="button" onClick={locked ? undefined : onChange} style={{
+    <button type="button" disabled={frozen} onClick={frozen ? undefined : onChange} style={{
       width: 40, height: 22, borderRadius: 11, position: 'relative', border: 'none', padding: 0, flexShrink: 0,
       background: locked ? 'var(--color-primary-dark,#1b4c6f)' : on ? 'var(--color-primary)' : '#CBD5E1',
-      cursor: locked ? 'not-allowed' : 'pointer', transition: 'background 0.2s',
+      cursor: frozen ? 'not-allowed' : 'pointer', transition: 'background 0.2s',
+      opacity: readOnly && !locked ? 0.6 : 1,
     }}>
       <span style={{
         position: 'absolute', top: 3, left: on || locked ? 21 : 3,
@@ -153,12 +147,29 @@ function Toggle({ on, onChange, locked }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function UserManagement() {
-  const { user: currentUser, users, updateUser, addUser, removeUser } = useAuth()
-  const isItAdmin = currentUser?.role?.id === 'it_admin'
+  const {
+    user: currentUser, users, updateUser, addUser, removeUser,
+    permissionMatrix: matrix, setModuleLevel, removeRolePermissions, setPermissionMatrix,
+  } = useAuth()
   const { tenders, updateTender, dropdownConfig, updateDropdownConfig } = useTenders()
   const { isDark } = useTheme()
 
-  const defaultTab = isItAdmin ? 'users' : 'dropdowns'
+  // What this page shows is decided by the role's Access Control level for the
+  // user_management module — never by its role id, or an admin's grant would open
+  // the route and then show nothing. NONE never gets here (the router blocks it),
+  // READ is Dropdowns only (the Business Admin's deliberate view), ACTION adds the
+  // Users and Access Control tabs read-only, CRUD makes them editable.
+  const roleId       = currentUser?.role?.id
+  const umLevel      = levelOf(matrix, roleId, 'user_management')
+  const canAdminSee  = umLevel === 'ACTION' || umLevel === 'CRUD'
+  const canAdminEdit = umLevel === 'CRUD'
+  // "Reassign Tasks" is its own capability flag (task_assignment owns no route),
+  // and it writes to tenders — so it needs both that flag and write access here.
+  const taskLevel    = levelOf(matrix, roleId, 'task_assignment')
+  const canReassign  = canAdminEdit && (taskLevel === 'ACTION' || taskLevel === 'CRUD')
+
+  const visibleTabs = TABS.filter(t => canAdminSee || t.id === 'dropdowns')
+  const defaultTab  = visibleTabs[0]?.id || 'dropdowns'
 
   const [tab,           setTab]           = useState(defaultTab)
   const [search,        setSearch]        = useState('')
@@ -186,18 +197,8 @@ export default function UserManagement() {
       return merged
     } catch { return DEFAULT_ROLES }
   })
-  const [matrix, setMatrix] = useState(() => {
-    try {
-      const s = localStorage.getItem('atm_matrix')
-      if (!s) return DEFAULT_MATRIX
-      const parsed = JSON.parse(s)
-      // Ensure all DEFAULT_MATRIX roles have the new module keys
-      const newKeys = Object.keys(DEFAULT_MATRIX.it_admin)
-      const needsReset = !newKeys.every(k => k in (parsed.it_admin || {}))
-      if (needsReset) { localStorage.removeItem('atm_matrix'); return DEFAULT_MATRIX }
-      return parsed
-    } catch { return DEFAULT_MATRIX }
-  })
+  // The matrix itself is AuthContext state (loaded, merged and persisted there),
+  // so edits here reach the router and the sidebar on the next render.
   const [savedRole, setSavedRole] = useState(null)
   const [lastLevel, setLastLevel] = useState({})
 
@@ -212,6 +213,11 @@ export default function UserManagement() {
   const [newDropdownItem, setNewDropdownItem] = useState({})
   const [dropdownSaved, setDropdownSaved] = useState(null)
 
+  // The level can drop while the page is open (an admin editing a role's grant),
+  // so render the selected tab only while it is still one this role may see —
+  // otherwise the pane would vanish and leave an empty page behind.
+  const activeTab = visibleTabs.some(t => t.id === tab) ? tab : defaultTab
+
   // ── Back wiring ────────────────────────────────────────────────────────────
   useDismissable(showUserModal,  () => setShowUserModal(false))
   useDismissable(showRoleModal,  () => setShowRoleModal(false))
@@ -223,11 +229,11 @@ export default function UserManagement() {
   // tab Back just popped and trap the user on this page forever.
   const tabTrail = useRef([])
   const selectTab = next => {
-    if (next === tab) return
+    if (next === activeTab) return
     // Drop any earlier visit to the tab being opened, so toggling between two
     // tabs a dozen times doesn't leave a dozen Back presses to escape the page.
     tabTrail.current = tabTrail.current.filter(x => x !== next)
-    tabTrail.current.push(tab)
+    tabTrail.current.push(activeTab)
     setTab(next)
   }
 
@@ -251,7 +257,6 @@ export default function UserManagement() {
   const selectTheme = { inputBg, surface, border, text, sub, hoverBg: surfBg }
 
   useEffect(() => { localStorage.setItem('atm_roles',  JSON.stringify(roles))  }, [roles])
-  useEffect(() => { localStorage.setItem('atm_matrix', JSON.stringify(matrix)) }, [matrix])
 
   const inp = (err) => ({
     width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 10, outline: 'none',
@@ -324,16 +329,19 @@ export default function UserManagement() {
   const deleteUser = id => { removeUser(id); setDeleteConfirm(null) }
 
   // ── Permissions ────────────────────────────────────────────────────────────
+  // Every edit writes straight through AuthContext, so the target role's router
+  // guard and sidebar pick it up without a reload or a storage wipe. NONE means
+  // no access; any other level opens the module's routes.
   const toggleModule = (roleId, key) => {
-    const cur = matrix[roleId]?.[key] || 'NONE'
+    const cur = matrix?.[roleId]?.[key] || 'NONE'
     if (cur === 'NONE') {
-      setMatrix(p => ({ ...p, [roleId]: { ...p[roleId], [key]: lastLevel[`${roleId}_${key}`] || 'READ' } }))
+      setModuleLevel(roleId, key, lastLevel[`${roleId}_${key}`] || 'READ')
     } else {
       setLastLevel(p => ({ ...p, [`${roleId}_${key}`]: cur }))
-      setMatrix(p => ({ ...p, [roleId]: { ...p[roleId], [key]: 'NONE' } }))
+      setModuleLevel(roleId, key, 'NONE')
     }
   }
-  const setLevel   = (roleId, key, lv) => setMatrix(p => ({ ...p, [roleId]: { ...p[roleId], [key]: lv } }))
+  const setLevel   = (roleId, key, lv) => setModuleLevel(roleId, key, lv)
   const saveMatrix = roleId => { setSavedRole(roleId); setTimeout(() => setSavedRole(null), 2000) }
 
   // ── Create role ────────────────────────────────────────────────────────────
@@ -341,14 +349,15 @@ export default function UserManagement() {
     if (!roleForm.label.trim()) return
     const id = roleForm.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     setRoles(p => [...p, { id, label: roleForm.label.trim(), color: roleForm.color, custom: true }])
-    setMatrix(p => ({ ...p, [id]: emptyModule() }))
+    // A custom role starts with nothing; the grid below is where it earns access.
+    setPermissionMatrix(p => ({ ...p, [id]: emptyModuleLevels() }))
     setRoleForm(emptyRoleForm)
     setShowRoleModal(false)
   }
 
   const deleteRole = id => {
     setRoles(p => p.filter(r => r.id !== id))
-    setMatrix(p => { const n = { ...p }; delete n[id]; return n })
+    removeRolePermissions(id)
   }
 
   // ── Reassign ───────────────────────────────────────────────────────────────
@@ -392,9 +401,17 @@ export default function UserManagement() {
           <h1 className="text-xl font-bold" style={{ color: text }}>User Management</h1>
           <p className="text-xs mt-0.5" style={{ color: sub }}>Manage system users, roles and access permissions</p>
         </div>
-        <div>
-          {tab === 'users'  && <Button onClick={openAdd}                      size="sm"><IcoPlus size={13} /> Onboard User</Button>}
-          {tab === 'access' && <Button onClick={() => setShowRoleModal(true)} size="sm"><IcoPlus size={13} /> Create Role</Button>}
+        <div className="flex items-center gap-2">
+          {/* Creating is a CRUD action — an ACTION-level role sees the tabs but no
+              way to change what is on them. */}
+          {activeTab === 'users'  && canAdminEdit && <Button onClick={openAdd}                      size="sm"><IcoPlus size={13} /> Onboard User</Button>}
+          {activeTab === 'access' && canAdminEdit && <Button onClick={() => setShowRoleModal(true)} size="sm"><IcoPlus size={13} /> Create Role</Button>}
+          {activeTab !== 'dropdowns' && !canAdminEdit && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+              style={{ background: surfBg, color: sub, border: `1px solid ${border}` }}>
+              <IcoEye size={12} /> View only
+            </span>
+          )}
         </div>
       </div>
 
@@ -419,12 +436,10 @@ export default function UserManagement() {
       {/* ── Tabs ── */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
         style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--color-border)' }}>
-         {[{ id: 'users', label: 'Users' }, { id: 'access', label: 'Access Control' }, { id: 'dropdowns', label: 'Dropdowns' }]
-          .filter(t => isItAdmin || t.id === 'dropdowns')
-          .map(t => (
+        {visibleTabs.map(t => (
           <button key={t.id} onClick={() => selectTab(t.id)}
             className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={tab === t.id
+            style={activeTab === t.id
               ? { background: 'var(--color-primary)', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
               : { background: 'transparent', color: sub }}>
             {t.label}
@@ -433,7 +448,7 @@ export default function UserManagement() {
       </div>
 
       {/* ══════════════════════════ USERS TAB ══════════════════════════════ */}
-      {tab === 'users' && (
+      {activeTab === 'users' && (
         <div className="space-y-4">
 
           {/* Filters */}
@@ -516,20 +531,26 @@ export default function UserManagement() {
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 relative">
-                        <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                          className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                          style={{ background: surfBg, color: sub }}>
-                          <IcoMore size={14} />
-                        </button>
+                        {/* Every entry in this menu writes, so an ACTION-level
+                            viewer gets no menu at all rather than an empty one. */}
+                        {canAdminEdit ? (
+                          <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                            style={{ background: surfBg, color: sub }}>
+                            <IcoMore size={14} />
+                          </button>
+                        ) : (
+                          <span className="text-xs" style={{ color: sub }}>—</span>
+                        )}
 
-                        {menuOpen === u.id && (
+                        {canAdminEdit && menuOpen === u.id && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />
                             <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-52 rounded-xl py-1.5 z-50`}
                               style={{ background: surface, border: `1px solid ${border}`, boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}>
 
                               <MenuItem Icon={IcoEdit} label="Edit User" onClick={() => openEdit(u)} hoverBg={surfBg} color={text} />
-                              {!isItAdmin && assigned.length > 0 && (
+                              {canReassign && assigned.length > 0 && (
                                 <MenuItem Icon={IcoArrows} label="Reassign Tasks" onClick={() => openReassign(u)} hoverBg={surfBg} color={text} badge={assigned.length} />
                               )}
                               {!u.superAdmin && (
@@ -566,7 +587,7 @@ export default function UserManagement() {
       )}
 
       {/* ══════════════════════════ ACCESS CONTROL ══════════════════════════ */}
-      {tab === 'access' && (
+      {activeTab === 'access' && (
         <div className="space-y-4">
 
           {/* Legend */}
@@ -583,6 +604,15 @@ export default function UserManagement() {
                 {l.label}
               </span>
             ))}
+            <span className="text-[11px]" style={{ color: sub }}>
+              Off means no access. Any level opens the module's pages for that role — applied immediately.
+            </span>
+            {!canAdminEdit && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                style={{ background: surfBg, color: sub, border: `1px solid ${border}` }}>
+                <IcoEye size={12} /> View only — you may not change these grants
+              </span>
+            )}
           </div>
 
           {roles.map(role => {
@@ -614,29 +644,40 @@ export default function UserManagement() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => deleteRole(role.id)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                      style={{ color: '#EF4444' }}
-                      onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
-                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-                      <IcoTrash size={14} />
-                    </button>
-                    <button onClick={() => saveMatrix(role.id)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white"
-                      style={{ background: savedRole === role.id ? '#059669' : 'var(--color-primary)', transition: 'background 0.2s' }}>
-                      {savedRole === role.id
-                        ? <><IcoCheckCircle size={12} /> Saved!</>
-                        : <><IcoSave size={12} /> Save</>}
-                    </button>
-                  </div>
+                  {canAdminEdit && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => deleteRole(role.id)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                        style={{ color: '#EF4444' }}
+                        onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                        <IcoTrash size={14} />
+                      </button>
+                      <button onClick={() => saveMatrix(role.id)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white"
+                        style={{ background: savedRole === role.id ? '#059669' : 'var(--color-primary)', transition: 'background 0.2s' }}>
+                        {savedRole === role.id
+                          ? <><IcoCheckCircle size={12} /> Saved!</>
+                          : <><IcoSave size={12} /> Save</>}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Module rows */}
                 {MODULES.map((mod, mi) => {
-                  const level   = matrix[role.id]?.[mod.key] || 'NONE'
+                  const level   = matrix?.[role.id]?.[mod.key] || 'NONE'
                   const enabled = level !== 'NONE'
                   const ModIcon = ModSvg[mod.key]
+                  // Which pages the toggle actually opens or closes. A module with
+                  // no route is an in-page capability (Task Assignment, Tender
+                  // Export) — say so rather than leave the admin guessing why the
+                  // menu did not change.
+                  const routes  = MODULE_ROUTES[mod.key] || []
+                  // The IT Admin's own User Management grant is the one cell that
+                  // cannot be revoked: with no backend, switching it off would
+                  // close the only screen that could ever switch it back on.
+                  const locked  = role.id === 'it_admin' && mod.key === 'user_management'
                   return (
                     <div key={mod.key} className="flex items-center gap-4 px-5 py-3 transition-colors flex-wrap"
                       style={{
@@ -650,25 +691,32 @@ export default function UserManagement() {
                           style={{ background: 'var(--color-primary)12' }}>
                           {ModIcon && <ModIcon size={14} style={{ color: 'var(--color-primary)' }} />}
                         </div>
-                        <span className="text-sm font-medium" style={{ color: text }}>{mod.label}</span>
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium block" style={{ color: text }}>{mod.label}</span>
+                          <span className="text-[10px] font-mono truncate block" style={{ color: sub }}>
+                            {routes.length ? routes.join('  ') : 'In-page action — no menu item'}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Toggle */}
-                      <Toggle on={enabled} onChange={() => toggleModule(role.id, mod.key)} />
+                      <Toggle on={enabled} locked={locked} readOnly={!canAdminEdit}
+                        onChange={() => toggleModule(role.id, mod.key)} />
 
-                      {/* Level selector */}
+                      {/* Level selector — a viewer without write access gets the
+                          granted level as a chip instead of three live buttons. */}
                       {enabled && (
                         <div className="flex items-center gap-1.5">
-                          {[
-                            { val: 'READ',   label: 'Read Only',     activeColor: '#64748B' },
-                            { val: 'ACTION', label: 'Read + Action', activeColor: 'var(--color-primary)' },
-                            { val: 'CRUD',   label: 'Full Access',   activeColor: '#059669' },
-                          ].map(opt => (
-                            <button key={opt.val} onClick={() => setLevel(role.id, mod.key, opt.val)}
+                          {LEVEL_OPTIONS.filter(opt => canAdminEdit || opt.val === level).map(opt => (
+                            <button key={opt.val} type="button" disabled={!canAdminEdit}
+                              onClick={canAdminEdit ? () => setLevel(role.id, mod.key, opt.val) : undefined}
                               className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all"
-                              style={level === opt.val
-                                ? { background: opt.activeColor + '15', color: opt.activeColor, border: `1.5px solid ${opt.activeColor}40` }
-                                : { background: 'transparent', color: sub, border: `1.5px solid ${border}` }}>
+                              style={{
+                                cursor: canAdminEdit ? 'pointer' : 'default',
+                                ...(level === opt.val
+                                  ? { background: opt.activeColor + '15', color: opt.activeColor, border: `1.5px solid ${opt.activeColor}40` }
+                                  : { background: 'transparent', color: sub, border: `1.5px solid ${border}` }),
+                              }}>
                               {opt.label}
                             </button>
                           ))}
@@ -688,7 +736,7 @@ export default function UserManagement() {
       )}
 
       {/* ══════════════════════════ DROPDOWNS TAB ═════════════════════════ */}
-      {tab === 'dropdowns' && (
+      {activeTab === 'dropdowns' && (
         <div className="space-y-5">
           {/* Header */}
           <div className="rounded-2xl p-5"

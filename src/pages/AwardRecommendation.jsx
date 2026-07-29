@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
+import { returnRecipient } from '../utils/evalAssignment'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -31,7 +32,21 @@ const Star           = p => <Svg {...p}><polygon points="12 2 15.09 8.26 22 9.27
 const RotateCcw      = p => <Svg {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.1"/></Svg>
 const Bot            = p => <Svg {...p}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></Svg>
 
-const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
+// The commercial recommendation carries its own currency (a single-source
+// tender can be priced in USD), so the gate reads it rather than assuming OMR.
+const fmtMoney = (n, ccy = 'OMR') => `${ccy} ` + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
+
+// Gate 2 clears both evaluations at once, so a return names the side to redo.
+// `owner` is the role that owns the side; the actual person is resolved from the
+// tender's assignment at render time (returnRecipient).
+const RETURN_TARGETS = [
+  { id: 'tech', label: 'Technical',  owner: 'Contract Holder',
+    hint: 'The Contract Holder re-opens the technical evaluation. The commercial recommendation is kept.' },
+  { id: 'comm', label: 'Commercial', owner: 'Contract Engineer',
+    hint: 'The Contract Engineer re-opens the commercial evaluation. The technical result is kept.' },
+  { id: 'both', label: 'Both',       owner: 'Holder & Engineer',
+    hint: 'Both sides are re-opened. A linear tender restarts at technical evaluation and walks forward through the technical gate again.' },
+]
 
 const scoreBar = (val, max = 100) => (
   <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -53,6 +68,9 @@ export default function AwardRecommendation() {
   const [rejected,   setRejected]   = useState({}) // { [bidderId]: true }
   const [remarks,    setRemarks]    = useState('')
   const [submitted,  setSubmitted]  = useState(false)
+  // Gate 2 sits downstream of both evaluations, so a return has to name the side
+  // being sent back — otherwise a technical concern lands on the Contract Engineer.
+  const [returnTo,   setReturnTo]   = useState('comm') // 'tech' | 'comm' | 'both'
 
   // ── Role gate ──
   if (user?.role?.id !== 'scm') return (
@@ -62,7 +80,7 @@ export default function AwardRecommendation() {
       </div>
       <div className="text-center">
         <p className="text-sm font-semibold text-slate-700">Access Restricted</p>
-        <p className="text-xs text-slate-400 mt-1">This review is only accessible to the Supply Chain Manager.</p>
+        <p className="text-xs text-slate-400 mt-1">This review is only accessible to Supply Chain.</p>
       </div>
       <Button variant="secondary" size="sm" onClick={() => navigate(home)}>
         <ArrowLeft size={13} /> Back to Home
@@ -134,9 +152,12 @@ export default function AwardRecommendation() {
     setSubmitted(true)
   }
 
-  // Send the tender back to the Contract Engineer for commercial rework.
+  // Who the chosen return target actually reaches on this tender.
+  const returnDest = returnRecipient(tender, returnTo)
+
+  // Send the tender back to the evaluator that owns the side being reworked.
   const handleReturn = () => {
-    returnGate(tender.id, 'scm_gate2', remarks.trim())
+    returnGate(tender.id, 'scm_gate2', remarks.trim(), returnTo)
     navigate('/tenders')
   }
 
@@ -177,7 +198,7 @@ export default function AwardRecommendation() {
           <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
             The Technical Evaluation produced a score; the Commercial Evaluator submitted a <strong>recommendation</strong> (not a score),
             so there is no combined average — the two are shown side by side.
-            {commRecName && <> Commercial recommends <strong>{commRecName}</strong>{commRec && <> at {fmtMoney(commRec.total)} ({commRec.variancePct <= 0 ? `${Math.abs(commRec.variancePct)}% below` : `${commRec.variancePct}% above`} estimate)</>}.</>}
+            {commRecName && <> Commercial recommends <strong>{commRecName}</strong>{commRec && <> at {fmtMoney(commRec.total, commRec.currency)} ({commRec.variancePct <= 0 ? `${Math.abs(commRec.variancePct)}% below` : `${commRec.variancePct}% above`} estimate)</>}.</>}
             <strong className="ml-1">Only one bidder can be approved for award.</strong>
           </p>
         </div>
@@ -270,7 +291,7 @@ export default function AwardRecommendation() {
                           </span>
                           {commRec && (
                             <span className="text-[10px] text-slate-500">
-                              {fmtMoney(commRec.total)} · {commRec.variancePct <= 0 ? `${Math.abs(commRec.variancePct)}% below` : `${commRec.variancePct}% above`} est.
+                              {fmtMoney(commRec.total, commRec.currency)} · {commRec.variancePct <= 0 ? `${Math.abs(commRec.variancePct)}% below` : `${commRec.variancePct}% above`} est.
                             </span>
                           )}
                         </div>
@@ -383,13 +404,46 @@ export default function AwardRecommendation() {
             </div>
           )}
 
+          {/* Return target — the tender goes back to whichever evaluator owns it */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-3">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Return for re-evaluation to</p>
+            <div className="flex flex-wrap gap-2">
+              {RETURN_TARGETS.map(t => {
+                const active = returnTo === t.id
+                return (
+                  <button key={t.id} onClick={() => setReturnTo(t.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors
+                      ${active ? 'border-[var(--color-primary)] bg-white text-slate-800' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+                    <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0
+                      ${active ? 'border-[var(--color-primary)]' : 'border-slate-300'}`}>
+                      {active && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)]" />}
+                    </span>
+                    <span className="font-semibold">{t.label}</span>
+                    <span className="text-slate-400">{t.owner}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {/* Name the person, not just the role — resolved from this tender's assignment */}
+            <p className="text-xs text-slate-800 font-semibold mt-2.5">
+              Goes to {returnDest.name}
+              <span className="text-slate-400 font-normal ml-1.5">· {returnDest.roleLabel}</span>
+            </p>
+            {returnDest.unassigned && (
+              <p className="text-[11px] text-amber-700 mt-1">
+                No named evaluator on this tender — it appears in the owning role’s queue marked “Unassigned”.
+              </p>
+            )}
+            <p className="text-[11px] text-slate-500 mt-1.5">{RETURN_TARGETS.find(t => t.id === returnTo)?.hint}</p>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="secondary"
               className="flex-1 justify-center"
               disabled={!remarks.trim()}
               onClick={handleReturn}>
-              <RotateCcw size={13} /> Return to Commercial Evaluation
+              <RotateCcw size={13} /> Return for Re-Evaluation
             </Button>
             <Button
               className="flex-1 justify-center"

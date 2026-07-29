@@ -4,7 +4,7 @@ import {
   Bot, Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
   FileText, AlertCircle, Circle, Download,
   UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
-  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye
+  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -32,6 +32,16 @@ const SECTION_OWNER = {
   sectionB2: 'pof', sectionC: 'hse', sectionE: 'pof', sectionF: 'contract_holder',
   sectionH: 'icv', sectionJ: 'pof', sectionK: 'pof', sectionL: 'pof', sectionG: 'pof',
 }
+// The section picker indexes the *full* flow, so it must not open on index 0 —
+// that is Section 1 (Contract Engineer) and every other role would land on a
+// read-only section. Open on the role's first un-approved own section instead.
+function defaultSectionIndexFor(flow, roleId, approved = {}) {
+  const owned = flow.reduce((acc, s, i) => ((SECTION_OWNER[s.id] || 'pof') === roleId ? [...acc, i] : acc), [])
+  if (owned.length === 0) return 0 // role owns nothing — still opens somewhere, read-only
+  const pending = owned.find(i => !approved[flow[i].id])
+  return pending ?? owned[0]
+}
+
 const OWNER_LABEL = { pof: 'Contract Engineer', contract_holder: 'Contract Holder', hse: 'Contract HSE', icv: 'ICV' }
 const OWNER_COLOR = { pof: '#1B4F8A', contract_holder: '#0891B2', hse: '#0EA5E9', icv: '#DB2777' }
 
@@ -170,8 +180,14 @@ export default function ITTCreation() {
   // Section B2 is authored as clause classes / sub-classes rather than template
   // fields. Seeded from the AI default set the first time the section is opened.
   const [b2Classes, setB2Classes] = useState(existingTender?.sectionB2Classes || cloneB2Classes())
-  // Index into the current role's own sections (the scoped section dropdown).
-  const [mySectionIndex, setMySectionIndex] = useState(0)
+  // Index into the *full* section flow of the section shown in the picker.
+  // Seeded (not 0) so the signed-in role opens on a section it owns.
+  const [mySectionIndex, setMySectionIndex] = useState(() =>
+    defaultSectionIndexFor(resolveFlow(existingTender?.b1Category || null), roleId, existingTender?.sectionApproved || {})
+  )
+  // Guards the re-default below: it fires once per role + tender, so a section
+  // the user picked by hand (including a view-only one) is never clobbered.
+  const defaultedForRef = useRef(`${roleId}|${existingTender?.id || ''}`)
   const [approvalNote, setApprovalNote] = useState('')
   const [ittApproved, setIttApproved] = useState(false)
   const [form, setForm] = useState(initialForm)
@@ -360,12 +376,12 @@ export default function ITTCreation() {
     if (draftTenderId && form.title) map['contract number & title'] = `${draftTenderId} — ${form.title}`
     else if (form.title) map['contract number & title'] = form.title
     // Section B2's only fillable field is the template's own authoring note —
-    // default it to "NOT USED" (per Section A's own instruction for an
-    // inapplicable section), editable if the CE wants to specify real deviations.
+    // fill it from the same clause classes the B2 editor works on, so the
+    // template and the editor never show different special conditions.
     map['(ai to identify and draft clauses where deviate from b 1 clauses)'] =
-      'NOT USED — Section B1 General Conditions of Contract apply without modification.'
+      renderB2Text(b2Classes)
     return map
-  }, [form.title, draftTenderId])
+  }, [form.title, draftTenderId, b2Classes])
 
   const effectiveFlow = useMemo(() => resolveFlow(b1Category), [b1Category])
   // Section-board helpers.
@@ -390,6 +406,24 @@ export default function ITTCreation() {
   const canEditCurrent = current ? canEditSection(current.id) : false
   // Indices (within the full flow) of the sections this role owns.
   const myIndices = flow.reduce((acc, s, i) => (canEditSection(s.id) ? [...acc, i] : acc), [])
+  // The section picker is split by access mode rather than listed flat, so the
+  // editable sections are never interleaved with the read-only ones. Both keep
+  // the original flow index as their value, so selection logic is unchanged.
+  const editableOptions = flow.map((item, idx) => ({ item, idx })).filter(o => canEditSection(o.item.id))
+  const viewOnlyOptions = flow.map((item, idx) => ({ item, idx })).filter(o => !canEditSection(o.item.id))
+  // Re-seed the picker when the role changes or the opened tender first resolves
+  // (its sectionApproved decides which of the role's sections is still pending).
+  // Keyed by role + tender so navigation inside one tender leaves the manual
+  // selection — and goToNext/Prev/approveAndAdvance — untouched.
+  useEffect(() => {
+    const key = `${roleId}|${existingTender?.id || ''}`
+    if (defaultedForRef.current === key || effectiveFlow.length === 0) return
+    defaultedForRef.current = key
+    // Read approvals off the tender when there is one — the local mirror may not
+    // have been re-synced yet on the commit where the tender first resolves.
+    setMySectionIndex(defaultSectionIndexFor(effectiveFlow, roleId, existingTender?.sectionApproved || sectionApproved))
+  }, [roleId, existingTender, effectiveFlow, sectionApproved])
+
   const isLastOwn = canEditCurrent && myIndices[myIndices.length - 1] === currentIndex
   const goToNextSection = () => setMySectionIndex(i => Math.min(i + 1, flow.length - 1))
   const goToPrevSection = () => setMySectionIndex(i => Math.max(i - 1, 0))
@@ -1161,31 +1195,75 @@ export default function ITTCreation() {
             </Card>
           ) : (
             <>
-              {/* Section dropdown — every section; the role edits its own and views the rest read-only */}
+              {/* Section dropdown — the two access modes are kept apart so it is
+                  never ambiguous whether the section being opened is editable.
+                  Group 1: the sections this role owns and may edit.
+                  Group 2: everyone else's sections, opened read-only. */}
               <Card branded className="p-4">
-                <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Select Section to Review</label>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Select Section</label>
                 <select
                   value={currentIndex}
                   onChange={e => setMySectionIndex(parseInt(e.target.value))}
                   className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2"
                   style={{ borderColor: 'rgba(0,137,207,0.2)', backgroundColor: '#fff', color: '#1b4c6f' }}
                 >
-                  {flow.map((item, idx) => {
-                    const owned = canEditSection(item.id)
-                    const tag = owned
-                      ? (isSectionComplete(item) ? '  ✓ Approved' : item.optional ? '  (optional)' : '')
-                      : '  · View only'
-                    return (
-                      <option key={item.id} value={idx}>
-                        {item.title}{tag}
-                      </option>
-                    )
-                  })}
+                  {editableOptions.length > 0 && (
+                    <optgroup label={`✏️  YOUR SECTIONS — you can edit (${editableOptions.length})`}>
+                      {editableOptions.map(({ item, idx }) => (
+                        <option key={item.id} value={idx}>
+                          {item.title}
+                          {isSectionComplete(item) ? '  —  ✓ Approved' : item.optional ? '  —  optional, not yet approved' : '  —  needs your review'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {viewOnlyOptions.length > 0 && (
+                    <optgroup label={`👁  OTHER ROLES' SECTIONS — view only (${viewOnlyOptions.length})`}>
+                      {viewOnlyOptions.map(({ item, idx }) => (
+                        <option key={item.id} value={idx}>
+                          {item.title}  —  {OWNER_LABEL[ownerOf(item.id)]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
-                <p className="text-[11px] text-slate-400 mt-2">
-                  You can open any section. Sections owned by other roles are read-only.
-                </p>
+                <div className="flex items-center gap-4 flex-wrap mt-2.5">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: '#0089cf' }}>
+                    <Pencil size={11} /> Editable — {editableOptions.length} section{editableOptions.length === 1 ? '' : 's'} you own
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: '#64748b' }}>
+                    <Eye size={11} /> View only — {viewOnlyOptions.length} owned by other roles
+                  </span>
+                </div>
               </Card>
+
+              {/* Mode banner — restates, in the section's own colour, which half of
+                  the dropdown the open section came from. */}
+              {current && (
+                <div
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 flex-wrap"
+                  style={canEditCurrent
+                    ? { background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))', border: '1px solid rgba(0,137,207,0.25)' }
+                    : { background: 'rgba(100,116,139,0.06)', border: '1px solid rgba(100,116,139,0.2)' }}
+                >
+                  <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                    style={canEditCurrent
+                      ? { background: 'rgba(0,137,207,0.14)', color: '#0089cf' }
+                      : { background: 'rgba(100,116,139,0.14)', color: '#64748b' }}>
+                    {canEditCurrent ? <Pencil size={13} /> : <Eye size={13} />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold" style={{ color: canEditCurrent ? '#1b4c6f' : '#475569' }}>
+                      {canEditCurrent ? 'Edit mode' : 'View-only mode'}
+                    </p>
+                    <p className="text-[11px]" style={{ color: '#94a3b8' }}>
+                      {canEditCurrent
+                        ? 'You own this section — fill the fields, refine the wording, then approve it.'
+                        : `Owned by ${OWNER_LABEL[ownerOf(current.id)]} — you can read it, but nothing here can be changed.`}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -1194,11 +1272,6 @@ export default function ITTCreation() {
                     {current?.title}
                   </div>
                   <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Section {currentIndex + 1} of {flow.length}</span>
-                  {current && !canEditCurrent && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1" style={{ color: '#64748b', background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)' }}>
-                      <Eye size={10} /> View only · {OWNER_LABEL[ownerOf(current.id)]}
-                    </span>
-                  )}
                   {current && canEditCurrent && isSectionComplete(current) && (
                     <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Approved</span>
                   )}
@@ -1278,6 +1351,9 @@ export default function ITTCreation() {
                     onNext={() => { flushB2(); approveAndAdvance() }}
                     onSkip={current.optional ? () => { flushB2(); skipAndAdvance() } : undefined}
                     onBack={() => { flushB2(); goToPrevSection() }}
+                    /* Here Save & Continue approves the section, so the editor
+                       gates it on every clause class being approved first. */
+                    nextApproves
                     readOnly={!canEditCurrent}
                     readOnlyNote={`Read-only — owned by ${OWNER_LABEL[ownerOf(current.id)]}`}
                   />

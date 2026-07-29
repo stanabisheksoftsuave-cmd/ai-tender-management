@@ -273,7 +273,19 @@ export function exportPreQualSummaryPDF(tender, qualifiedBidders) {
   doc.save(`${tender.id}-PreQual-Summary.pdf`)
 }
 
-export function exportBidderFailReasonsPDF(tender, bidder) {
+/**
+ * Bidder failure reasoning. Serves two evaluations:
+ *  - Pre-qualification, which carries its reasons on bidder.stage3Reasons;
+ *  - Technical evaluation, which has no such shape, so the caller passes its
+ *    scored failures in `technical` — without it a tech bidder would export the
+ *    empty "no reasons" fallback.
+ * @param {object} tender
+ * @param {object} bidder
+ * @param {{ threshold?: number, summary?: string, failures?: Array<{
+ *   criterion: string, type?: string, kind: 'must'|'clarify',
+ *   score: number, maxScore?: number, minScore?: number, band?: string }> }} [technical]
+ */
+export function exportBidderFailReasonsPDF(tender, bidder, technical = null) {
   const { doc, L, R, W } = reportShell(tender, 'BIDDER FAILURE REASONING')
   let y = 78
 
@@ -286,8 +298,16 @@ export function exportBidderFailReasonsPDF(tender, bidder) {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 116, 139)
-  doc.text(`${bidder.country} · ${bidder.category}`, L, y)
-  y += 12
+  doc.text([bidder.country, bidder.category].filter(Boolean).join(' · '), L, y)
+  y += technical?.summary ? 7 : 12
+
+  if (technical?.summary) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(51, 65, 85)
+    doc.splitTextToSize(technical.summary, W).forEach(l => { doc.text(l, L, y); y += 5 })
+    y += 7
+  }
 
   doc.setFontSize(8)
   doc.setFont('helvetica', 'bold')
@@ -297,7 +317,41 @@ export function exportBidderFailReasonsPDF(tender, bidder) {
 
   let hasReasons = false
 
-  if (bidder.stage3Reasons) {
+  const techFailures = technical?.failures || []
+  if (techFailures.length > 0) {
+    hasReasons = true
+    const threshold = technical?.threshold ?? 2
+    techFailures.forEach(f => {
+      const max = f.maxScore ?? 3
+      const why = f.kind === 'must'
+        ? `Mandatory criterion scored ${f.score} against a minimum of ${f.minScore ?? '—'} — the bidder fails on this criterion regardless of the weighted total.`
+        : `Scored ${f.score}, at or below the clarification threshold of ${threshold} — a corrected submission is required before the evaluation can be finalised.`
+      const detail = f.band ? `${why} Band: ${f.band}.` : why
+      const lines = doc.splitTextToSize(`Reason: ${detail}`, W - 6)
+      const blockH = 10 + lines.length * 4
+
+      if (y + blockH > 265) { doc.addPage(); y = 30 }
+
+      doc.setFillColor(...(f.kind === 'must' ? [254, 242, 242] : [255, 251, 235]))
+      doc.rect(L, y - 4, W, blockH, 'F')
+
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(15, 23, 42)
+      doc.text(`[${f.kind === 'must' ? 'MUST BELOW MINIMUM' : 'CLARIFICATION'}] ${f.criterion}`, L + 3, y + 1.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(71, 85, 105)
+      doc.text(`Score ${f.score}/${max}${f.minScore != null ? `  ·  min ${f.minScore}` : ''}`, R - 3, y + 1.5, { align: 'right' })
+
+      doc.setFontSize(8)
+      doc.setTextColor(...(f.kind === 'must' ? [220, 38, 38] : [180, 83, 9]))
+      doc.text(lines, L + 3, y + 6)
+
+      y += blockH + 4
+    })
+  }
+
+  if (!hasReasons && bidder.stage3Reasons) {
     Object.keys(bidder.stage3Reasons).forEach(sheet => {
       Object.keys(bidder.stage3Reasons[sheet]).forEach(crit => {
         if (bidder.stage3Reasons[sheet][crit]) {
@@ -333,7 +387,9 @@ export function exportBidderFailReasonsPDF(tender, bidder) {
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 116, 139)
-    doc.text('No specific failure reasons recorded or bidder failed at a different stage.', L, y)
+    doc.text(technical
+      ? 'No individual criterion failed — the bidder fell short on the overall weighted total only.'
+      : 'No specific failure reasons recorded or bidder failed at a different stage.', L, y)
   }
 
   reportFooter(doc, tender)

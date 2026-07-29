@@ -38,3 +38,13 @@ export function resolveFlow(b1Category) {
     return { id: s.id, title: s.title, docxUrl: cat.docxUrl, exportFilename: cat.exportFilename, isStandIn: cat.isStandIn, nearestTier: cat.nearestTier }
   })
 }
+
+/*
+ * The sections a contract is made of — the very same section templates the ITT
+ * was filled in against, resolved with this tender's B1 tier. Section 1
+ * (Instructions to Tenderers) is left out: it governs how tenderers submit their
+ * bids, not the contract that follows. Contract drafting and the post-award
+ * issued-document record both read this, so they cannot show different papers.
+ */
+export const contractSections = (b1Category) =>
+  resolveFlow(b1Category).filter(s => s.id !== 'section1')

@@ -26,7 +26,7 @@ import { useTheme } from '../context/ThemeContext'
 import { technicalCriteria } from '../data/mockData'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-// The three approval gates owned by the Supply Chain Manager.
+// The three approval gates owned by Supply Chain.
 const SCM_GATE_STATUSES = ['scm_gate1', 'scm_gate2', 'scm_gate3']
 const SCM_GATE_ROUTE = {
   scm_gate1: '/scm-tech-review',

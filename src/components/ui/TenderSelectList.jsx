@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Building2, Calendar, Users, FileText, RefreshCw } from 'lucide-react'
+import { ChevronRight, Building2, Calendar, Users, FileText, RefreshCw, UserPlus } from 'lucide-react'
 import Card from './Card'
 import Badge from './Badge'
 
@@ -21,11 +21,19 @@ const statusVariant = {
   active:              'active',
   contract_closure:    'contract_closure',
   closed:              'closed',
+  parallel_eval:       'tech_eval',
 }
 
-export default function TenderSelectList({ tenders, status, basePath, title, description, emptyText }) {
+/**
+ * `status` accepts an array — a parallel tender sits on `parallel_eval`, so an
+ * evaluation queue that only matched its own status silently dropped it.
+ * `isUnassigned` (optional) flags a tender nobody owns yet, so it reads as work
+ * to pick up rather than a normal assignment.
+ */
+export default function TenderSelectList({ tenders, status, basePath, title, description, emptyText, isUnassigned }) {
   const navigate = useNavigate()
-  const filtered = tenders.filter(t => t.status === status)
+  const allowed = Array.isArray(status) ? status : [status]
+  const filtered = tenders.filter(t => allowed.includes(t.status))
 
   return (
     <div className="space-y-5">
@@ -67,6 +75,11 @@ export default function TenderSelectList({ tenders, status, basePath, title, des
                     {tender.evalProgress === 'not_started' && (
                       <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
                         Not Started
+                      </span>
+                    )}
+                    {isUnassigned?.(tender) && (
+                      <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 ring-1 ring-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <UserPlus size={8} /> Unassigned
                       </span>
                     )}
                     {tender.correctionRequests?.some(r => r.resolved) && (
