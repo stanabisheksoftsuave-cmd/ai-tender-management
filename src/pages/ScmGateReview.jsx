@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
+import SectionTemplateModal from '../components/contract/SectionTemplateModal'
+import { contractSections } from '../components/itt/sectionFlow'
 import { bidders as seedBidders } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
 import { returnRecipient } from '../utils/evalAssignment'
+import { awardOutcome, openRegretLetter } from '../utils/contractDocs'
 
 // ── Inline SVG icons (matching the rest of the app) ──────────────────────────
 const Svg = ({ size = 16, sw = 1.6, style, className = '', children }) => (
@@ -24,6 +27,7 @@ const AlertTriangle = p => <Svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.
 const RotateCcw     = p => <Svg {...p}><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.1" /></Svg>
 const BarChart3     = p => <Svg {...p}><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></Svg>
 const ChevronRight  = p => <Svg {...p}><polyline points="9 18 15 12 9 6" /></Svg>
+const Eye           = p => <Svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></Svg>
 
 const scoreBar = (val, max = 100) => (
   <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -74,8 +78,15 @@ export default function ScmGateReview({ gate }) {
 
   const [comment,  setComment]  = useState('')
   const [outcome,  setOutcome]  = useState(null) // 'approved' | 'returned'
+  // The contract draft is read back as its ITT section documents, one at a
+  // time — same read-only viewer Contract Management shows the issued record in.
+  const [docOpen,   setDocOpen]   = useState(false)
+  const [sectionId, setSectionId] = useState('sectionA')
 
   const copy = GATE_COPY[gate]
+  const tender = tenderId ? tenders.find(t => t.id === tenderId) : null
+  const sections = useMemo(() => contractSections(tender?.b1Category), [tender?.b1Category])
+  const section  = sections.find(s => s.id === sectionId) || sections[0]
 
   // ── Role gate ──
   if (user?.role?.id !== 'scm') return (
@@ -105,8 +116,6 @@ export default function ScmGateReview({ gate }) {
     />
   )
 
-  const tender = tenders.find(t => t.id === tenderId)
-
   // Keep rendering after a decision so the manager can see (and revise) it.
   if (!tender || (tender.status !== gate && !outcome)) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
@@ -123,12 +132,11 @@ export default function ScmGateReview({ gate }) {
     : seedBidders.slice(0, tender.bidders || 4)
 
   const ranked = [...tenderBidders].sort((a, b) => (b.techScore ?? 0) - (a.techScore ?? 0))
-  const awardedBidder = tender.mgmtWinnerId
-    ? tenderBidders.find(b => b.id === tender.mgmtWinnerId)
-    : null
-  const failedBidders = awardedBidder
-    ? tenderBidders.filter(b => b.id !== awardedBidder.id)
-    : []
+  // Winner + regret list — the same derivation Contract Drafting and Contract
+  // Management use, so gate 3 previews exactly the bidders whose documents it
+  // is about to release.
+  const { awarded: awardedBidder, unsuccessful: failedBidders } = awardOutcome(tender)
+  const openRejectionLetter = (b) => openRegretLetter(tender, b, awardedBidder?.name)
 
   const handleApprove = () => { approveGate(tender.id, gate, comment.trim()); setOutcome('approved') }
   const handleReturn  = () => { returnGate(tender.id, gate, comment.trim());  setOutcome('returned') }
@@ -208,7 +216,7 @@ export default function ScmGateReview({ gate }) {
         </Card>
       )}
 
-      {/* ── Gate 3: what approval will issue ── */}
+      {/* ── Gate 3: the contract draft and regret letters SCM is approving ── */}
       {gate === 'scm_gate3' && (
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-3">
@@ -218,15 +226,38 @@ export default function ScmGateReview({ gate }) {
           {awardedBidder ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Winner — contract to be issued</p>
-                <p className="text-sm font-semibold text-emerald-900 mt-1">{awardedBidder.name}</p>
-                <p className="text-xs text-emerald-700 mt-0.5">{awardedBidder.country} · {awardedBidder.totalBid}</p>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Winner — contract to be issued</p>
+                    <p className="text-sm font-semibold text-emerald-900 mt-1">{awardedBidder.name}</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">{awardedBidder.country} · {awardedBidder.totalBid}</p>
+                  </div>
+                  <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setDocOpen(true)}>
+                    <Eye size={12} /> View Contract Draft
+                  </Button>
+                </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                   Unsuccessful — {failedBidders.length} regret letter{failedBidders.length !== 1 ? 's' : ''} to be generated
                 </p>
-                <p className="text-xs text-slate-600 mt-1">{failedBidders.map(b => b.name).join(', ') || '—'}</p>
+                {failedBidders.length === 0 ? (
+                  <p className="text-xs text-slate-500">—</p>
+                ) : (
+                  <div className="space-y-2">
+                    {failedBidders.map(b => (
+                      <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-200 px-3 py-2 flex-wrap">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate">{b.name}</p>
+                          <p className="text-[10px] text-slate-400">{b.country}</p>
+                        </div>
+                        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => openRejectionLetter(b)}>
+                          <Eye size={12} /> View Letter
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {tender.mgmtRemarks && (
                 <p className="text-xs text-slate-500 italic">Award remarks: “{tender.mgmtRemarks}”</p>
@@ -310,6 +341,21 @@ export default function ScmGateReview({ gate }) {
             Back to Tenders <ChevronRight size={14} />
           </Button>
         </Card>
+      )}
+
+      {/* The drafted contract, read through the same section templates it was
+          drafted against — read-only, this is a review copy, not a working draft. */}
+      {docOpen && (
+        <SectionTemplateModal
+          tender={tender}
+          section={section}
+          sections={sections}
+          onSectionChange={setSectionId}
+          title="Contract Draft Review"
+          readOnly
+          readOnlyNote="Awaiting Supply Chain approval — read-only"
+          onClose={() => setDocOpen(false)}
+        />
       )}
     </div>
   )

@@ -12,7 +12,7 @@ import {
   classStatus, classesPendingApproval, b2ClassDocument,
   B2_ACTION_TYPES, B2_ACTION_OBJECTS, B2_EVIDENCE_SOURCES,
   ADD_NEW_CLAUSE, ADD_NEW_SUBCLAUSE,
-  B1_CLAUSE_CATALOGUE, b1ClauseTitle, b1SubclauseOptions, b1SubclauseTitle,
+  B1_CLAUSE_CATALOGUE, b1ClauseTitle, subclauseOptions, sourceSubclauseTitle,
 } from './b2Classes'
 
 /*
@@ -81,7 +81,13 @@ export default function B2ClassEditor({
     setEditing({ kind: 'class', classId: cls.id })
   }
 
-  const addSubclass = (classId) => {
+  /*
+   * A drafting row is created by picking its Type of Action (column H) — the
+   * template's controlled list is what drives adding a special condition, so
+   * the row arrives already set to the action instead of being added blank and
+   * classified afterwards.
+   */
+  const addSubclass = (classId, actionType = '') => {
     const cls = classes.find(c => c.id === classId)
     if (!cls || !cls.code) return   // sub-class numbering hangs off the class number
     // The class code *is* the B1 clause the family acts on, so seed columns B/C
@@ -89,6 +95,10 @@ export default function B2ClassEditor({
     const sub = newSubclass(`${cls.code}.${cls.subclasses.length + 1}`, {
       sourceClauseNo: b1ClauseTitle(cls.code) ? cls.code : '',
       sourceClauseTitle: b1ClauseTitle(cls.code),
+      actionType,
+      // ADD creates new text rather than acting on existing wording, so it
+      // defaults to the object the sheet pairs it with in the example block.
+      actionObject: actionType === 'ADD' ? 'Clause' : actionType ? 'Subclause' : '',
     })
     commit(classes.map(c => (c.id === classId ? { ...c, status: 'draft', subclasses: [...c.subclasses, sub] } : c)))
     setOpenClassId(classId)
@@ -274,12 +284,10 @@ export default function B2ClassEditor({
                       <p className="pl-7 pr-2.5 py-2 text-[10.5px] text-slate-400">No sub-classes in this class yet.</p>
                     )}
                     {!readOnly && (
-                      <button onClick={() => addSubclass(cls.id)} disabled={!cls.code}
-                        title={cls.code ? 'Add a sub-class' : 'Pick a clause number for this class first'}
-                        className="ml-7 mt-1 flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent"
-                        style={{ color: '#0089cf' }}>
-                        <Plus size={11} /> Add sub-class
-                      </button>
+                      <div className="ml-7 mt-1 mr-2.5">
+                        <ActionPicker disabled={!cls.code} onPick={a => addSubclass(cls.id, a)}
+                          title={cls.code ? 'Pick the action this special condition performs' : 'Pick a clause number for this class first'} />
+                      </div>
                     )}
                   </div>
                 )}
@@ -299,7 +307,7 @@ export default function B2ClassEditor({
               takenCodes={classes.filter(c => c.id !== activeClass.id).map(c => c.code).filter(Boolean)}
               onSave={patch => { touchClass(activeClass.id, patch); setEditing(null) }} />
           ) : editing?.kind === 'sub' && activeSub ? (
-            <SubForm key={activeSub.id} sub={activeSub} onCancel={() => setEditing(null)}
+            <SubForm key={activeSub.id} sub={activeSub} classes={classes} onCancel={() => setEditing(null)}
               onSave={patch => { patchSub(activeClass.id, activeSub.id, patch); setEditing(null) }} />
           ) : activeSub ? (
             <SubDetail
@@ -307,6 +315,7 @@ export default function B2ClassEditor({
               onEdit={() => setEditing({ kind: 'sub', classId: activeClass.id, subId: activeSub.id })}
               onDelete={() => setConfirmDelete({ kind: 'sub', classId: activeClass.id, subId: activeSub.id, label: `${activeSub.code} ${activeSub.title}` })}
               onContentChange={val => patchSub(activeClass.id, activeSub.id, { content: val })}
+              onFieldChange={patch => patchSub(activeClass.id, activeSub.id, patch)}
               onBackToClass={() => setSelected(null)}
             />
           ) : (
@@ -314,7 +323,7 @@ export default function B2ClassEditor({
             <ClassDetail
               key={activeClass.id} cls={activeClass} readOnly={readOnly}
               onOpenSub={subId => setSelected({ classId: activeClass.id, subId })}
-              onAddSub={() => addSubclass(activeClass.id)}
+              onAddSub={action => addSubclass(activeClass.id, action)}
               onEdit={() => setEditing({ kind: 'class', classId: activeClass.id })}
               onDelete={() => setConfirmDelete({ kind: 'class', classId: activeClass.id, label: `${activeClass.code ? `${activeClass.code}. ` : ''}${activeClass.title}` })}
               onGenerate={() => generateClass(activeClass.id)}
@@ -502,12 +511,10 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
             No sub-classes yet.{!readOnly && ' Add one to draft a special condition under this class.'}
           </p>
           {!readOnly && (
-            <button onClick={onAddSub} disabled={!cls.code}
-              title={cls.code ? 'Add a sub-class' : 'Pick a clause number for this class first'}
-              className="mx-auto mt-3 flex items-center gap-1 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent"
-              style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.25)' }}>
-              <Plus size={11} /> Add the first sub-class
-            </button>
+            <div className="mt-3 flex justify-center">
+              <ActionPicker disabled={!cls.code} onPick={onAddSub} label="Add the first sub-class"
+                title={cls.code ? 'Pick the action this special condition performs' : 'Pick a clause number for this class first'} />
+            </div>
           )}
         </div>
       ) : (
@@ -550,12 +557,8 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
       {/* ── Document actions ── */}
       {!readOnly && (
         <div className="mt-4 pt-4 flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: '1px solid #eef6fc' }}>
-          <button onClick={onAddSub} disabled={!cls.code}
-            title={cls.code ? 'Add a sub-class' : 'Pick a clause number for this class first'}
-            className="flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent"
-            style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.25)' }}>
-            <Plus size={11} /> Add sub-class
-          </button>
+          <ActionPicker disabled={!cls.code} onPick={onAddSub}
+            title={cls.code ? 'Pick the action this special condition performs' : 'Pick a clause number for this class first'} />
           {status === 'generated' && (
             <button onClick={onApprove}
               className="flex items-center gap-1.5 text-xs font-semibold text-white px-3.5 py-1.5 rounded-lg transition-opacity hover:opacity-90"
@@ -576,7 +579,7 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
 }
 
 // A single drafting row: the spreadsheet metadata plus the AI-editable clause text.
-function SubDetail({ cls, sub, readOnly, onEdit, onDelete, onContentChange, onBackToClass }) {
+function SubDetail({ cls, sub, readOnly, onEdit, onDelete, onContentChange, onFieldChange, onBackToClass }) {
   const [genBusy, setGenBusy] = useState(false)
   const canGenerate = !!sub.instruction?.trim()
 
@@ -631,8 +634,14 @@ function SubDetail({ cls, sub, readOnly, onEdit, onDelete, onContentChange, onBa
         style={{ background: 'rgba(236,244,252,0.5)', border: '1px solid #e2eefb' }}>
         <Meta label="Source clause" value={sub.sourceClauseNo && `${sub.sourceClauseNo} — ${sub.sourceClauseTitle || '—'}`} />
         <Meta label="Source sub-clause" value={subLevels && `${subLevels}${sub.sourceSubclauseTitle ? ` — ${sub.sourceSubclauseTitle}` : ''}`} />
-        <Meta label="Type of action" value={sub.actionType && actionLabel(sub.actionType)} />
-        <Meta label="Action object" value={sub.actionObject} />
+        {/* H and I are the sheet's two plain controlled lists — editable in place
+            so changing what a special condition does never needs the edit form. */}
+        <MetaSelect label="Type of action" value={sub.actionType} readOnly={readOnly}
+          options={B2_ACTION_TYPES} labelOf={actionLabel} placeholder="Select an action"
+          onChange={v => onFieldChange({ actionType: v })} />
+        <MetaSelect label="Action object" value={sub.actionObject} readOnly={readOnly}
+          options={B2_ACTION_OBJECTS} placeholder="Select an object"
+          onChange={v => onFieldChange({ actionObject: v })} />
         <Meta label="Source / evidence" value={sub.evidenceSource} />
         <Meta label="Evidence document" value={sub.evidenceFile} />
         <div className="sm:col-span-2">
@@ -738,54 +747,65 @@ function ClassForm({ cls, takenCodes = [], onSave, onCancel }) {
  * free-text number, because the catalogue cannot cover every General
  * Conditions tier.
  */
-function SubForm({ sub, onSave, onCancel }) {
+function SubForm({ sub, classes, onSave, onCancel }) {
   const [f, setF] = useState(() => ({ ...sub }))
   const set = (patch) => setF(prev => ({ ...prev, ...patch }))
 
+  const optionsFor = (level, clauseNo = f.sourceClauseNo) =>
+    subclauseOptions(level, clauseNo, classes, sub.id)
+
   const inCatalogue = (no) => B1_CLAUSE_CATALOGUE.some(c => c.no === no)
   const [customClause, setCustomClause] = useState(() => !!sub.sourceClauseNo && !inCatalogue(sub.sourceClauseNo))
+  // A level the catalogues do not carry was typed in through "Add New Sub-Clause"
+  // and must stay a free-text field rather than snapping back to a drop list.
   const [customLvl, setCustomLvl] = useState(() => ({
-    1: !!sub.sourceLevel1 && !b1SubclauseOptions(sub.sourceClauseNo, null, null, 1).some(o => o.no === sub.sourceLevel1),
-    2: !!sub.sourceLevel2 && !b1SubclauseOptions(sub.sourceClauseNo, sub.sourceLevel1, null, 2).some(o => o.no === sub.sourceLevel2),
-    3: !!sub.sourceLevel3 && !b1SubclauseOptions(sub.sourceClauseNo, sub.sourceLevel1, sub.sourceLevel2, 3).some(o => o.no === sub.sourceLevel3),
+    1: !!sub.sourceLevel1 && !optionsFor(1, sub.sourceClauseNo).some(o => o.no === sub.sourceLevel1),
+    2: !!sub.sourceLevel2 && !optionsFor(2).some(o => o.no === sub.sourceLevel2),
+    3: !!sub.sourceLevel3 && !optionsFor(3).some(o => o.no === sub.sourceLevel3),
   }))
 
-  const clearLevels = { sourceLevel1: '', sourceLevel2: '', sourceLevel3: '', sourceSubclauseTitle: '' }
-
   const pickClause = (value) => {
+    // Only Level 1 hangs off the B1 clause; Levels 2 and 3 cite Sections B2 and
+    // B3 independently, so changing the clause must not clear them.
+    const clearLvl1 = { sourceLevel1: '' }
     if (value === ADD_NEW_CLAUSE) {
       setCustomClause(true)
-      setCustomLvl({ 1: false, 2: false, 3: false })
-      set({ sourceClauseNo: '', sourceClauseTitle: '', ...clearLevels })
+      setCustomLvl(prev => ({ ...prev, 1: false }))
+      set({ sourceClauseNo: '', sourceClauseTitle: '', ...clearLvl1 })
       return
     }
     setCustomClause(false)
-    setCustomLvl({ 1: false, 2: false, 3: false })
-    set({ sourceClauseNo: value, sourceClauseTitle: b1ClauseTitle(value), ...clearLevels })
-  }
-
-  // Selecting a level clears the deeper ones — their options hang off it.
-  const pickLevel = (level, value) => {
-    const key = `sourceLevel${level}`
-    const deeper = level === 1 ? { sourceLevel2: '', sourceLevel3: '' } : level === 2 ? { sourceLevel3: '' } : {}
-    if (value === ADD_NEW_SUBCLAUSE) {
-      setCustomLvl(prev => ({ ...prev, [level]: true }))
-      set({ [key]: '', ...deeper, sourceSubclauseTitle: '' })
-      return
-    }
-    setCustomLvl(prev => ({ ...prev, [level]: false }))
-    const next = { ...f, [key]: value, ...deeper }
+    setCustomLvl(prev => ({ ...prev, 1: false }))
+    const next = { ...f, sourceClauseNo: value, ...clearLvl1 }
     set({
-      [key]: value, ...deeper,
-      sourceSubclauseTitle: b1SubclauseTitle(next.sourceClauseNo, next.sourceLevel1, next.sourceLevel2, next.sourceLevel3),
+      sourceClauseNo: value, sourceClauseTitle: b1ClauseTitle(value), ...clearLvl1,
+      sourceSubclauseTitle: sourceSubclauseTitle(next, classes),
     })
   }
 
-  const lvl1 = b1SubclauseOptions(f.sourceClauseNo, null, null, 1)
-  const lvl2 = b1SubclauseOptions(f.sourceClauseNo, f.sourceLevel1, null, 2)
-  const lvl3 = b1SubclauseOptions(f.sourceClauseNo, f.sourceLevel1, f.sourceLevel2, 3)
+  const pickLevel = (level, value) => {
+    const key = `sourceLevel${level}`
+    if (value === ADD_NEW_SUBCLAUSE) {
+      setCustomLvl(prev => ({ ...prev, [level]: true }))
+      set({ [key]: '', sourceSubclauseTitle: '' })
+      return
+    }
+    setCustomLvl(prev => ({ ...prev, [level]: false }))
+    const next = { ...f, [key]: value }
+    set({ [key]: value, sourceSubclauseTitle: sourceSubclauseTitle(next, classes) })
+  }
+
+  // Column D from Section B1, E from Section B2, F from Section B3 — row 3 of
+  // the client's template names a different section behind each level.
+  const LEVELS = [
+    { level: 1, from: 'B1', hint: 'Sub-clauses of the selected Section B1 clause', needsClause: true },
+    { level: 2, from: 'B2', hint: "Sub-clauses this tender's Section B2 already carries", needsClause: false },
+    { level: 3, from: 'B3', hint: 'Section B3 is not part of this ITT — add the number manually', needsClause: false },
+  ]
+
   const clauseTitleAuto = !customClause && !!f.sourceClauseNo
-  const subTitleAuto = !!f.sourceLevel1 && !customLvl[1] && !customLvl[2] && !customLvl[3]
+  const anyLevel = f.sourceLevel1 || f.sourceLevel2 || f.sourceLevel3
+  const subTitleAuto = !!anyLevel && !customLvl[1] && !customLvl[2] && !customLvl[3]
 
   return (
     <FormShell title="Edit drafting row" onCancel={onCancel}
@@ -821,21 +841,22 @@ function SubForm({ sub, onSave, onCancel }) {
       {/* Columns D-F — one merged "Source Sub-clause" group, three optional levels */}
       <div>
         <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5">
-          Source sub-clause <span className="font-medium normal-case tracking-normal text-slate-300">(optional — level 1 to 3)</span>
+          Source sub-clause <span className="font-medium normal-case tracking-normal text-slate-300">(optional — from Sections B1, B2 and B3)</span>
         </label>
         <div className="grid grid-cols-3 gap-2">
-          {[1, 2, 3].map(level => {
-            const opts = level === 1 ? lvl1 : level === 2 ? lvl2 : lvl3
+          {LEVELS.map(({ level, from, hint, needsClause }) => {
+            const opts = optionsFor(level)
             const value = f[`sourceLevel${level}`]
-            const parentPicked = level === 1 ? !!f.sourceClauseNo : !!f[`sourceLevel${level - 1}`]
+            const available = !needsClause || !!f.sourceClauseNo
             return customLvl[level] ? (
-              <Field key={level} label={`Level ${level} (new)`} value={value}
-                onChange={v => set({ [`sourceLevel${level}`]: v })} placeholder="e.g. 40.5" />
+              <Field key={level} label={`Level ${level} · ${from} (new)`} value={value}
+                onChange={v => set({ [`sourceLevel${level}`]: v })} placeholder="e.g. 40.5" hint={hint} />
             ) : (
-              <Select key={level} label={`Level ${level}`} value={value}
-                onChange={v => pickLevel(level, v)} disabled={!parentPicked}
-                options={opts.map(o => ({ value: o.no, label: `${o.no} — ${o.title}` }))}
-                extra={parentPicked ? ADD_NEW_SUBCLAUSE : null} placeholder="—" />
+              <Select key={level} label={`Level ${level} · ${from}`} value={value}
+                onChange={v => pickLevel(level, v)} disabled={!available} hint={hint}
+                options={opts.map(o => ({ value: o.no, label: `${o.no}${o.title ? ` — ${o.title}` : ''}` }))}
+                extra={available ? ADD_NEW_SUBCLAUSE : null}
+                placeholder={!available ? 'Pick a B1 clause first' : opts.length ? '—' : 'None — add manually'} />
             )
           })}
         </div>
@@ -925,7 +946,7 @@ function Field({ label, value, onChange, placeholder, multiline = false, width =
   )
 }
 
-function Select({ label, value, onChange, options, extra, placeholder, disabled = false }) {
+function Select({ label, value, onChange, options, extra, placeholder, disabled = false, hint }) {
   return (
     <div className="min-w-0">
       <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5">{label}</label>
@@ -936,6 +957,7 @@ function Select({ label, value, onChange, options, extra, placeholder, disabled 
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         {extra && <option value={extra}>+ {extra}</option>}
       </select>
+      {hint && <p className="text-[9.5px] text-slate-400 mt-1 leading-snug">{hint}</p>}
     </div>
   )
 }
@@ -990,6 +1012,44 @@ function Meta({ label, value }) {
       <p className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="text-[11.5px] leading-relaxed text-slate-600 break-words">{value || '—'}</p>
     </div>
+  )
+}
+
+/*
+ * A Meta row whose value is one of the template's controlled lists, editable in
+ * place. Read-only viewers get the plain Meta text so the layout does not shift
+ * between the two modes.
+ */
+function MetaSelect({ label, value, options, onChange, placeholder, readOnly, labelOf = v => v }) {
+  if (readOnly) return <Meta label={label} value={value && labelOf(value)} />
+  return (
+    <div className="min-w-0">
+      <p className="text-[9.5px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <select value={value || ''} onChange={e => onChange(e.target.value)}
+        className="mt-0.5 w-full px-2 py-1 text-[11.5px] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#0089cf]/30"
+        style={{ border: '1px solid #cce6f8', color: value ? '#334155' : '#94a3b8' }}>
+        <option value="">{placeholder}</option>
+        {options.map(o => <option key={o} value={o}>{labelOf(o)}</option>)}
+      </select>
+    </div>
+  )
+}
+
+/*
+ * Adding a special condition starts from the Type of Action list (column H) —
+ * the engineer picks what the row does and it is created already set to it.
+ * Resets to the placeholder after each pick so the same action can be added
+ * twice in a row.
+ */
+function ActionPicker({ onPick, disabled = false, title, label = 'Add sub-class' }) {
+  return (
+    <select value="" disabled={disabled} title={title}
+      onChange={e => { if (e.target.value) onPick(e.target.value) }}
+      className="text-[10.5px] font-semibold px-2 py-1 rounded-lg bg-white cursor-pointer transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#0089cf]/30"
+      style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.25)' }}>
+      <option value="">+ {label}…</option>
+      {B2_ACTION_TYPES.map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}
+    </select>
   )
 }
 

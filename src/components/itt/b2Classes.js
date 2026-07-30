@@ -9,9 +9,9 @@
  *   A  Target B2 Clause No.            -> code
  *   B  Source Clause No.               -> sourceClauseNo        (B1 drop list)
  *   C  Source Clause Title             -> sourceClauseTitle     (auto-linked from B)
- *   D  Source Sub-clause · Level 1     -> sourceLevel1          (optional)
- *   E  Source Sub-clause · Level 2     -> sourceLevel2          (optional)
- *   F  Source Sub-clause · Level 3     -> sourceLevel3          (optional)
+ *   D  Source Sub-clause · Level 1     -> sourceLevel1          (from Section B1)
+ *   E  Source Sub-clause · Level 2     -> sourceLevel2          (from Section B2)
+ *   F  Source Sub-clause · Level 3     -> sourceLevel3          (from Section B3)
  *   G  Source Sub-Clause Title         -> sourceSubclauseTitle  (auto-linked from D/E/F)
  *   H  Type of Action                  -> actionType            (controlled list)
  *   I  Action Object                   -> actionObject          (controlled list)
@@ -19,10 +19,12 @@
  *   K  Drafting Instruction to AI      -> instruction           (Contract Engineer)
  *   L  Generated Clause/Sub-clause Text-> content               (AI drafts from K + J)
  *
- * The sheet labels the three optional levels "from Section B1 / B2 / B3"; there
- * is no Section B3 in this ITT, so they are read as the nesting depth of the
- * source sub-clause (40.1 -> 40.1.2 -> 40.1.2(a)) and their options come from
- * B1_CLAUSE_CATALOGUE below.
+ * Row 3 of the sheet names a different section behind each of the three optional
+ * level columns, and they are wired that way: Level 1 lists the sub-clauses of
+ * the Section B1 clause chosen in column B, Level 2 lists the sub-clauses this
+ * tender's own Section B2 already carries, and Level 3 lists Section B3. They
+ * are three independent optional references, not one nested cascade — an
+ * amendment may cite a B1 sub-clause, an earlier B2 amendment, or both.
  *
  * The seed set is the clause text of the client's own "Section B2 - Special
  * Conditions.docx" — copied verbatim, including clause numbering, percentages
@@ -172,31 +174,65 @@ export const b1ClauseTitle = (no) =>
   B1_CLAUSE_CATALOGUE.find(c => c.no === no)?.title || ''
 
 /*
- * Options for one of the three optional Source Sub-clause levels. Level 1 lists
- * the chosen clause's sub-clauses; levels 2 and 3 list the children of the
- * level above, so an unselected parent yields an empty (disabled) drop list.
+ * Column D — every sub-clause of the chosen Section B1 clause, at any nesting
+ * depth. The catalogue nests (40.1 -> 40.1.1) but the sheet asks for one flat
+ * drop list of sub-clause numbers, so the tree is walked into a single list.
  */
-export function b1SubclauseOptions(clauseNo, level1, level2, level = 1) {
+export function b1SubclauseOptions(clauseNo) {
   const clause = B1_CLAUSE_CATALOGUE.find(c => c.no === clauseNo)
   if (!clause) return []
-  if (level === 1) return clause.subclauses
-  const l1 = clause.subclauses.find(s => s.no === level1)
-  if (level === 2) return l1?.children || []
-  const l2 = (l1?.children || []).find(s => s.no === level2)
-  return l2?.children || []
+  const out = []
+  const walk = (list) => (list || []).forEach(s => { out.push({ no: s.no, title: s.title }); walk(s.children) })
+  walk(clause.subclauses)
+  return out
 }
 
-// The title column G auto-links to: the deepest level the engineer selected.
-export function b1SubclauseTitle(clauseNo, level1, level2, level3) {
-  if (level3) return b1SubclauseOptions(clauseNo, level1, level2, 3).find(s => s.no === level3)?.title || ''
-  if (level2) return b1SubclauseOptions(clauseNo, level1, null, 2).find(s => s.no === level2)?.title || ''
-  if (level1) return b1SubclauseOptions(clauseNo, null, null, 1).find(s => s.no === level1)?.title || ''
-  return ''
+/*
+ * Column E — the sub-clauses Section B2 already carries. B2 is authored in this
+ * same editor, so the list is the tender's own drafting rows rather than a
+ * fixed catalogue. The row being edited is excluded: a special condition cannot
+ * cite itself as its own source.
+ */
+export function b2SubclauseOptions(classes, excludeSubId = null) {
+  return (classes || [])
+    .flatMap(c => (c.subclasses || []).map(s => ({ no: s.code, title: s.title, id: s.id })))
+    .filter(o => o.no && o.id !== excludeSubId)
 }
 
-// The deepest source reference a sub-class points at, phrased for clause text.
+/*
+ * Column F — Section B3. This ITT's document set runs B1, B2, C, D, … with no
+ * Section B3 (sectionFlow.js), so there is no catalogue to list. The column is
+ * kept because the client's sheet defines it: the drop list is empty and the
+ * engineer types the number through "Add New Sub-Clause".
+ */
+export const B3_SUBCLAUSE_CATALOGUE = []
+
+export const b3SubclauseOptions = () => B3_SUBCLAUSE_CATALOGUE
+
+// Options for one of the three level columns, each from its own section.
+export function subclauseOptions(level, clauseNo, b2Classes, excludeSubId) {
+  if (level === 1) return b1SubclauseOptions(clauseNo)
+  if (level === 2) return b2SubclauseOptions(b2Classes, excludeSubId)
+  return b3SubclauseOptions()
+}
+
+/*
+ * Column G auto-links to the title of whichever level is filled, resolved
+ * against that level's own section. B1 is preferred: it is the General
+ * Conditions text the special condition actually acts on.
+ */
+export function sourceSubclauseTitle(s, b2Classes) {
+  const at = (level, no) => no
+    ? subclauseOptions(level, s.sourceClauseNo, b2Classes, s.id).find(o => o.no === no)?.title || ''
+    : ''
+  return at(1, s.sourceLevel1) || at(2, s.sourceLevel2) || at(3, s.sourceLevel3)
+}
+
+// The source reference a sub-class points at, phrased for clause text. The
+// levels are independent, so this is the first one filled — B1 before B2 before
+// B3 — not the deepest.
 export const sourceRef = (s) => {
-  const no = s.sourceLevel3 || s.sourceLevel2 || s.sourceLevel1
+  const no = s.sourceLevel1 || s.sourceLevel2 || s.sourceLevel3
   if (no) return `Sub-Clause ${no}`
   return s.sourceClauseNo ? `Clause ${s.sourceClauseNo}` : ''
 }
@@ -209,7 +245,8 @@ export const sourceRef = (s) => {
 export function sourceRefLabel(s) {
   const ref = sourceRef(s)
   if (!ref) return s.b1Ref || ''
-  const title = (s.sourceLevel1 ? s.sourceSubclauseTitle : s.sourceClauseTitle) || ''
+  const anyLevel = s.sourceLevel1 || s.sourceLevel2 || s.sourceLevel3
+  const title = (anyLevel ? s.sourceSubclauseTitle : s.sourceClauseTitle) || ''
   return title ? `${ref} — ${title}` : ref
 }
 
