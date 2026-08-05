@@ -167,7 +167,7 @@ export default function DocxViewer() {
             <FileText size={18} style={{ color: '#2563eb' }} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#1b4c6f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>Word Document Preview</div>
           </div>
         </div>

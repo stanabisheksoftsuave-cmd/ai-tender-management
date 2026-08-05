@@ -61,7 +61,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
     const isHeading = !hasField && paraText.length > 0 && paraText.length <= 60 &&
       paraText === paraText.toUpperCase() && /[A-Z]{3,}/.test(paraText)
     if (isHeading) {
-      return <p key={block.id} className="font-semibold tracking-wide mt-3 mb-1 first:mt-0" style={{ color: '#1b4c6f' }}>{paraText}</p>
+      return <p key={block.id} className="font-semibold tracking-wide mt-3 mb-1 first:mt-0" style={{ color: '#1e293b' }}>{paraText}</p>
     }
     return <p key={block.id} className="whitespace-pre-wrap mb-1">{block.segments.map(renderSegment)}</p>
   }
@@ -85,7 +85,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
                 {row.cells.map((cell, ci) => (
                   <td key={ci} className={`px-2.5 py-1.5 align-top ${ri === 0 ? 'font-semibold' : ''}`} style={{
                     border: '1px solid #cce6f8',
-                    color: ri === 0 ? '#1b4c6f' : undefined
+                    color: ri === 0 ? '#1e293b' : undefined
                   }}>
                     {renderBlocks(cell.blocks)}
                   </td>
@@ -117,7 +117,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
     <Card branded className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Section B1 — General Conditions of Contract</h3>
+          <h3 className="font-semibold" style={{ color: '#1e293b' }}>Section B1 — General Conditions of Contract</h3>
           <p className="text-xs text-slate-400 mt-1">Choose the value/risk tier, or Purchase of Materials for goods procurement, that applies to this CONTRACT.</p>
         </div>
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-50" style={{ color: '#0089cf' }}>
@@ -127,14 +127,14 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
 
       {/* Category dropdown — the user picks the tier that applies to this contract */}
       <div className="mb-4">
-        <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>
+        <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>
           Select the value / risk tier that applies to this contract
         </label>
         <select
           value={key}
           onChange={e => setIndex(CATEGORY_KEYS.indexOf(e.target.value))}
           className="w-full px-3.5 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0089cf]/30"
-          style={{ border: '1px solid rgba(0,137,207,0.25)', background: '#fff', color: '#1b4c6f' }}
+          style={{ border: '1px solid rgba(0,137,207,0.25)', background: '#fff', color: '#1e293b' }}
         >
           {CATEGORY_KEYS.map(k => (
             <option key={k} value={k}>{B1_CATEGORY_MAP[k].label} — {B1_CATEGORY_MAP[k].sub}</option>
@@ -149,7 +149,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
       }}>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-sm font-bold" style={{ color: '#1b4c6f' }}>{cat.label}</p>
+            <p className="text-sm font-bold" style={{ color: '#1e293b' }}>{cat.label}</p>
             <p className="text-[11px] text-slate-500 mt-0.5">{cat.sub}</p>
           </div>
           <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #0089cf, #00b4d8)' }}>

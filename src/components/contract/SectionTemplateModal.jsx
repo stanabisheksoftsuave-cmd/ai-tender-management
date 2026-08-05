@@ -111,5 +111,5 @@ export default function SectionTemplateModal({
       </div>
     </div>,
     document.body,
-  )
+  )                                               
 }

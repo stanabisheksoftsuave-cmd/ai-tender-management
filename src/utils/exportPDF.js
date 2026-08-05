@@ -461,16 +461,6 @@ export function exportPsfPDF(tender, psf = {}) {
   section('EXECUTIVE SUMMARY')
   paragraph(psf.executiveSummary)
 
-  section('REVIEWS / APPROVALS')
-  Object.entries(psf.reviews || {}).forEach(([body, checked]) => {
-    if (y > 262) { doc.addPage(); y = 30 }
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(15, 23, 42)
-    doc.text(`${checked ? '[X]' : '[ ]'}  ${body}`, L, y)
-    y += 6
-  })
-
   const assignees = tender.assignedContractEngineers || (tender.assignedContractEngineer ? [tender.assignedContractEngineer] : [])
   if (assignees.length) {
     y += 4

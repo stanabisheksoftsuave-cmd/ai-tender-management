@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Target, Building2, ShieldOff, ArrowRight, FileText, AlertCircle,
   DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert,
-  UploadCloud, X, Paperclip, Bot, Sparkles, CheckCircle, RefreshCw,
-  Circle, Download, Edit3, ChevronRight, Wand2, Undo2
+  UploadCloud, X, Paperclip, Sparkles, CheckCircle, RefreshCw,
+  Download, Edit3, ChevronRight, Wand2, Undo2
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -432,7 +433,7 @@ export default function ContractStrategy() {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
                 <Target size={16} style={{ color: '#0089cf' }} />
               </div>
-              <h3 className="font-semibold text-sm" style={{ color: '#1b4c6f' }}>
+              <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
                 {existingTender ? `Contract Strategy — ${existingTender.id}` : 'New Contract Strategy'}
               </h3>
             </div>
@@ -444,7 +445,7 @@ export default function ContractStrategy() {
 
           {/* CONTRACT DETAILS FORM */}
           <Card branded className="p-6 space-y-5 olng-slide-up" style={{ animationDelay: '60ms' }}>
-            <h3 className="font-semibold flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+            <h3 className="font-semibold flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
                 <FileText size={16} style={{ color: '#0089cf' }} />
               </div>
@@ -454,7 +455,7 @@ export default function ContractStrategy() {
             <div className="grid grid-cols-2 gap-4">
               {/* Contract / Project Title — full width */}
               <div className="col-span-2">
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {t('itt.fieldTitle')}
                   <span style={{ color: '#0089cf' }}>*</span>
                 </label>
@@ -471,7 +472,7 @@ export default function ContractStrategy() {
 
               {/* Tender Type */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Briefcase size={12} style={{ color: '#0089cf' }} />
                   Tender Type
                 </label>
@@ -486,7 +487,7 @@ export default function ContractStrategy() {
 
               {/* Department */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Building2 size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldDept')}
                 </label>
@@ -507,7 +508,7 @@ export default function ContractStrategy() {
 
               {/* Anticipated Value */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <DollarSign size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldBudget')}
                   <span style={{ color: '#0089cf' }}>*</span>
@@ -517,7 +518,7 @@ export default function ContractStrategy() {
                     value={form.currency}
                     onChange={e => handleCurrencyChange(e.target.value)}
                     className="w-28 px-2 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white font-semibold"
-                    style={{ color: '#1b4c6f' }}
+                    style={{ color: '#1e293b' }}
                   >
                     {CURRENCIES.map(c => (
                       <option key={c.code} value={c.code}>{c.code}</option>
@@ -537,7 +538,7 @@ export default function ContractStrategy() {
 
               {/* Cost Code */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Hash size={12} style={{ color: '#0089cf' }} />
                   {t('strategy.fieldCostCode')}
                 </label>
@@ -551,7 +552,7 @@ export default function ContractStrategy() {
 
               {/* Date Required */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Calendar size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldDeadline')}
                   <span style={{ color: '#0089cf' }}>*</span>
@@ -569,7 +570,7 @@ export default function ContractStrategy() {
 
               {/* Duration (Years + Months) */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Clock size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldDuration')}
                 </label>
@@ -594,7 +595,7 @@ export default function ContractStrategy() {
 
               {/* Scope Overview — full width textarea */}
               <div className="col-span-2">
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {t('strategy.fieldScopeOverview')}
                   <span style={{ color: '#0089cf' }}>*</span>
                 </label>
@@ -636,55 +637,19 @@ export default function ContractStrategy() {
 
       {/* ══════════════ STEP 1: AI GENERATION LOADER ══════════════ */}
       {step === 1 && (
-        <Card branded className="p-12 olng-scale-in">
-          <div className="olng-dot-pattern absolute inset-0 opacity-40 pointer-events-none rounded-2xl" style={{ position: 'absolute' }} />
-          <div className="relative z-10">
-            <div className="text-center mb-10">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 olng-float" style={{
-                background: 'linear-gradient(135deg, rgba(0,137,207,0.15), rgba(27,76,111,0.1))',
-                boxShadow: '0 8px 32px rgba(0,137,207,0.15)'
-              }}>
-                <Bot size={36} style={{ color: '#0089cf' }} />
-              </div>
-              <h3 className="text-lg font-bold mb-1" style={{ color: '#1b4c6f' }}>AI is Generating Your SOW</h3>
-              <p className="text-sm text-slate-400">Building the Statement of Work document from your contract details and compliance standards</p>
-            </div>
-
-            <div className="max-w-sm mx-auto space-y-3 mb-10">
-              {SOW_GEN_TASKS.map((task, i) => (
-                <div key={i} className="flex items-center gap-3 olng-slide-up olng-stagger" style={{ '--i': i }}>
-                  <div className={`olng-gen-dot shrink-0 ${
-                    i < genStep ? 'olng-gen-dot--done' :
-                    i === genStep ? 'olng-gen-dot--active' :
-                    'olng-gen-dot--pending'
-                  }`}>
-                    {i < genStep
-                      ? <CheckCircle size={14} className="text-white" />
-                      : i === genStep
-                      ? <RefreshCw size={13} className="text-white animate-spin" />
-                      : <Circle size={12} style={{ color: '#cce6f8' }} />}
-                  </div>
-                  <span className={`text-sm transition-colors ${
-                    i < genStep ? 'text-slate-400 line-through' :
-                    i === genStep ? 'font-semibold' : 'text-slate-300'
-                  }`} style={i === genStep ? { color: '#1b4c6f' } : {}}>{task}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="max-w-sm mx-auto">
-              <div className="olng-progress-bar h-2">
-                <div
-                  className="olng-progress-fill"
-                  style={{ width: `${Math.round((genStep / SOW_GEN_TASKS.length) * 100)}%` }}
-                />
-              </div>
-              <p className="text-center text-xs mt-2.5 font-medium" style={{ color: '#0089cf' }}>
-                {Math.round((genStep / SOW_GEN_TASKS.length) * 100)}% complete
-              </p>
-            </div>
-          </div>
-        </Card>
+        <div className="flex items-center justify-center py-10">
+          <AiAnalysisLoader
+            className="max-w-md"
+            title="AI is Generating Your SOW"
+            description="Building the Statement of Work document from your contract details and compliance standards"
+            progress={(genStep / SOW_GEN_TASKS.length) * 100}
+            steps={SOW_GEN_TASKS.map((task, i) => ({
+              id: task,
+              label: task,
+              status: i < genStep ? 'complete' : i === genStep ? 'active' : 'pending',
+            }))}
+          />
+        </div>
       )}
 
       {/* ══════════════ STEP 2: SOW REVIEW ══════════════ */}
@@ -699,7 +664,7 @@ export default function ContractStrategy() {
                 <FileText size={20} style={{ color: '#0089cf' }} />
               </div>
               <div>
-                <h2 className="font-bold" style={{ color: '#1b4c6f' }}>Statement of Work — Generated</h2>
+                <h2 className="font-bold" style={{ color: '#1e293b' }}>Statement of Work — Generated</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {sowContent.reference} · Generated {sowContent.generatedDate}
                 </p>
@@ -722,7 +687,7 @@ export default function ContractStrategy() {
               borderBottom: '1px solid rgba(0,137,207,0.1)'
             }}>
               <div>
-                <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>{sowContent.title}</h3>
+                <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>{sowContent.title}</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Reference: {sowContent.reference} · {form.contractMode} · {form.budget}</p>
                 <p className="flex items-center gap-1 text-[10.5px] mt-1 font-medium" style={{ color: '#0089cf' }}>
                   <Wand2 size={10} /> Select any text in the document to edit it with AI
@@ -764,7 +729,7 @@ export default function ContractStrategy() {
             >
               {sowContent.sections.map((section, si) => (
                 <div key={si}>
-                  <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1b4c6f' }}>
+                  <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
                     <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
                     {section.heading}
                   </h4>
@@ -786,7 +751,7 @@ export default function ContractStrategy() {
                           border: '1px solid rgba(0,137,207,0.08)'
                         }}>
                           <span className="text-[11px] text-slate-400">{item.label}</span>
-                          <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1b4c6f' }}>
+                          <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1e293b' }}>
                             {item.value}
                           </span>
                         </div>
@@ -798,7 +763,7 @@ export default function ContractStrategy() {
                     <div className="pl-4 space-y-3 mt-2">
                       {section.subsections.map((sub, si2) => (
                         <div key={si2}>
-                          <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1b4c6f' }}>{sub.title}</p>
+                          <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1e293b' }}>{sub.title}</p>
                           <ul className="space-y-1">
                             {sub.items.map((item, ii) => (
                               <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
@@ -930,7 +895,7 @@ export default function ContractStrategy() {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{item.label}</p>
-                    <p className="text-xs font-semibold" style={{ color: '#1b4c6f' }}>{item.value || '—'}</p>
+                    <p className="text-xs font-semibold" style={{ color: '#1e293b' }}>{item.value || '—'}</p>
                   </div>
                 </div>
               ))}

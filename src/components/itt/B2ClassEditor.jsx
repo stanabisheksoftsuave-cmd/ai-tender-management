@@ -176,7 +176,7 @@ export default function B2ClassEditor({
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
             <Layers size={16} style={{ color: '#0089cf' }} />
           </div>
-          <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>{section.title}</h3>
+          <h3 className="font-semibold" style={{ color: '#1e293b' }}>{section.title}</h3>
           {section.optional && <Chip>Optional</Chip>}
           {readOnly && <Chip>Read only</Chip>}
         </div>
@@ -190,7 +190,7 @@ export default function B2ClassEditor({
       {/* ── Summary strip ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4 px-3.5 py-2.5 rounded-xl"
         style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.15)' }}>
-        <p className="text-[11px] leading-relaxed" style={{ color: '#1b4c6f' }}>
+        <p className="text-[11px] leading-relaxed" style={{ color: '#1e293b' }}>
           <strong>{classes.length}</strong> clause class{classes.length === 1 ? '' : 'es'} ·{' '}
           <strong>{total}</strong> special condition{total === 1 ? '' : 's'} amending the B1 General Conditions.
           {' '}Pick a class to list its sub-classes, then a sub-class to open its clause text.
@@ -206,7 +206,7 @@ export default function B2ClassEditor({
         {/* ══════════ LEFT — class list ══════════ */}
         <div className="rounded-xl bg-white overflow-hidden lg:max-h-[58vh] lg:overflow-y-auto" style={{ border: '1px solid #cce6f8' }}>
           <div className="px-3 py-2.5 flex items-center justify-between sticky top-0 bg-white z-10" style={{ borderBottom: '1px solid #cce6f8' }}>
-            <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#1b4c6f' }}>Clause Classes</span>
+            <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#1e293b' }}>Clause Classes</span>
             {!readOnly && (
               <button onClick={addClass} title="Add a clause class"
                 className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-slate-50"
@@ -232,7 +232,7 @@ export default function B2ClassEditor({
                   {open ? <ChevronDown size={13} className="mt-0.5 shrink-0 text-slate-400" />
                         : <ChevronRight size={13} className="mt-0.5 shrink-0 text-slate-400" />}
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold leading-tight truncate" style={{ color: '#1b4c6f' }}>
+                    <p className="text-[12px] font-semibold leading-tight truncate" style={{ color: '#1e293b' }}>
                       {cls.code ? `${cls.code}. ` : ''}{cls.title}
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
@@ -445,7 +445,7 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
             </p>
             <StatusBadge cls={cls} />
           </div>
-          <h4 className="text-base font-semibold mt-0.5" style={{ color: '#1b4c6f' }}>{cls.title}</h4>
+          <h4 className="text-base font-semibold mt-0.5" style={{ color: '#1e293b' }}>{cls.title}</h4>
           <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{cls.description}</p>
         </div>
         {!readOnly && (
@@ -470,7 +470,7 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
           ? { background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.28)' }
           : { background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.2)' }}>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: status === 'approved' ? '#047857' : '#1b4c6f' }}>
+          <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: status === 'approved' ? '#047857' : '#1e293b' }}>
             Clause template
           </p>
           <p className="text-[11px] leading-relaxed mt-1" style={{ color: status === 'approved' ? '#047857' : '#475569' }}>
@@ -523,7 +523,7 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
               Section B2 — Special Conditions of Contract
             </p>
-            <p className="font-semibold tracking-wide text-[14px] mt-1" style={{ color: '#1b4c6f' }}>
+            <p className="font-semibold tracking-wide text-[14px] mt-1" style={{ color: '#1e293b' }}>
               {doc.heading}
             </p>
 
@@ -531,7 +531,7 @@ function ClassDetail({ cls, readOnly, onOpenSub, onAddSub, onEdit, onDelete, onG
               <div key={entry.id} className={i === 0 ? 'mt-5' : 'mt-5 pt-5'}
                 style={i === 0 ? undefined : { borderTop: '1px solid #eef6fc' }}>
                 <div className="group flex items-start justify-between gap-2">
-                  <p className="font-semibold" style={{ color: '#1b4c6f' }}>{entry.heading}</p>
+                  <p className="font-semibold" style={{ color: '#1e293b' }}>{entry.heading}</p>
                   {!readOnly && (
                     <button onClick={() => onOpenSub(entry.id)} title="Open this drafting row"
                       className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:bg-slate-50"
@@ -604,7 +604,7 @@ function SubDetail({ cls, sub, readOnly, onEdit, onDelete, onContentChange, onFi
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-mono font-bold" style={{ color: '#0089cf' }}>{sub.code}</span>
-            <h4 className="text-base font-semibold" style={{ color: '#1b4c6f' }}>{sub.title}</h4>
+            <h4 className="text-base font-semibold" style={{ color: '#1e293b' }}>{sub.title}</h4>
             <ActionBadge action={sub.actionType} />
           </div>
           {sourceRefLabel(sub) && (
@@ -916,7 +916,7 @@ function FormShell({ title, children, onSave, onCancel, canSave }) {
   return (
     <div className="p-5">
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{title}</h4>
+        <h4 className="text-sm font-semibold" style={{ color: '#1e293b' }}>{title}</h4>
         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={15} /></button>
       </div>
       <div className="space-y-3.5">{children}</div>
@@ -1077,7 +1077,7 @@ function Empty({ icon: Icon, title, body }) {
       <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.08)' }}>
         <Icon size={20} style={{ color: '#0089cf' }} />
       </div>
-      <p className="text-sm font-semibold mt-3" style={{ color: '#1b4c6f' }}>{title}</p>
+      <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>{title}</p>
       <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">{body}</p>
     </div>
   )

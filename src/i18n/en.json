@@ -219,8 +219,6 @@
   "eval.submitted":       "Evaluation Submitted",
   "eval.submittedSub":    "Your evaluation has been submitted successfully.",
 
-  "audit.adminNotice":   "Administrator View",
-  "audit.adminSub":      "Full audit trail access. All user actions, system events, and AI operations are logged here.",
   "audit.totalEvents":   "Total Events",
   "audit.today":         "Today",
   "audit.activeUsers":   "Users Active",

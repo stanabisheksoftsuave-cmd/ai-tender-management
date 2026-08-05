@@ -459,7 +459,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
-              <img src="/src/assets/icons/bulb.svg" alt="" width={14} height={14}
+              <img src="/icons/bulb.svg" alt="" width={14} height={14}
                 style={{ filter: 'brightness(0) invert(1)' }} />
             </div>
             <h3 className="font-bold text-sm" style={{ color: c.text }}>Ask AI Tender</h3>
@@ -470,7 +470,7 @@ export default function Dashboard() {
           </div>
 
           <div className="relative mb-3">
-            <img src="/src/assets/icons/bulb.svg" alt=""
+            <img src="/icons/bulb.svg" alt=""
               className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               width={14} height={14}
               style={{ filter: isDark ? 'brightness(0) invert(0.5)' : 'brightness(0) invert(0.6)' }} />

@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Bot, Sparkles, CheckCircle, FileText, UploadCloud, Download, ChevronRight, ChevronDown,
-  ShieldOff, ClipboardCheck, X, RefreshCw, UserCheck,
+  ShieldOff, ClipboardCheck, X, UserCheck,
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import AiEditableTextarea from '../components/ui/AiEditableTextarea'
+import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useBackHandler } from '../context/NavigationContext'
@@ -32,14 +33,6 @@ const GEN_TASKS = [
   'Compiling anticipated value & funding source',
   'Drafting background and executive summary',
   'Assembling Procurement Submission Form',
-]
-
-const REVIEW_BODIES = [
-  'Established Board',
-  'Technical Committee',
-  'Management Team',
-  'CPL Review',
-  'C&P Steering Committee',
 ]
 
 // Supporting documents uploaded alongside the strategy templates on the PSF page.
@@ -71,7 +64,6 @@ function buildPsf(tender, uploads) {
       `${tender?.tenderType || 'the applicable'} category. The contract strategy, company estimate, risk assessments and ` +
       `negotiation approach have been reviewed and are attached. ${Object.keys(uploads).length} supporting document(s) ` +
       `accompany this form. Recommended award route is competitive tender against the pre-qualified bidder list.`,
-    reviews: REVIEW_BODIES.reduce((acc, b) => ({ ...acc, [b]: b === 'Technical Committee' || b === 'Management Team' }), {}),
   }
 }
 
@@ -91,12 +83,8 @@ export default function PsfStrategy() {
   )
 
   // Every template is uploadable on the PSF page, even ones not chosen at the
-  // acknowledgement gate. The templates the Holder selected are the ones REQUIRED
-  // before the PSF can be generated; the rest are optional supporting uploads.
-  const requiredTemplateIds = useMemo(() => {
-    return Array.isArray(tender?.selectedTemplates) ? tender.selectedTemplates : TEMPLATE_DEFS.map(t => t.id)
-  }, [tender])
-  const isTemplateRequired = id => requiredTemplateIds.includes(id)
+  // acknowledgement gate. None of them block generation — every upload here is optional.
+  const isTemplateRequired = () => false
 
   // 0 = re-upload templates, 1 = AI generation, 2 = review & submit
   const [step, setStep] = useState(tender?.psfDocument ? 2 : 0)
@@ -111,15 +99,8 @@ export default function PsfStrategy() {
   )
   const [templatesOpen, setTemplatesOpen] = useState(true)
 
-  // The Pre-Qualification Document is required once the tender has actually been
-  // through pre-qualification.
   const qualifiedBidders = (tender?.prequalBidders || []).filter(b => !b.droppedAt)
   const hasPreQual = (tender?.prequalBidders?.length || 0) > 0
-
-  // Ready to generate once every REQUIRED item is uploaded. Vacuously true when
-  // the Holder excluded every template, so the tender can still proceed.
-  const requiredIds = hasPreQual ? [...requiredTemplateIds, 'pre-qual'] : requiredTemplateIds
-  const allUploaded = requiredIds.every(id => uploads[id])
 
   useBackHandler(() => {
     if (step === 2 && !tender?.psfCompleted) { setStep(0); return true }
@@ -179,7 +160,6 @@ export default function PsfStrategy() {
   const startGeneration = () => { setGenStep(0); setStep(1) }
 
   const setPsfField = (key, value) => setPsf(prev => ({ ...prev, [key]: value }))
-  const toggleReview = (body) => setPsf(prev => ({ ...prev, reviews: { ...prev.reviews, [body]: !prev.reviews[body] } }))
 
   const handleSubmit = () => {
     const ces = contractEngineers
@@ -339,9 +319,7 @@ export default function PsfStrategy() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-800 truncate">Pre-Qualification Document</p>
-                        {hasPreQual
-                          ? <span className="text-[9px] font-bold uppercase tracking-wide text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-1.5 py-0.5 rounded-full">Required</span>
-                          : <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">Optional</span>}
+                        <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">Optional</span>
                       </div>
                       <p className="text-[11px] text-slate-400">
                         {hasPreQual ? `${qualifiedBidders.length} qualified bidder${qualifiedBidders.length === 1 ? '' : 's'}` : 'No pre-qualification data'}
@@ -414,19 +392,17 @@ export default function PsfStrategy() {
             </div>
           </div>
 
-          <Card className={`p-4 transition-opacity ${!allUploaded ? 'opacity-60' : ''}`}>
+          <Card className="p-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <Sparkles size={14} className="text-[var(--color-primary)]" /> Generate PSF Strategy
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {allUploaded
-                    ? 'All required documents uploaded — ready to generate.'
-                    : `${requiredIds.filter(id => uploads[id]).length} of ${requiredIds.length} required documents uploaded.`}
+                  All template uploads are optional — ready to generate.
                 </p>
               </div>
-              <Button disabled={!allUploaded} onClick={startGeneration}>
+              <Button onClick={startGeneration}>
                 <Bot size={13} /> Generate with AI
               </Button>
             </div>
@@ -436,28 +412,19 @@ export default function PsfStrategy() {
 
       {/* ── Step 1: AI generation ── */}
       {step === 1 && (
-        <Card className="p-8">
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3"
-              style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.14), rgba(27,76,111,0.09))' }}>
-              <Bot size={22} className="text-[var(--color-primary)]" />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-800">Generating the Procurement Submission Form</h3>
-            <p className="text-xs text-slate-400 mt-1">Building the PSF Strategy from your templates and contract details</p>
-          </div>
-          <div className="space-y-2 max-w-md mx-auto">
-            {GEN_TASKS.map((task, i) => (
-              <div key={task} className="flex items-center gap-2.5 text-xs">
-                {i < genStep
-                  ? <CheckCircle size={14} className="text-emerald-500 shrink-0" />
-                  : i === genStep
-                    ? <RefreshCw size={14} className="text-[var(--color-primary)] shrink-0 animate-spin" />
-                    : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200 shrink-0" />}
-                <span className={i <= genStep ? 'text-slate-700' : 'text-slate-300'}>{task}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <div className="flex items-center justify-center py-10">
+          <AiAnalysisLoader
+            className="max-w-md"
+            title="Generating the Procurement Submission Form"
+            description="Building the PSF Strategy from your templates and contract details"
+            progress={(genStep / GEN_TASKS.length) * 100}
+            steps={GEN_TASKS.map((task, i) => ({
+              id: task,
+              label: task,
+              status: i < genStep ? 'complete' : i === genStep ? 'active' : 'pending',
+            }))}
+          />
+        </div>
       )}
 
       {/* ── Step 2: review & submit ── */}
@@ -508,24 +475,6 @@ export default function PsfStrategy() {
                 />
               </div>
             ))}
-          </Card>
-
-          <Card className="p-5">
-            <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Reviews / Approvals</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {REVIEW_BODIES.map(body => (
-                <label key={body} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!psf.reviews?.[body]}
-                    onChange={() => toggleReview(body)}
-                    disabled={tender.psfCompleted}
-                    className="accent-[var(--color-primary)] w-4 h-4"
-                  />
-                  {body}
-                </label>
-              ))}
-            </div>
           </Card>
 
           {/* Assign the Contract Engineer(s) who will pick this up for ITT creation */}

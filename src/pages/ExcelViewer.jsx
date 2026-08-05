@@ -169,7 +169,7 @@ export default function ExcelViewer() {
             <FileSpreadsheet size={18} style={{ color: '#10b981' }} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#1b4c6f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>Excel Spreadsheet Preview</div>
           </div>
         </div>

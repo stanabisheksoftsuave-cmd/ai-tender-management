@@ -3,12 +3,13 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   FileText, ShieldAlert, DollarSign, BarChart2, CheckSquare,
   ArrowRight, ArrowLeft, Layout, CheckCircle, X, Plus, Trash2,
-  ChevronRight, AlertTriangle, Users, Download, Bot, RefreshCw,
-  Sparkles, Circle, Edit3, ChevronDown, FileSpreadsheet, ExternalLink, ClipboardList
+  ChevronRight, AlertTriangle, Users, Download, Bot,
+  Sparkles, Edit3, ChevronDown, FileSpreadsheet, ExternalLink, ClipboardList
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import AiEditableTextarea from '../components/ui/AiEditableTextarea'
+import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -17,20 +18,20 @@ import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportE
 /* ─── Form field definitions for each template ─── */
 
 const COMPANY_ESTIMATE_FIELDS = [
-  { id: 'itemDescription', label: 'Item / Service Description', type: 'text', required: true, placeholder: 'e.g. Supply of Gas Turbine Filters', span: 2 },
-  { id: 'quantity', label: 'Quantity', type: 'number', required: true, placeholder: 'e.g. 10' },
-  { id: 'unit', label: 'Unit of Measure', type: 'select', options: ['Each', 'Lot', 'Set', 'Meter', 'Kg', 'Hours', 'Days', 'Lump Sum'], required: true },
-  { id: 'unitRate', label: 'Estimated Unit Rate', type: 'number', required: true, placeholder: 'e.g. 5000' },
+  { id: 'itemDescription', label: 'Item / Service Description', type: 'text', placeholder: 'e.g. Supply of Gas Turbine Filters', span: 2 },
+  { id: 'quantity', label: 'Quantity', type: 'number', placeholder: 'e.g. 10' },
+  { id: 'unit', label: 'Unit of Measure', type: 'select', options: ['Each', 'Lot', 'Set', 'Meter', 'Kg', 'Hours', 'Days', 'Lump Sum'] },
+  { id: 'unitRate', label: 'Estimated Unit Rate', type: 'number', placeholder: 'e.g. 5000' },
   { id: 'totalEstimate', label: 'Total Estimate', type: 'computed', compute: (row) => ((row.quantity || 0) * (row.unitRate || 0)).toLocaleString('en-US') },
   { id: 'contingency', label: 'Contingency %', type: 'number', placeholder: 'e.g. 10' },
   { id: 'remarks', label: 'Remarks / Assumptions', type: 'text', placeholder: 'Any assumptions or notes', span: 2 },
 ]
 
 const CONTRACT_RISK_FIELDS = [
-  { id: 'riskCategory', label: 'Risk Category', type: 'select', options: ['Commercial', 'Operational', 'Financial', 'Legal', 'Schedule', 'QHSSE', 'Technical', 'Reputational'], required: true },
-  { id: 'riskDescription', label: 'Risk Description', type: 'text', required: true, placeholder: 'Describe the identified risk', span: 2 },
-  { id: 'likelihood', label: 'Likelihood', type: 'select', options: ['Very Low', 'Low', 'Medium', 'High', 'Very High'], required: true },
-  { id: 'impact', label: 'Impact', type: 'select', options: ['Negligible', 'Minor', 'Moderate', 'Major', 'Critical'], required: true },
+  { id: 'riskCategory', label: 'Risk Category', type: 'select', options: ['Commercial', 'Operational', 'Financial', 'Legal', 'Schedule', 'QHSSE', 'Technical', 'Reputational'] },
+  { id: 'riskDescription', label: 'Risk Description', type: 'text', placeholder: 'Describe the identified risk', span: 2 },
+  { id: 'likelihood', label: 'Likelihood', type: 'select', options: ['Very Low', 'Low', 'Medium', 'High', 'Very High'] },
+  { id: 'impact', label: 'Impact', type: 'select', options: ['Negligible', 'Minor', 'Moderate', 'Major', 'Critical'] },
   { id: 'riskRating', label: 'Risk Rating', type: 'computed', compute: (row) => {
     const l = ['Very Low','Low','Medium','High','Very High'].indexOf(row.likelihood)+1
     const i = ['Negligible','Minor','Moderate','Major','Critical'].indexOf(row.impact)+1
@@ -40,22 +41,22 @@ const CONTRACT_RISK_FIELDS = [
     if (score <= 16) return 'High'
     return 'Critical'
   }},
-  { id: 'mitigation', label: 'Mitigation / Control Measure', type: 'text', required: true, placeholder: 'How to mitigate this risk', span: 2 },
+  { id: 'mitigation', label: 'Mitigation / Control Measure', type: 'text', placeholder: 'How to mitigate this risk', span: 2 },
   { id: 'owner', label: 'Risk Owner', type: 'text', placeholder: 'e.g. Contract Holder' },
 ]
 
 // Categories follow Section H — In Country Value Requirements, part B.3
 // ("Instructions to prepare ICV Plan").
 const ICV_FIELDS = [
-  { id: 'icvCategory', label: 'ICV Category', type: 'select', required: true, options: [
+  { id: 'icvCategory', label: 'ICV Category', type: 'select', options: [
     'Investment in Fixed Assets in Oman',
     'Omanisation in the Workforce',
     'Local Sourcing of Goods',
     'Local Sourcing of Subcontracted Services',
   ]},
-  { id: 'description', label: 'Description / Commitment', type: 'text', required: true, placeholder: 'e.g. Local fabrication of spool pieces at Sohar facility', span: 2 },
-  { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', required: true, placeholder: 'e.g. 500000' },
-  { id: 'icvSpend', label: 'In-Country Spend', type: 'number', required: true, placeholder: 'e.g. 350000' },
+  { id: 'description', label: 'Description / Commitment', type: 'text', placeholder: 'e.g. Local fabrication of spool pieces at Sohar facility', span: 2 },
+  { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', placeholder: 'e.g. 500000' },
+  { id: 'icvSpend', label: 'In-Country Spend', type: 'number', placeholder: 'e.g. 350000' },
   { id: 'icvPercent', label: 'ICV %', type: 'computed', compute: (row) => {
     if (!row.plannedSpend || !row.icvSpend) return '—'
     return ((row.icvSpend / row.plannedSpend) * 100).toFixed(1) + '%'
@@ -76,14 +77,14 @@ const ICV_FIELDS = [
 // into three parts, each a Must or a Want, weighted, with a 0–3 scoring band.
 // Musts carry a minimum score; Wants do not.
 const TECHNICAL_EVAL_MATRIX_FIELDS = [
-  { id: 'part', label: 'Part', type: 'select', required: true, options: [
+  { id: 'part', label: 'Part', type: 'select', options: [
     'Part 1: QHSE',
     'Part 2: Contract-Specific',
     'Part 3: Contract-Generic',
   ]},
-  { id: 'criteriaType', label: 'Must / Want', type: 'select', options: ['Must', 'Want'], required: true },
-  { id: 'criterion', label: 'Criterion', type: 'text', required: true, placeholder: 'e.g. Methodology Statement — manner and sequence of executing the Work', span: 2 },
-  { id: 'weight', label: 'Weight', type: 'number', required: true, placeholder: 'e.g. 10' },
+  { id: 'criteriaType', label: 'Must / Want', type: 'select', options: ['Must', 'Want'] },
+  { id: 'criterion', label: 'Criterion', type: 'text', placeholder: 'e.g. Methodology Statement — manner and sequence of executing the Work', span: 2 },
+  { id: 'weight', label: 'Weight', type: 'number', placeholder: 'e.g. 10' },
   { id: 'minScore', label: 'Min. Score (Musts only)', type: 'number', placeholder: 'e.g. 2' },
   { id: 'band1', label: 'Score 1 — Description', type: 'text', placeholder: 'e.g. Submission shows lack of understanding of Work', span: 2 },
   { id: 'band2', label: 'Score 2 — Description', type: 'text', placeholder: 'e.g. Submission shows a competent understanding of Work', span: 2 },
@@ -100,12 +101,12 @@ const TECHNICAL_EVAL_MATRIX_FIELDS = [
 ]
 
 const HSE_RISK_FIELDS = [
-  { id: 'hazard', label: 'Hazard Identification', type: 'text', required: true, placeholder: 'Describe the hazard', span: 2 },
-  { id: 'activity', label: 'Associated Activity', type: 'text', required: true, placeholder: 'e.g. Welding at Height' },
-  { id: 'consequence', label: 'Potential Consequence', type: 'select', options: ['Near Miss', 'First Aid', 'Medical Treatment', 'Lost Time Injury', 'Permanent Disability', 'Fatality'], required: true },
+  { id: 'hazard', label: 'Hazard Identification', type: 'text', placeholder: 'Describe the hazard', span: 2 },
+  { id: 'activity', label: 'Associated Activity', type: 'text', placeholder: 'e.g. Welding at Height' },
+  { id: 'consequence', label: 'Potential Consequence', type: 'select', options: ['Near Miss', 'First Aid', 'Medical Treatment', 'Lost Time Injury', 'Permanent Disability', 'Fatality'] },
   { id: 'existingControls', label: 'Existing Controls', type: 'text', placeholder: 'Current safety measures', span: 2 },
-  { id: 'residualLikelihood', label: 'Residual Likelihood', type: 'select', options: ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'], required: true },
-  { id: 'residualSeverity', label: 'Residual Severity', type: 'select', options: ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'], required: true },
+  { id: 'residualLikelihood', label: 'Residual Likelihood', type: 'select', options: ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'] },
+  { id: 'residualSeverity', label: 'Residual Severity', type: 'select', options: ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'] },
   { id: 'residualRisk', label: 'Residual Risk Level', type: 'computed', compute: (row) => {
     const l = ['Rare','Unlikely','Possible','Likely','Almost Certain'].indexOf(row.residualLikelihood)+1
     const s = ['Insignificant','Minor','Moderate','Major','Catastrophic'].indexOf(row.residualSeverity)+1
@@ -119,11 +120,11 @@ const HSE_RISK_FIELDS = [
 ]
 
 const NEGOTIATION_STRATEGY_FIELDS = [
-  { id: 'theme', label: 'Theme', type: 'select', options: ['Specification', 'Quality', 'HSE', 'Lead Time', 'T&Cs', 'Liquidated Damages', 'Demand', 'Spare Part Quantity', 'Cost Price', 'Payments', 'ICV', 'Job Seekers / Omanization', 'Training & Interns', 'Other initiatives'], required: true },
-  { id: 'negotiationPoints', label: 'Negotiation Points', type: 'text', required: true, placeholder: 'Describe the points of negotiation', span: 2 },
+  { id: 'theme', label: 'Theme', type: 'select', options: ['Specification', 'Quality', 'HSE', 'Lead Time', 'T&Cs', 'Liquidated Damages', 'Demand', 'Spare Part Quantity', 'Cost Price', 'Payments', 'ICV', 'Job Seekers / Omanization', 'Training & Interns', 'Other initiatives'] },
+  { id: 'negotiationPoints', label: 'Negotiation Points', type: 'text', placeholder: 'Describe the points of negotiation', span: 2 },
   { id: 'aspiration', label: 'Aspiration', type: 'text', placeholder: 'Best possible outcome' },
-  { id: 'target', label: 'Target', type: 'text', required: true, placeholder: 'Realistic target' },
-  { id: 'walkAway', label: 'Walk-Away', type: 'text', required: true, placeholder: 'Minimum acceptable outcome' },
+  { id: 'target', label: 'Target', type: 'text', placeholder: 'Realistic target' },
+  { id: 'walkAway', label: 'Walk-Away', type: 'text', placeholder: 'Minimum acceptable outcome' },
   { id: 'finalAchievement', label: 'Final Negotiation Achievement', type: 'text', placeholder: 'Actual outcome (updated post-negotiation)' },
 ]
 
@@ -527,7 +528,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
   const removeRow = (idx) => setRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)
 
   const handleSubmit = () => {
-    const validRows = rows.filter(r => template.fields.some(f => f.required && r[f.id]))
+    const validRows = rows.filter(r => template.fields.some(f => f.type !== 'computed' && r[f.id]))
     onSave(validRows)
     onClose()
   }
@@ -540,59 +541,19 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
   // ── AI Loading State ──
   if (isAiLoading) {
     return (
-      <Card branded className="p-12 olng-scale-in">
-        <div className="olng-dot-pattern absolute inset-0 opacity-40 pointer-events-none rounded-2xl" style={{ position: 'absolute' }} />
-        <div className="relative z-10">
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 olng-float" style={{
-              background: `linear-gradient(135deg, ${template.color}25, ${template.color}10)`,
-              boxShadow: `0 8px 32px ${template.color}25`
-            }}>
-              <Bot size={36} style={{ color: template.color }} />
-            </div>
-            <h3 className="text-lg font-bold mb-1" style={{ color: '#1b4c6f' }}>
-              AI is Analysing & Pre-filling
-            </h3>
-            <p className="text-sm text-slate-400">
-              Generating {template.title} data based on tender requirements and industry benchmarks
-            </p>
-          </div>
-
-          <div className="max-w-sm mx-auto space-y-3 mb-10">
-            {AI_ANALYSIS_TASKS.map((task, i) => (
-              <div key={i} className="flex items-center gap-3 olng-slide-up olng-stagger" style={{ '--i': i }}>
-                <div className={`olng-gen-dot shrink-0 ${
-                  i < aiStep ? 'olng-gen-dot--done' :
-                  i === aiStep ? 'olng-gen-dot--active' :
-                  'olng-gen-dot--pending'
-                }`}>
-                  {i < aiStep
-                    ? <CheckCircle size={14} className="text-white" />
-                    : i === aiStep
-                    ? <RefreshCw size={13} className="text-white animate-spin" />
-                    : <Circle size={12} style={{ color: '#cce6f8' }} />}
-                </div>
-                <span className={`text-sm transition-colors ${
-                  i < aiStep ? 'text-slate-400 line-through' :
-                  i === aiStep ? 'font-semibold' : 'text-slate-300'
-                }`} style={i === aiStep ? { color: '#1b4c6f' } : {}}>{task}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="max-w-sm mx-auto">
-            <div className="olng-progress-bar h-2">
-              <div
-                className="olng-progress-fill"
-                style={{ width: `${Math.round((aiStep / AI_ANALYSIS_TASKS.length) * 100)}%` }}
-              />
-            </div>
-            <p className="text-center text-xs mt-2.5 font-medium" style={{ color: template.color }}>
-              {Math.round((aiStep / AI_ANALYSIS_TASKS.length) * 100)}% complete
-            </p>
-          </div>
-        </div>
-      </Card>
+      <div className="flex items-center justify-center py-10">
+        <AiAnalysisLoader
+          className="max-w-md"
+          title="AI is Analysing & Pre-filling"
+          description={`Generating ${template.title} data based on tender requirements and industry benchmarks`}
+          progress={(aiStep / AI_ANALYSIS_TASKS.length) * 100}
+          steps={AI_ANALYSIS_TASKS.map((task, i) => ({
+            id: task,
+            label: task,
+            status: i < aiStep ? 'complete' : i === aiStep ? 'active' : 'pending',
+          }))}
+        />
+      </div>
     )
   }
 
@@ -608,7 +569,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
             <template.icon size={20} style={{ color: template.color }} />
           </div>
           <div>
-            <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>{template.title}</h3>
+            <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>{template.title}</h3>
             <p className="text-[11px] text-slate-400">{template.description}</p>
           </div>
         </div>
@@ -666,7 +627,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
           <div className="grid grid-cols-2 gap-3">
             {template.fields.map(field => (
               <div key={field.id} className={field.span === 2 ? 'col-span-2' : ''}>
-                <label className="text-[11px] font-semibold mb-1.5 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-[11px] font-semibold mb-1.5 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {field.label}
                   {field.required && <span style={{ color: template.color }}>*</span>}
                 </label>
@@ -675,7 +636,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
                   <div className="px-3 py-2 text-sm font-semibold rounded-lg" style={{
                     background: 'rgba(0,137,207,0.04)',
                     border: '1px solid rgba(0,137,207,0.1)',
-                    color: riskColor(field.compute(row)) !== '#64748b' ? riskColor(field.compute(row)) : '#1b4c6f'
+                    color: riskColor(field.compute(row)) !== '#64748b' ? riskColor(field.compute(row)) : '#1e293b'
                   }}>
                     {field.compute(row) || '—'}
                   </div>
@@ -780,7 +741,7 @@ function SowPreviewer({ sowDocument, onSave }) {
             <FileText size={18} style={{ color: '#0089cf' }} />
           </div>
           <div>
-            <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>Statement of Work — {doc.title}</h3>
+            <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>Statement of Work — {doc.title}</h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Reference: {doc.reference} · Generated {doc.date}</p>
           </div>
         </div>
@@ -815,7 +776,7 @@ function SowPreviewer({ sowDocument, onSave }) {
         <div className="px-6 py-5 space-y-5 text-sm leading-relaxed max-h-[500px] overflow-y-auto" style={{ color: '#334155' }}>
           {doc.sections.map((section, si) => (
             <div key={si}>
-              <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1b4c6f' }}>
+              <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
                 <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
                 {section.heading}
               </h4>
@@ -843,7 +804,7 @@ function SowPreviewer({ sowDocument, onSave }) {
                       border: '1px solid rgba(0,137,207,0.08)'
                     }}>
                       <span className="text-[11px] text-slate-400">{item.label}</span>
-                      <span className="text-[11px] font-semibold" style={{ color: item.color || '#1b4c6f' }}>
+                      <span className="text-[11px] font-semibold" style={{ color: item.color || '#1e293b' }}>
                         {item.value}
                       </span>
                     </div>
@@ -855,7 +816,7 @@ function SowPreviewer({ sowDocument, onSave }) {
                 <div className="pl-4 space-y-3 mt-2">
                   {section.subsections.map((sub, si2) => (
                     <div key={si2}>
-                      <p className="text-[12px] font-semibold mb-1" style={{ color: '#1b4c6f' }}>{sub.title}</p>
+                      <p className="text-[12px] font-semibold mb-1" style={{ color: '#1e293b' }}>{sub.title}</p>
                       <ul className="space-y-1">
                         {sub.items.map((item, ii) => (
                           <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
@@ -1019,7 +980,7 @@ export default function StrategyTemplatesDashboard() {
               <Layout size={18} style={{ color: '#0089cf' }} />
             </div>
             <div>
-              <h3 className="font-bold text-[15px]" style={{ color: '#1b4c6f' }}>Select Required Templates</h3>
+              <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>Select Required Templates</h3>
               <p className="text-[11px] text-slate-400">{existingTender.id} — confirm which strategies to include</p>
             </div>
           </div>
@@ -1036,7 +997,7 @@ export default function StrategyTemplatesDashboard() {
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${card.color}15` }}>
                       <card.icon size={14} style={{ color: card.color }} />
                     </div>
-                    <span className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>{card.title}</span>
+                    <span className="text-[13px] font-semibold truncate" style={{ color: '#1e293b' }}>{card.title}</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
@@ -1084,7 +1045,7 @@ export default function StrategyTemplatesDashboard() {
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
             <Layout size={16} style={{ color: '#0089cf' }} />
           </div>
-          <h3 className="font-semibold text-sm" style={{ color: '#1b4c6f' }}>
+          <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
             {existingTender ? `Strategies — ${existingTender.id}` : 'Strategies'}
           </h3>
         </div>
@@ -1119,7 +1080,7 @@ export default function StrategyTemplatesDashboard() {
       {!activeForm && (
         <>
           <div className="mb-2 flex items-center justify-between olng-slide-up relative z-50" style={{ animationDelay: '40ms' }}>
-            <h4 className="font-semibold text-[13px]" style={{ color: '#1b4c6f' }}>Required Templates</h4>
+            <h4 className="font-semibold text-[13px]" style={{ color: '#1e293b' }}>Required Templates</h4>
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -1184,7 +1145,7 @@ export default function StrategyTemplatesDashboard() {
                         <card.icon size={18} style={{ color: card.color }} />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-bold text-sm" style={{ color: '#1b4c6f' }}>{card.title}</h4>
+                        <h4 className="font-bold text-sm" style={{ color: '#1e293b' }}>{card.title}</h4>
                         <span className="text-[10px] font-semibold tracking-wide uppercase" style={{ color: card.color }}>
                           {card.isForm ? (card.id !== 'pre-qual' ? 'AI-Powered Template' : 'Form Template') : 'Workflow'}
                         </span>
@@ -1225,13 +1186,13 @@ export default function StrategyTemplatesDashboard() {
           </div>
 
           {/* ── Submitted Documents list ── */}
-          {submittedDocs.length > 0 && (
+          {(submittedDocs.length > 0 || existingTender?.prequalBidders?.length > 0) && (
             <Card className="p-5 border border-slate-100 olng-slide-up" style={{ animationDelay: '75ms' }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
                   <FileText size={14} style={{ color: '#0089cf' }} />
                 </div>
-                <h4 className="font-bold text-[13px]" style={{ color: '#1b4c6f' }}>Submitted Documents</h4>
+                <h4 className="font-bold text-[13px]" style={{ color: '#1e293b' }}>Submitted Documents</h4>
                 <span className="text-[11px] text-slate-400">— open in a new tab, or download as Excel</span>
               </div>
               <div className="space-y-2">
@@ -1252,7 +1213,7 @@ export default function StrategyTemplatesDashboard() {
                           <FileIcon size={15} style={{ color: accent }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>{card.title}</p>
+                          <p className="text-[13px] font-semibold truncate" style={{ color: '#1e293b' }}>{card.title}</p>
                           <p className="text-[10px] text-slate-400">{typeLabel}</p>
                         </div>
                         <ExternalLink size={15} className="text-slate-300 group-hover:text-[#0089cf] transition-colors shrink-0" />
@@ -1280,7 +1241,7 @@ export default function StrategyTemplatesDashboard() {
                       <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: '#1b4c6f' }}>Pre-Qualification Summary</p>
+                      <p className="text-[13px] font-semibold truncate" style={{ color: '#1e293b' }}>Pre-Qualification Summary</p>
                       <p className="text-[10px] text-slate-400">Excel Spreadsheet (.xlsx) — bidders, outcomes and financial results</p>
                     </div>
                     <button

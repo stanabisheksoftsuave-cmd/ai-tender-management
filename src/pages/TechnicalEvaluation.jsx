@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
+import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { bidders as seedBidders, technicalCriteria as defaultTechCriteria, technicalEvalParts, TECHNICAL_OVERALL_PASS } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
@@ -547,92 +548,41 @@ export default function TechnicalEvaluation() {
   // ── Re-extraction screen (second pass — only for re-uploaded bidders) ──
   if (reExtracting) {
     const resubmittedBidders = tenderBidders.filter(b => resolvedIds.has(b.id))
-    const reProgress = Math.round(((reExtractStep + 1) / RE_EXTRACT_STEPS.length) * 100)
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 px-4">
-        <div className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl"
-          style={{ background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', boxShadow: '0 8px 32px rgba(37,99,235,0.35)' }}>
-          <Bot size={36} className="text-white animate-pulse" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-lg font-bold text-slate-800 mb-1">Re-Extracting Updated Documents</h2>
-          <p className="text-sm text-slate-500">
-            Processing re-uploaded documents for {resubmittedBidders.length} bidder{resubmittedBidders.length !== 1 ? 's' : ''}
-          </p>
-          {resubmittedBidders.length > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
-              {resubmittedBidders.map(b => (
-                <span key={b.id} className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  {b.name}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="w-full max-w-md space-y-3">
-          <div className="flex justify-between text-xs text-slate-500 font-medium">
-            <span>Re-processing…</span>
-            <span>{reProgress}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${reProgress}%`, background: 'linear-gradient(90deg, #1D4ED8, #3B82F6)' }} />
-          </div>
-          <div className="space-y-1.5 pt-2">
-            {RE_EXTRACT_STEPS.map((step, i) => (
-              <div key={i} className={`flex items-center gap-2 text-xs transition-all duration-300
-                ${i < reExtractStep ? 'text-blue-600' : i === reExtractStep ? 'text-slate-800 font-semibold' : 'text-slate-300'}`}>
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all
-                  ${i < reExtractStep ? 'bg-blue-500' : i === reExtractStep ? 'bg-slate-800 animate-pulse' : 'bg-slate-200'}`}>
-                  {i < reExtractStep
-                    ? <CheckCircle size={10} className="text-white" />
-                    : <span className="text-white text-[8px] font-bold">{i + 1}</span>}
-                </div>
-                {step}
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <AiAnalysisLoader
+          className="max-w-md"
+          title="Re-Extracting Updated Documents"
+          description={`Processing re-uploaded documents for ${resubmittedBidders.length} bidder${resubmittedBidders.length !== 1 ? 's' : ''}`}
+          progress={((reExtractStep + 1) / RE_EXTRACT_STEPS.length) * 100}
+          steps={RE_EXTRACT_STEPS.map((task, i) => ({
+            id: task,
+            label: task,
+            status: i < reExtractStep ? 'complete' : i === reExtractStep ? 'active' : 'pending',
+          }))}
+          helperText={resubmittedBidders.length > 0
+            ? `Re-processing: ${resubmittedBidders.map(b => b.name).join(', ')}`
+            : undefined}
+        />
       </div>
     )
   }
 
   // ── AI Loading screen ──
   if (aiLoading) {
-    const progress = Math.round(((aiStep + 1) / AI_STEPS.length) * 100)
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 px-4">
-        <div className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl"
-          style={{ background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', boxShadow: '0 8px 32px rgba(37,99,235,0.35)' }}>
-          <Bot size={36} className="text-white animate-pulse" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-lg font-bold text-slate-800 mb-1">AI Compliance Engine Running</h2>
-          <p className="text-sm text-slate-500">Analysing {displayBidders.length} bidder submissions against 10 compliance metrics</p>
-        </div>
-        <div className="w-full max-w-md space-y-3">
-          <div className="flex justify-between text-xs text-slate-500 font-medium">
-            <span>Processing…</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #1D4ED8, #3B82F6)' }} />
-          </div>
-          <div className="space-y-1.5 pt-2">
-            {AI_STEPS.map((step, i) => (
-              <div key={i} className={`flex items-center gap-2 text-xs transition-all duration-300
-                ${i < aiStep ? 'text-blue-600' : i === aiStep ? 'text-slate-800 font-semibold' : 'text-slate-300'}`}>
-                {i < aiStep
-                  ? <CheckCircle size={12} className="shrink-0 text-blue-500" />
-                  : i === aiStep
-                    ? <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                    : <span className="w-3 h-3 rounded-full bg-slate-200 shrink-0" />}
-                {step}
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <AiAnalysisLoader
+          className="max-w-md"
+          title="AI Compliance Engine Running"
+          description={`Analysing ${displayBidders.length} bidder submissions against 10 compliance metrics`}
+          progress={((aiStep + 1) / AI_STEPS.length) * 100}
+          steps={AI_STEPS.map((task, i) => ({
+            id: task,
+            label: task,
+            status: i < aiStep ? 'complete' : i === aiStep ? 'active' : 'pending',
+          }))}
+        />
       </div>
     )
   }

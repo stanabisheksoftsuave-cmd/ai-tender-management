@@ -177,7 +177,7 @@ export default function Login() {
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
             <img
-              src="/olng-logo.png"
+              src="/olng-logo-white.svg"
               alt="Oman LNG"
               className="h-24 w-auto object-contain"
             />

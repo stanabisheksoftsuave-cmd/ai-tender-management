@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import JSZip from 'jszip'
 import {
-  Bot, Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
-  FileText, AlertCircle, Circle, Download,
+  Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
+  FileText, AlertCircle, Download,
   UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
   Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
+import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import { useTenders } from '../context/TenderContext'
@@ -632,7 +633,7 @@ export default function ITTCreation() {
                 </span>
               )}
             </div>
-            <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1b4c6f' }}>{dt.title || 'Untitled tender'}</p>
+            <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1e293b' }}>{dt.title || 'Untitled tender'}</p>
             <p className="text-xs text-slate-400 mt-0.5">
               {dt.department || 'No department set'}{dt.deadline ? ` · Deadline ${dt.deadline}` : ''}
             </p>
@@ -647,7 +648,7 @@ export default function ITTCreation() {
     return (
       <div className="space-y-5">
         <div className="olng-slide-up">
-          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1b4c6f' }}>
+          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1e293b' }}>
             <ShieldAlert size={20} style={{ color: '#d97706' }} />
             PSF Strategy Required
           </h2>
@@ -666,7 +667,7 @@ export default function ITTCreation() {
                 <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{existingTender.id}</span>
                 <Badge variant="draft">{existingTender.stage || 'Draft'}</Badge>
               </div>
-              <p className="text-sm font-semibold mt-1" style={{ color: '#1b4c6f' }}>{existingTender.title || 'Untitled tender'}</p>
+              <p className="text-sm font-semibold mt-1" style={{ color: '#1e293b' }}>{existingTender.title || 'Untitled tender'}</p>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 The Procurement Submission Form (PSF Strategy) has not been completed for this tender.
                 Complete <strong>PSF Strategy</strong> after Strategy Templates, then return here to create the ITT.
@@ -690,7 +691,7 @@ export default function ITTCreation() {
     return (
       <div className="space-y-5">
         <div className="olng-slide-up">
-          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1b4c6f' }}>
+          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1e293b' }}>
             <Inbox size={20} style={{ color: '#0089cf' }} />
             Create ITT
           </h2>
@@ -704,7 +705,7 @@ export default function ITTCreation() {
             <div className="w-11 h-11 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
               <ShieldAlert size={18} style={{ color: '#0089cf' }} />
             </div>
-            <p className="text-sm font-semibold mt-3" style={{ color: '#1b4c6f' }}>No tenders ready for ITT creation</p>
+            <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>No tenders ready for ITT creation</p>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-md mx-auto">
               A tender must complete the <strong>PSF Strategy</strong> (Procurement Submission Form) step before its ITT can be created.
               Finish Strategy Templates and submit the PSF for a tender, then it will appear here.
@@ -717,7 +718,7 @@ export default function ITTCreation() {
           <div className="olng-slide-up" style={{ animationDelay: '60ms' }}>
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle size={14} style={{ color: '#059669' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>From PSF Strategy</h3>
+              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>From PSF Strategy</h3>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>{afterPsfTenders.length}</span>
             </div>
             <p className="text-[11px] text-slate-400 mb-2.5">Completed pre-qualification and PSF — details are pre-populated.</p>
@@ -730,7 +731,7 @@ export default function ITTCreation() {
           <div className="olng-slide-up" style={{ animationDelay: '90ms' }}>
             <div className="flex items-center gap-2 mb-1">
               <Plus size={14} style={{ color: '#0089cf' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>Direct ITT (No PSF)</h3>
+              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>Direct ITT (No PSF)</h3>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,137,207,0.12)', color: '#0089cf' }}>{directIttTenders.length}</span>
             </div>
             <p className="text-[11px] text-slate-400 mb-2.5">Started directly without pre-qualification / PSF, with templates uploaded here.</p>
@@ -758,7 +759,7 @@ export default function ITTCreation() {
         <div className="olng-status-banner">
           <span className="status-dot" />
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{currentDraftStatus.label}</span>
+            <span className="text-sm font-semibold" style={{ color: '#1e293b' }}>{currentDraftStatus.label}</span>
             <span className="text-slate-300">·</span>
             <span className="text-xs text-slate-500">{currentDraftStatus.sub}</span>
           </div>
@@ -783,7 +784,7 @@ export default function ITTCreation() {
               <span className={`text-sm whitespace-nowrap ${
                 i === step ? 'font-semibold' : i < step ? 'font-medium' : ''
               }`} style={{
-                color: i === step ? '#1b4c6f' : i < step ? '#0089cf' : '#94a3b8'
+                color: i === step ? '#1e293b' : i < step ? '#0089cf' : '#94a3b8'
               }}>{s}</span>
             </div>
             {i < steps.length - 1 && (
@@ -799,7 +800,7 @@ export default function ITTCreation() {
           <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
             <Clock size={20} style={{ color: '#0089cf' }} />
           </div>
-          <p className="text-sm font-semibold mt-3" style={{ color: '#1b4c6f' }}>ITT is being prepared</p>
+          <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>ITT is being prepared</p>
           <p className="text-xs text-slate-400 mt-1.5 max-w-md mx-auto leading-relaxed">
             The Contract Holder is still setting up this ITT. Your assigned sections will appear here for editing once the ITT has been generated.
           </p>
@@ -818,14 +819,14 @@ export default function ITTCreation() {
             }}>
               <Info size={16} style={{ color: '#0089cf' }} className="mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-semibold" style={{ color: '#1b4c6f' }}>{t('strategy.prefillBanner')}</p>
+                <p className="text-xs font-semibold" style={{ color: '#1e293b' }}>{t('strategy.prefillBanner')}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">Fields below are populated from the Contract Strategy stage. You can modify them before generating.</p>
               </div>
             </div>
           )}
 
           <Card branded className="p-6">
-            <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+            <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
                 <FileText size={16} style={{ color: '#0089cf' }} />
               </div>
@@ -845,7 +846,7 @@ export default function ITTCreation() {
                 { key: 'deadline',   label: t('itt.fieldDeadline'), type: 'date', required: true },
               ].map(f => (
                 <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
-                  <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                  <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                     {f.label}
                     {f.required && <span style={{ color: '#0089cf' }}>*</span>}
                   </label>
@@ -888,7 +889,7 @@ export default function ITTCreation() {
                 }
                 return (
                   <div>
-                    <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                    <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                       <Clock size={12} style={{ color: '#0089cf' }} />
                       {t('itt.fieldDuration')}
                     </label>
@@ -914,7 +915,7 @@ export default function ITTCreation() {
 
               {/* Cost Code */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Hash size={12} style={{ color: '#0089cf' }} />
                   {t('strategy.fieldCostCode')}
                 </label>
@@ -929,7 +930,7 @@ export default function ITTCreation() {
 
               <div className="col-span-2">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1b4c6f' }}>
+                  <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1e293b' }}>
                     Project Description / Key Requirements
                     <span style={{ color: '#0089cf' }}>*</span>
                   </label>
@@ -939,7 +940,7 @@ export default function ITTCreation() {
                       <button key={m.id} type="button" onClick={() => setDescMode(m.id)}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
                         style={descMode === m.id
-                          ? { background: '#fff', color: '#1b4c6f', boxShadow: '0 1px 3px rgba(27,76,111,0.1)' }
+                          ? { background: '#fff', color: '#1e293b', boxShadow: '0 1px 3px rgba(27,76,111,0.1)' }
                           : { color: '#94a3b8' }
                         }>
                         <m.icon size={11} /> {m.label}
@@ -977,7 +978,7 @@ export default function ITTCreation() {
                           <UploadCloud size={22} style={{ color: isDragging ? '#0089cf' : '#94a3b8' }} />
                         </div>
                         <div className="text-center">
-                          <p className="text-xs font-medium" style={{ color: '#1b4c6f' }}>
+                          <p className="text-xs font-medium" style={{ color: '#1e293b' }}>
                             Drag & drop or <span style={{ color: '#0089cf' }} className="underline underline-offset-2 cursor-pointer">browse</span>
                           </p>
                           <p className="text-[10px] text-slate-400 mt-1">.pdf · .docx · .txt · .doc</p>
@@ -1001,7 +1002,7 @@ export default function ITTCreation() {
                           borderLeft: '3px solid #0089cf'
                         }}>
                           <Paperclip size={13} style={{ color: '#0089cf' }} className="shrink-0" />
-                          <span className="text-xs font-medium flex-1 truncate" style={{ color: '#1b4c6f' }}>{uploadedFile.name}</span>
+                          <span className="text-xs font-medium flex-1 truncate" style={{ color: '#1e293b' }}>{uploadedFile.name}</span>
                           <span className="text-[10px] text-slate-400">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
                           <button type="button"
                             onClick={() => { setUploadedFile(null); setField('description', '') }}
@@ -1042,7 +1043,7 @@ export default function ITTCreation() {
                     <FileText size={16} style={{ color: '#0089cf' }} />
                   </span>
                   <span className="text-left min-w-0">
-                    <span className="block font-semibold" style={{ color: '#1b4c6f', fontSize: '15px' }}>Strategy Templates</span>
+                    <span className="block font-semibold" style={{ color: '#1e293b', fontSize: '15px' }}>Strategy Templates</span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">Upload the completed strategy templates for this ITT</span>
                   </span>
                 </span>
@@ -1062,7 +1063,7 @@ export default function ITTCreation() {
                       <div key={tpl.id} className="flex items-center justify-between gap-4 px-5 py-3 flex-wrap">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <FileText size={14} style={{ color: '#0089cf' }} className="shrink-0" />
-                          <span className="text-sm font-medium truncate" style={{ color: '#1b4c6f' }}>{tpl.title}</span>
+                          <span className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{tpl.title}</span>
                         </div>
                         {up ? (
                           <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 shrink-0">
@@ -1090,7 +1091,7 @@ export default function ITTCreation() {
           {/* Pre-Qualification Handoff Section — if this tender came from pre-qual */}
           {existingTender?.bidderList && existingTender?.bidderList.length > 0 && (
             <Card branded accent className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
                   <User size={16} style={{ color: '#0089cf' }} />
                 </div>
@@ -1103,7 +1104,7 @@ export default function ITTCreation() {
                       {idx + 1}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: '#1b4c6f' }}>{bidder.name}</p>
+                      <p className="text-sm font-medium" style={{ color: '#1e293b' }}>{bidder.name}</p>
                       <p className="text-xs text-slate-400">{bidder.country}</p>
                     </div>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: '#10b98130', color: '#059669' }}>
@@ -1118,7 +1119,7 @@ export default function ITTCreation() {
           {/* Handoff Documents Section — if pre-qual documents exist */}
           {existingTender?.handoffDocuments && Object.keys(existingTender.handoffDocuments).length > 0 && (
             <Card branded accent className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1b4c6f', fontSize: '15px' }}>
+              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
                   <Paperclip size={16} style={{ color: '#0089cf' }} />
                 </div>
@@ -1136,7 +1137,7 @@ export default function ITTCreation() {
                     <div key={key} className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
                       <FileText size={13} style={{ color: '#0089cf' }} className="shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium" style={{ color: '#1b4c6f' }}>{docLabel}</span>
+                        <span className="font-medium" style={{ color: '#1e293b' }}>{docLabel}</span>
                         <span className="ml-1.5 text-xs truncate" style={{ color: '#94a3b8' }}>— {fileName}</span>
                       </div>
                       <button
@@ -1181,7 +1182,7 @@ export default function ITTCreation() {
       {step === 2 && (
         <div className="space-y-4 olng-slide-up">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>
+            <h3 className="font-semibold" style={{ color: '#1e293b' }}>
               Your ITT Sections
               <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle" style={{ color: OWNER_COLOR[roleId] || '#1B4F8A', background: `${OWNER_COLOR[roleId] || '#1B4F8A'}14` }}>{OWNER_LABEL[roleId] || 'Contract Engineer'}</span>
             </h3>
@@ -1200,12 +1201,12 @@ export default function ITTCreation() {
                   Group 1: the sections this role owns and may edit.
                   Group 2: everyone else's sections, opened read-only. */}
               <Card branded className="p-4">
-                <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Select Section</label>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>Select Section</label>
                 <select
                   value={currentIndex}
                   onChange={e => setMySectionIndex(parseInt(e.target.value))}
                   className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2"
-                  style={{ borderColor: 'rgba(0,137,207,0.2)', backgroundColor: '#fff', color: '#1b4c6f' }}
+                  style={{ borderColor: 'rgba(0,137,207,0.2)', backgroundColor: '#fff', color: '#1e293b' }}
                 >
                   {editableOptions.length > 0 && (
                     <optgroup label={`✏️  YOUR SECTIONS — you can edit (${editableOptions.length})`}>
@@ -1253,7 +1254,7 @@ export default function ITTCreation() {
                     {canEditCurrent ? <Pencil size={13} /> : <Eye size={13} />}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold" style={{ color: canEditCurrent ? '#1b4c6f' : '#475569' }}>
+                    <p className="text-xs font-bold" style={{ color: canEditCurrent ? '#1e293b' : '#475569' }}>
                       {canEditCurrent ? 'Edit mode' : 'View-only mode'}
                     </p>
                     <p className="text-[11px]" style={{ color: '#94a3b8' }}>
@@ -1267,7 +1268,7 @@ export default function ITTCreation() {
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.1), rgba(27,76,111,0.06))', color: '#1b4c6f', border: '1px solid rgba(0,137,207,0.15)' }}>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.1), rgba(27,76,111,0.06))', color: '#1e293b', border: '1px solid rgba(0,137,207,0.15)' }}>
                     <Layers size={12} style={{ color: '#0089cf' }} />
                     {current?.title}
                   </div>
@@ -1293,7 +1294,7 @@ export default function ITTCreation() {
                           <UploadCloud size={15} style={{ color: '#0089cf' }} />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>Upload completed {label}</p>
+                          <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>Upload completed {label}</p>
                           <p className="text-[11px] text-slate-400 mt-0.5">Attach the finalised document for this section (optional — the fields below still apply).</p>
                         </div>
                       </div>
@@ -1326,10 +1327,10 @@ export default function ITTCreation() {
                     />
                   ) : (
                     <Card branded className="p-6">
-                      <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Section B1 — General Conditions of Contract</h3>
+                      <h3 className="font-semibold" style={{ color: '#1e293b' }}>Section B1 — General Conditions of Contract</h3>
                       {b1Category ? (
                         <div className="mt-3 rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.05), rgba(236,244,252,0.6))', border: '1px solid rgba(0,137,207,0.2)' }}>
-                          <p className="text-sm font-bold" style={{ color: '#1b4c6f' }}>{B1_CATEGORY_MAP[b1Category]?.label}</p>
+                          <p className="text-sm font-bold" style={{ color: '#1e293b' }}>{B1_CATEGORY_MAP[b1Category]?.label}</p>
                           <p className="text-[11px] text-slate-500 mt-0.5">{B1_CATEGORY_MAP[b1Category]?.sub}</p>
                         </div>
                       ) : (
@@ -1409,7 +1410,7 @@ export default function ITTCreation() {
             {isExporter ? (
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>Draft &amp; Export ITT</p>
+                  <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>Draft &amp; Export ITT</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {allSectionsComplete ? 'Every owner has approved their required sections — draft and export the ITT to share with bidders.' : `${requiredPending} required section(s) still awaiting owner approval.`}
                   </p>
@@ -1432,55 +1433,19 @@ export default function ITTCreation() {
 
       {/* ── Step 1: AI Generation (Contract Holder only) ── */}
       {step === 1 && isCreator && (
-        <Card branded className="p-12 olng-scale-in">
-          <div className="olng-dot-pattern absolute inset-0 opacity-40 pointer-events-none rounded-2xl" style={{ position: 'absolute' }} />
-          <div className="relative z-10">
-            <div className="text-center mb-10">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 olng-float" style={{
-                background: 'linear-gradient(135deg, rgba(0,137,207,0.15), rgba(27,76,111,0.1))',
-                boxShadow: '0 8px 32px rgba(0,137,207,0.15)'
-              }}>
-                <Bot size={36} style={{ color: '#0089cf' }} />
-              </div>
-              <h3 className="text-lg font-bold mb-1" style={{ color: '#1b4c6f' }}>AI is Generating Your ITT</h3>
-              <p className="text-sm text-slate-400">Building your document based on project requirements and compliance standards</p>
-            </div>
-
-            <div className="max-w-sm mx-auto space-y-3 mb-10">
-              {generationTasks.map((task, i) => (
-                <div key={i} className="flex items-center gap-3 olng-slide-up olng-stagger" style={{ '--i': i }}>
-                  <div className={`olng-gen-dot shrink-0 ${
-                    i < genStep ? 'olng-gen-dot--done' :
-                    i === genStep ? 'olng-gen-dot--active' :
-                    'olng-gen-dot--pending'
-                  }`}>
-                    {i < genStep
-                      ? <CheckCircle size={14} className="text-white" />
-                      : i === genStep
-                      ? <RefreshCw size={13} className="text-white animate-spin" />
-                      : <Circle size={12} style={{ color: '#cce6f8' }} />}
-                  </div>
-                  <span className={`text-sm transition-colors ${
-                    i < genStep ? 'text-slate-400 line-through' :
-                    i === genStep ? 'font-semibold' : 'text-slate-300'
-                  }`} style={i === genStep ? { color: '#1b4c6f' } : {}}>{task}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="max-w-sm mx-auto">
-              <div className="olng-progress-bar h-2">
-                <div
-                  className="olng-progress-fill"
-                  style={{ width: `${Math.round((genStep / generationTasks.length) * 100)}%` }}
-                />
-              </div>
-              <p className="text-center text-xs mt-2.5 font-medium" style={{ color: '#0089cf' }}>
-                {Math.round((genStep / generationTasks.length) * 100)}% complete
-              </p>
-            </div>
-          </div>
-        </Card>
+        <div className="flex items-center justify-center py-10">
+          <AiAnalysisLoader
+            className="max-w-md"
+            title="AI is Generating Your ITT"
+            description="Building your document based on project requirements and compliance standards"
+            progress={(genStep / generationTasks.length) * 100}
+            steps={generationTasks.map((task, i) => ({
+              id: task,
+              label: task,
+              status: i < genStep ? 'complete' : i === genStep ? 'active' : 'pending',
+            }))}
+          />
+        </div>
       )}
 
       {/* ── Step 3: Export ITT ── */}
@@ -1493,7 +1458,7 @@ export default function ITTCreation() {
                 <Download size={20} />
               </div>
               <div>
-                <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>Ready to Export</h3>
+                <h3 className="font-semibold" style={{ color: '#1e293b' }}>Ready to Export</h3>
                 <p className="text-xs text-slate-400 mt-0.5">{draftTenderId} ready for external review</p>
               </div>
             </div>
@@ -1513,7 +1478,7 @@ export default function ITTCreation() {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider mb-0.5 font-semibold" style={{ color: '#94a3b8' }}>{item.label}</p>
-                    <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{item.value}</p>
+                    <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{item.value}</p>
                     {item.sub && <p className="text-xs text-slate-400">{item.sub}</p>}
                   </div>
                 </div>
@@ -1536,7 +1501,7 @@ export default function ITTCreation() {
                 {approverInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: '#1b4c6f' }}>{approverName}</p>
+                <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{approverName}</p>
                 <p className="text-xs text-slate-400">{approverRole}</p>
               </div>
               <Badge variant="info">Exporter</Badge>
@@ -1553,13 +1518,13 @@ export default function ITTCreation() {
               ].map(item => (
                 <div key={item.label} className="flex justify-between py-2 text-xs" style={{ borderBottom: '1px solid rgba(0,137,207,0.08)' }}>
                   <span className="text-slate-400">{item.label}</span>
-                  <span className="font-semibold" style={{ color: '#1b4c6f' }}>{item.value}</span>
+                  <span className="font-semibold" style={{ color: '#1e293b' }}>{item.value}</span>
                 </div>
               ))}
             </div>
 
             <div className="mb-4">
-              <label className="text-xs font-semibold mb-2 block" style={{ color: '#1b4c6f' }}>Export Notes (Optional)</label>
+              <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>Export Notes (Optional)</label>
               <AiEditableTextarea
                 value={approvalNote}
                 onChange={setApprovalNote}
@@ -1610,7 +1575,7 @@ export default function ITTCreation() {
             <CheckCircle size={32} style={{ color: '#0089cf' }} />
           </div>
           <Badge variant="success" className="mb-3">ITT Exported</Badge>
-          <h2 className="text-xl font-bold mb-1" style={{ color: '#1b4c6f' }}>ITT Exported & Created</h2>
+          <h2 className="text-xl font-bold mb-1" style={{ color: '#1e293b' }}>ITT Exported & Created</h2>
           <p className="text-sm mb-1" style={{ color: '#64748b' }}>Exported by {approverName} · {approverRole}</p>
           <p className="text-xs mb-6" style={{ color: '#94a3b8' }}>{draftTenderId} — {form.title} is exported for external review. Upload the finalised version when ready.</p>
           {zipError && (

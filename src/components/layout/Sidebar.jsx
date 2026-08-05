@@ -63,50 +63,50 @@ const isCifTender = (t) =>
 // for instance, belongs to the Contract Holder and the two admin roles only.
 const navByRole = {
   it_admin: [
-    { to: '/dashboard', icon: '/src/assets/icons/dashboard.svg', labelKey: 'nav.dashboard' },
-    { to: '/users',     icon: '/src/assets/icons/users.svg',     labelKey: 'nav.users'     },
-    { to: '/audit-log', icon: '/src/assets/icons/audit-log.svg', labelKey: 'nav.auditLog'  },
+    { to: '/dashboard', icon: '/icons/dashboard.svg', labelKey: 'nav.dashboard' },
+    { to: '/users',     icon: '/icons/users.svg',     labelKey: 'nav.users'     },
+    { to: '/audit-log', icon: '/icons/audit-log.svg', labelKey: 'nav.auditLog'  },
   ],
   biz_admin: [
-    { to: '/dashboard', icon: '/src/assets/icons/dashboard.svg', labelKey: 'nav.dashboard'   },
-    { to: '/tenders',   icon: '/src/assets/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
+    { to: '/dashboard', icon: '/icons/dashboard.svg', labelKey: 'nav.dashboard'   },
+    { to: '/tenders',   icon: '/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
   ],
   pof: [
-    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
-    { to: '/pre-qualification',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
-    { to: '/commercial-eval',    icon: '/src/assets/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
-    { to: '/upload',             icon: '/src/assets/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
-    { to: '/contract',           icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.contract'    },
-    { to: '/contract-management',icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
-    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
+    { to: '/pre-qualification',  icon: '/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
+    { to: '/commercial-eval',    icon: '/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
+    { to: '/upload',             icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
+    { to: '/contract',           icon: '/icons/contract.svg',    labelKey: 'nav.contract'    },
+    { to: '/contract-management',icon: '/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
+    { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   contract_holder: [
-    { to: '/dashboard',          icon: '/src/assets/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
-    { to: '/contract-strategy',  icon: '/src/assets/icons/bulb.svg',        labelKey: 'nav.contractStrategy',
+    { to: '/dashboard',          icon: '/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
+    { to: '/contract-strategy',  icon: '/icons/bulb.svg',        labelKey: 'nav.contractStrategy',
       hasChildren: true },
-    { to: '/create-itt',         icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.createItt'   },
-    { to: '/technical-eval',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.ittTechEval' },
-    { to: '/tenders',            icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.createItt'   },
+    { to: '/technical-eval',     icon: '/icons/tech-eval.svg',   labelKey: 'nav.ittTechEval' },
+    { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   scm: [
-    { to: '/scm-tech-review',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview' },
-    { to: '/scm-review',          icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview' },
-    { to: '/scm-contract-review', icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
-    { to: '/tenders',             icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenders'   },
+    { to: '/scm-tech-review',     icon: '/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview' },
+    { to: '/scm-review',          icon: '/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview' },
+    { to: '/scm-contract-review', icon: '/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
+    { to: '/tenders',             icon: '/icons/tenders.svg',     labelKey: 'nav.tenders'   },
   ],
   legal_review: [
-    { to: '/legal-review', icon: '/src/assets/icons/audit-log.svg',  labelKey: 'nav.legalReview' },
+    { to: '/legal-review', icon: '/icons/audit-log.svg',  labelKey: 'nav.legalReview' },
   ],
   // HSE and ICV each own their ITT sections; they reach them from the same
   // "ITT Draft" entry the Contract Engineer uses (the page scopes to each role's
   // own sections). Tender Tracking is included so they can find generated ITTs.
   hse: [
-    { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
-    { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/create-itt', icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
+    { to: '/tenders',    icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   icv: [
-    { to: '/create-itt', icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
-    { to: '/tenders',    icon: '/src/assets/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/create-itt', icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft' },
+    { to: '/tenders',    icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
 }
 
@@ -118,24 +118,24 @@ const navByRole = {
 // here. Modules with no route (task_assignment, tender_export) are absent by
 // design — there is nothing to navigate to.
 const MODULE_NAV = {
-  user_management:   [{ to: '/users',           icon: '/src/assets/icons/users.svg',       labelKey: 'nav.users'      }],
-  audit_log:         [{ to: '/audit-log',       icon: '/src/assets/icons/audit-log.svg',   labelKey: 'nav.auditLog'   }],
-  itt_creation:      [{ to: '/create-itt',      icon: '/src/assets/icons/create-itt.svg',  labelKey: 'nav.ittDraft'   }],
-  ingestion:         [{ to: '/upload',          icon: '/src/assets/icons/ingestion.svg',   labelKey: 'nav.ingestion'  }],
-  tech_eval:         [{ to: '/technical-eval',  icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.techEval'   }],
-  comm_eval:         [{ to: '/commercial-eval', icon: '/src/assets/icons/comm-eval.svg',   labelKey: 'nav.commEval'   }],
+  user_management:   [{ to: '/users',           icon: '/icons/users.svg',       labelKey: 'nav.users'      }],
+  audit_log:         [{ to: '/audit-log',       icon: '/icons/audit-log.svg',   labelKey: 'nav.auditLog'   }],
+  itt_creation:      [{ to: '/create-itt',      icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'   }],
+  ingestion:         [{ to: '/upload',          icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'  }],
+  tech_eval:         [{ to: '/technical-eval',  icon: '/icons/tech-eval.svg',   labelKey: 'nav.techEval'   }],
+  comm_eval:         [{ to: '/commercial-eval', icon: '/icons/comm-eval.svg',   labelKey: 'nav.commEval'   }],
   // One grant covers all three SCM gates, so all three get an entry.
   scm_review: [
-    { to: '/scm-tech-review',     icon: '/src/assets/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview'     },
-    { to: '/scm-review',          icon: '/src/assets/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview'    },
-    { to: '/scm-contract-review', icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
+    { to: '/scm-tech-review',     icon: '/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview'     },
+    { to: '/scm-review',          icon: '/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview'    },
+    { to: '/scm-contract-review', icon: '/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
   ],
-  contract_creation: [{ to: '/contract',        icon: '/src/assets/icons/contract.svg',    labelKey: 'nav.contract'   }],
+  contract_creation: [{ to: '/contract',        icon: '/icons/contract.svg',    labelKey: 'nav.contract'   }],
 }
 
 // Open to every signed-in role and the last resort of landingPath(), so a role
 // with no curated menu is never left staring at an empty sidebar.
-const TENDERS_ITEM = { to: '/tenders', icon: '/src/assets/icons/tenders.svg', labelKey: 'nav.tenderTrack' }
+const TENDERS_ITEM = { to: '/tenders', icon: '/icons/tenders.svg', labelKey: 'nav.tenderTrack' }
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
@@ -209,7 +209,6 @@ export default function Sidebar() {
   }
 
   const isOlng   = theme === 'olng'
-  const isBright = theme === 'bright'
 
   // Is the current path under the Contract Strategy umbrella?
   const strategyPaths = ['/contract-strategy', '/strategy-templates', '/pre-qualification', '/psf-strategy']
@@ -231,7 +230,7 @@ export default function Sidebar() {
   })()
 
   // sidebar token colours
-  const sidebarBg = isOlng ? '#1b4c6f' : isBright ? '#1e293b' : 'var(--color-sidebar)'
+  const sidebarBg = isOlng ? '#1b4c6f' : 'var(--color-sidebar)'
   const accent     = isOlng ? '#0089cf' : 'var(--color-primary)'
   const logoText   = '#ffffff'
   const logoSub    = 'rgba(255,255,255,0.50)'
@@ -265,7 +264,7 @@ export default function Sidebar() {
     >
       {/* ── Logo ── */}
       <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-        <img src="/olng-logo.png" alt="OLNG" className="h-10 w-10 object-contain shrink-0" />
+        <img src="/olng-logo-white.svg" alt="OLNG" className="h-10 w-10 object-contain shrink-0" />
         <div>
           <div className="font-bold text-sm leading-tight tracking-tight" style={{ color: logoText }}>
             Oman LNG
@@ -477,7 +476,7 @@ export default function Sidebar() {
           onMouseOver={e => { e.currentTarget.style.background = logoutHoverBg; e.currentTarget.style.color = logoutHoverColor }}
           onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = logoutColor }}
         >
-          <img src="/src/assets/icons/logout.svg" alt="" width={14} height={14}
+          <img src="/icons/logout.svg" alt="" width={14} height={14}
             style={{ filter: 'brightness(0) invert(0.5)' }} />
           {t('nav.signOut')}
         </button>

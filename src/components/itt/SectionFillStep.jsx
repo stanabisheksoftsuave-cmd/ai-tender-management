@@ -285,7 +285,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
       // Rendered from its segments, not the joined string, so a heading is
       // selectable and AI-editable like the rest of the section.
       return (
-        <p key={block.id} className="font-semibold tracking-wide mt-4 mb-1.5 first:mt-0" style={{ color: '#1b4c6f' }}>
+        <p key={block.id} className="font-semibold tracking-wide mt-4 mb-1.5 first:mt-0" style={{ color: '#1e293b' }}>
           {block.segments.map(renderSegment)}
         </p>
       )
@@ -317,7 +317,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
                 {row.cells.map((cell, ci) => (
                   <td key={ci} className={`px-3 py-2 align-top ${ri === 0 ? 'font-semibold' : ''}`} style={{
                     border: '1px solid #cce6f8',
-                    color: ri === 0 ? '#1b4c6f' : undefined
+                    color: ri === 0 ? '#1e293b' : undefined
                   }}>
                     {renderBlocks(cell.blocks)}
                   </td>
@@ -352,7 +352,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
             <FileText size={16} style={{ color: '#0089cf' }} />
           </div>
-          <h3 className="font-semibold" style={{ color: '#1b4c6f' }}>{section.title}</h3>
+          <h3 className="font-semibold" style={{ color: '#1e293b' }}>{section.title}</h3>
           {section.optional && (
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ color: '#64748b', background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)' }}>
               Optional
@@ -390,10 +390,10 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-2.5 text-xs">
               {total === 0
-                ? <span className="font-semibold" style={{ color: '#1b4c6f' }}>No fillable fields <span className="font-normal text-slate-400">· refine the wording with AI</span></span>
+                ? <span className="font-semibold" style={{ color: '#1e293b' }}>No fillable fields <span className="font-normal text-slate-400">· refine the wording with AI</span></span>
                 : allFilled
                 ? <span className="flex items-center gap-1.5 font-bold" style={{ color: '#0089cf' }}><CheckCircle2 size={14} /> All AI-filled fields · can be overwritten</span>
-                : <span className="font-semibold" style={{ color: '#1b4c6f' }}>{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">AI-filled fields · can be overwritten</span></span>}
+                : <span className="font-semibold" style={{ color: '#1e293b' }}>{filledCount} <span className="font-normal text-slate-400">of</span> {total} <span className="font-normal text-slate-400">AI-filled fields · can be overwritten</span></span>}
               {total > 0 && !allFilled && (
                 <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{
                   color: '#e69c00',

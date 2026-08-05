@@ -110,7 +110,7 @@ const TABS = [
   { id: 'dropdowns', label: 'Dropdowns' },
 ]
 
-const emptyUser     = { name: '', email: '', role: 'pof', status: 'active', password: '' }
+const emptyUser     = { name: '', email: '', role: 'pof', status: 'active' }
 const emptyRoleForm = { label: '', color: '#0089cf', description: '' }
 
 // ── Small sub-components ─────────────────────────────────────────────────────
@@ -180,7 +180,6 @@ export default function UserManagement() {
   const [editUser,      setEditUser]      = useState(null)
   const [userForm,      setUserForm]      = useState(emptyUser)
   const [formErrors,    setFormErrors]    = useState({})
-  const [showPwd,       setShowPwd]       = useState(false)
 
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
@@ -292,10 +291,10 @@ export default function UserManagement() {
     : []
 
   // ── User CRUD ──────────────────────────────────────────────────────────────
-  const openAdd  = () => { setEditUser(null); setUserForm(emptyUser); setFormErrors({}); setShowPwd(false); setShowUserModal(true) }
+  const openAdd  = () => { setEditUser(null); setUserForm(emptyUser); setFormErrors({}); setShowUserModal(true) }
   const openEdit = u  => {
     setEditUser(u)
-    setUserForm({ name: u.name, email: u.email || u.username || '', role: u.roleId, status: u.status, password: '' })
+    setUserForm({ name: u.name, email: u.email || u.username || '', role: u.roleId, status: u.status })
     setFormErrors({})
     setShowUserModal(true)
     setMenuOpen(null)
@@ -1088,25 +1087,6 @@ export default function UserManagement() {
               </div>
               {formErrors.email && <p className="text-[11px] text-red-500 mt-1">{formErrors.email}</p>}
             </div>
-
-            {!editUser && (
-              <div>
-                <MLabel text="Password (optional)" color={sub} />
-                <div className="relative" style={{ marginTop: 6 }}>
-                  <IcoKey size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: sub, pointerEvents: 'none' }} />
-                  <input type={showPwd ? 'text' : 'password'} value={userForm.password}
-                    onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Leave blank — user sets it on first login"
-                    style={{ ...inp(), paddingLeft: 34, paddingRight: 36 }} />
-                  <button type="button" onClick={() => setShowPwd(v => !v)} style={{
-                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    color: sub, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  }}>
-                    {showPwd ? <IcoEyeOff size={14} /> : <IcoEye size={14} />}
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div>
               <MLabel text="Assign Role" color={sub} required />

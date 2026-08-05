@@ -2,32 +2,68 @@
 
 @tailwind base;
 
+/* ═══════════════════════════════════════════════════════════════════════
+   BRAND TYPEFACE — Fedra Sans (OLNG brand guidelines)
+═══════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Fedra Sans';
+  src: url('/fonts/fedra-sans-regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fedra Sans';
+  src: url('/fonts/fedra-sans-medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fedra Sans';
+  src: url('/fonts/fedra-sans-bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SECONDARY TYPEFACE — Candara (muted/supporting text)
+═══════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Candara';
+  src: url('/fonts/candara-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Candara';
+  src: url('/fonts/candara-bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Candara';
+  src: url('/fonts/candara-italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Candara';
+  src: url('/fonts/candara-bold-italic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 [dir="rtl"] { font-family: 'Cairo', 'Segoe UI', sans-serif; }
 [dir="rtl"] input, [dir="rtl"] textarea, [dir="rtl"] select { text-align: right; }
 
 @tailwind components;
 @tailwind utilities;
-
-/* ═══════════════════════════════════════════════════════════════════════
-   THEME: Bright Light (default)
-═══════════════════════════════════════════════════════════════════════ */
-[data-theme='bright'] {
-  --color-primary:       #2563EB;
-  --color-primary-dark:  #1D4ED8;
-  --color-primary-light: #3B82F6;
-  --color-accent:        #F59E0B;
-  --color-surface:       #FFFFFF;
-  --color-surface-2:     #F8FAFF;
-  --color-background:    #F1F5FF;
-  --color-sidebar:       #FFFFFF;
-  --color-sidebar-text:  #64748B;
-  --color-sidebar-active:#2563EB;
-  --color-badge-ai:      #7C3AED;
-  --color-border:        #E2E8F0;
-  --gradient: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
-  --color-shadow:        0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
-}
-[data-theme='bright'] body { color: #0F172A; background-color: #F1F5FF; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    THEME: Oman LNG Brand  (OLNG01 Brand Manual)
@@ -49,7 +85,7 @@
   --gradient: linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%);
   --color-shadow: 0 1px 4px rgba(27,76,111,0.08), 0 4px 16px rgba(27,76,111,0.12);
 }
-[data-theme='olng'] body { color: #1b4c6f; background-color: #ecf4fc; }
+[data-theme='olng'] body { color: #1e293b; background-color: #ecf4fc; }
 
 /* ── OLNG: force primary blue for Tailwind utility classes ── */
 [data-theme='olng'] .text-blue-600  { color: #0089cf !important; }
@@ -82,63 +118,14 @@
   --color-shadow: 0 1px 4px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.15);
 }
 
-/* ── Other themes (kept for backwards compat) ── */
-[data-theme='ocean'] {
-  --color-primary: #1AA8A8; --color-primary-dark: #14787A; --color-primary-light: #2BCFCF;
-  --color-accent: #F0C050; --color-surface: #FFFFFF; --color-background: #F0FAFA;
-  --color-sidebar: #082828; --color-sidebar-text: #78C8C8; --color-sidebar-active: #1AA8A8;
-  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
-  --gradient: linear-gradient(135deg, #082828 0%, #1AA8A8 100%);
-  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
-}
-[data-theme='navy'] {
-  --color-primary: #1B4F8A; --color-primary-dark: #0F3468; --color-primary-light: #2563EB;
-  --color-accent: #D4AF37; --color-surface: #FFFFFF; --color-background: #F8FAFC;
-  --color-sidebar: #0A1828; --color-sidebar-text: #94A3B8; --color-sidebar-active: #1B4F8A;
-  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
-  --gradient: linear-gradient(135deg, #0A1828 0%, #1B4F8A 100%);
-  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
-}
-[data-theme='sage'] {
-  --color-primary: #5A7A48; --color-primary-dark: #3D5830; --color-primary-light: #78A060;
-  --color-accent: #C8904A; --color-surface: #FFFFFF; --color-background: #F5F7F2;
-  --color-sidebar: #1E2E14; --color-sidebar-text: #90B878; --color-sidebar-active: #5A7A48;
-  --color-badge-ai: #7C3AED; --color-border: #E2E8F0;
-  --gradient: linear-gradient(135deg, #1E2E14 0%, #5A7A48 100%);
-  --color-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
-}
-[data-theme='midnight'] {
-  --color-primary: #7048C8; --color-primary-dark: #5030A8; --color-primary-light: #9068E8;
-  --color-accent: #C88040; --color-surface: #1A1230; --color-background: #120A28;
-  --color-sidebar: #0A0818; --color-sidebar-text: #8070A8; --color-sidebar-active: #4A2888;
-  --color-badge-ai: #A078E8; --color-border: rgba(255,255,255,0.08);
-  --gradient: linear-gradient(135deg, #0A0818 0%, #3A2080 100%);
-  --color-shadow: 0 1px 4px rgba(0,0,0,0.2), 0 4px 20px rgba(0,0,0,0.15);
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    GLOBAL DARK THEME OVERRIDES
    Remaps Tailwind's hardcoded light-mode classes to dark-friendly values
-   when TenderIQ theme is active.
+   when the Dark theme is active.
 ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Body ── */
 [data-theme='tenderiq'] body { color: #F1F5F9; background-color: #0A0F1E; }
-[data-theme='midnight'] body { color: #E2E8F0; background-color: #120A28; }
-
-/* ── Midnight: critical Tailwind overrides ── */
-[data-theme='midnight'] .bg-white         { background-color: #1A1230 !important; }
-[data-theme='midnight'] .bg-slate-50      { background-color: #150E28 !important; }
-[data-theme='midnight'] .bg-slate-100     { background-color: #261845 !important; }
-[data-theme='midnight'] .text-slate-900   { color: #F1EEF9 !important; }
-[data-theme='midnight'] .text-slate-800   { color: #E2D9F3 !important; }
-[data-theme='midnight'] .text-slate-700   { color: #C4B4E4 !important; }
-[data-theme='midnight'] .text-slate-600   { color: #A090C8 !important; }
-[data-theme='midnight'] .text-slate-500   { color: #8070A8 !important; }
-[data-theme='midnight'] .border-slate-100 { border-color: rgba(255,255,255,0.07) !important; }
-[data-theme='midnight'] .border-slate-200 { border-color: rgba(255,255,255,0.10) !important; }
-[data-theme='midnight'] .hover\:bg-slate-50:hover  { background-color: rgba(255,255,255,0.04) !important; }
-[data-theme='midnight'] .hover\:bg-slate-100:hover { background-color: rgba(255,255,255,0.07) !important; }
 
 /* ── Background overrides ── */
 [data-theme='tenderiq'] .bg-white          { background-color: #111827 !important; }
@@ -281,11 +268,18 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Fedra Sans', 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--color-background);
   color: #0F172A;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Secondary/muted text (subtitles, descriptions, helper copy) — the app's
+   existing convention for this is the text-slate-300/400/500 utility classes.
+   Manual opt-in elsewhere via the font-secondary utility (see tailwind.config.js). */
+.text-slate-300, .text-slate-400, .text-slate-500 {
+  font-family: 'Candara', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* ── Scrollbar ── */
@@ -588,7 +582,7 @@ input:focus, select:focus, textarea:focus { outline: none; }
   background: linear-gradient(135deg, rgba(0,137,207,0.06) 0%, rgba(175,217,244,0.15) 100%);
   border: 1px solid rgba(0,137,207,0.18);
   border-radius: 10px;
-  color: #1b4c6f;
+  color: #1e293b;
 }
 
 /* ── Success celebration ── */

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Download, Filter, CheckCircle, Shield } from 'lucide-react'
+import { Search, Download, Filter, CheckCircle } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -36,15 +36,6 @@ export default function AuditLog() {
 
   return (
     <div className="space-y-5">
-      {/* Admin notice */}
-      <div className="flex items-start gap-3 bg-amber-900 text-white rounded-xl px-4 py-3">
-        <Shield size={16} className="text-amber-300 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-sm font-medium">{t('audit.adminNotice')}</p>
-          <p className="text-xs text-amber-200/70">{t('audit.adminSub')}</p>
-        </div>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
