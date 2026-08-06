@@ -255,7 +255,7 @@ export default function Sidebar() {
   return (
     <>
     <aside
-      className={`fixed ${isRtl ? 'right-0' : 'left-0'} top-16 h-[calc(100vh-4rem)] w-[220px] flex flex-col z-40 select-none`}
+      className={`fixed ${isRtl ? 'right-0' : 'left-0'} top-0 h-screen w-[220px] flex flex-col z-40 select-none`}
       style={{
         background: sidebarBg,
         borderRight: isRtl ? 'none' : `1px solid ${divider}`,

@@ -50,7 +50,8 @@ export default function Header({ title, subtitle }) {
   const initials = (user?.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-50"
+    <header
+      className={`fixed top-0 ${isRtl ? 'right-[220px] left-0' : 'left-[220px] right-0'} h-16 flex items-center justify-between px-6 z-50`}
       style={{
         background: bg,
         backdropFilter: 'blur(16px)',
