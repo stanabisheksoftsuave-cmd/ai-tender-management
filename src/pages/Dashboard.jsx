@@ -69,6 +69,7 @@ const getPofTenderRoute = (tender) => {
 const getContractHolderTenderRoute = (tender) => {
   if (tender.status === 'tech_eval') return `/technical-eval/${tender.id}`
   if (tender.status === 'draft')     return `/create-itt/${tender.id}`
+  if (tender.status === 'cif_draft') return `/contract-strategy/${tender.id}`
   return `/pre-qualification/${tender.id}`
 }
 
@@ -92,10 +93,12 @@ const complianceLabelAr = { compliant: 'مستوفٍ', partial_compliant: 'جز�
 
 const getVisibleTenders = (roleId, tenders) => {
   if (roleId === 'it_admin')    return []
-  if (roleId === 'biz_admin')   return tenders
+  // cif_draft tenders are WIP-only, resumable from the Contract Holder's own
+  // Contract Initiating Form picker — not yet "in the pipeline" for anyone else.
+  if (roleId === 'biz_admin')   return tenders.filter(t => t.status !== 'cif_draft')
   // prequal_stage4 is the financial assessment the Contract Engineer owns.
   if (roleId === 'pof')         return tenders.filter(t => ['prequal_stage4','draft','upload','comm_eval','award','legal_review','contract_execution','active','contract_closure'].includes(t.status))
-  if (roleId === 'contract_holder') return tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_final_review','prequal_rejected','draft','tech_eval'].includes(t.status))
+  if (roleId === 'contract_holder') return tenders.filter(t => ['cif_draft','prequal_stage1','prequal_stage2','prequal_stage3','prequal_final_review','prequal_rejected','draft','tech_eval'].includes(t.status))
   if (roleId === 'tech_eval')   return tenders.filter(t => t.status === 'tech_eval')
   if (roleId === 'comm_eval')   return tenders.filter(t => t.status === 'comm_eval')
   if (roleId === 'scm')         return tenders.filter(t => SCM_GATE_STATUSES.includes(t.status))
@@ -103,6 +106,9 @@ const getVisibleTenders = (roleId, tenders) => {
 }
 
 const getStatCards = (roleId, tenders) => {
+  // cif_draft tenders are WIP-only (see getVisibleTenders) — never counted as
+  // part of the procurement pipeline in cross-role stat cards.
+  const pipelineTenders = tenders.filter(t => t.status !== 'cif_draft')
   const byStatus = (s) => tenders.filter(t => t.status === s)
   const byGates = () => tenders.filter(t => SCM_GATE_STATUSES.includes(t.status))
   const notStarted = (s) => tenders.filter(t => t.status === s && t.evalProgress === 'not_started').length
@@ -134,7 +140,7 @@ const getStatCards = (roleId, tenders) => {
   ]
 
   if (roleId === 'pof') return [
-    { label: 'Active Tenders',  value: String(tenders.length),              icon: FileText,  accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
+    { label: 'Active Tenders',  value: String(pipelineTenders.length),      icon: FileText,  accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
     { label: 'In Evaluation',   value: String(byStatus('tech_eval').length + byStatus('comm_eval').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT', chipVariant: 'urgent', sub: 'Closing next 7 days' },
     { label: 'At SCM Gates',    value: String(byGates().length),               icon: UserCog, accentColor: '#2563EB', trend: 'SOON',         chipVariant: 'soon',   sub: 'Awaiting SCM approval' },
     { label: 'AI Extractions',  value: '8',                                  icon: BulbIcon,  accentColor: '#7C3AED', trend: '96% ACC.',     chipVariant: 'acc',    sub: 'Documents processed' },
@@ -161,7 +167,7 @@ const getStatCards = (roleId, tenders) => {
 
   if (roleId === 'biz_admin') {
     return [
-      { label: 'Total Tenders',  value: String(tenders.length),                                                                        icon: FileText,       accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
+      { label: 'Total Tenders',  value: String(pipelineTenders.length),                                                                icon: FileText,       accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
       { label: 'In Evaluation',  value: String(byStatus('tech_eval').length + byStatus('comm_eval').length),                           icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT',        chipVariant: 'urgent', sub: 'Active evaluation stage' },
       { label: 'At SCM Gates',   value: String(byGates().length),                                                                       icon: UserCog,        accentColor: '#2563EB', trend: 'SOON',          chipVariant: 'soon',   sub: 'Awaiting SCM approval' },
       { label: 'Awarded',        value: String(byStatus('award').length),                                                                icon: BulbIcon,       accentColor: '#7C3AED', trend: 'Complete',      chipVariant: '',       sub: 'Contracts recommended' },
@@ -171,7 +177,7 @@ const getStatCards = (roleId, tenders) => {
   // Fallback — system-wide view
   const activeUsers = INITIAL_USERS.filter(u => u.status === 'active').length
   return [
-    { label: 'Total Tenders',  value: String(tenders.length),                                                                      icon: FileText,       accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
+    { label: 'Total Tenders',  value: String(pipelineTenders.length),                                                              icon: FileText,       accentColor: '#10B981', trend: '+2 this month', chipVariant: '',       sub: 'In procurement pipeline' },
     { label: 'Active Users',   value: String(activeUsers),                                                                          icon: Users,          accentColor: '#2563EB', trend: '5 roles',       chipVariant: '',       sub: 'System-wide access' },
     { label: 'In Evaluation',  value: String(byStatus('tech_eval').length + byStatus('comm_eval').length),                         icon: ClipboardCheck, accentColor: '#EF4444', trend: 'URGENT',        chipVariant: 'urgent', sub: 'Active evaluation stage' },
     { label: 'AI Accuracy',    value: '96%',                                                                                        icon: BulbIcon,       accentColor: '#7C3AED', trend: '96% ACC.',      chipVariant: 'acc',    sub: 'Extraction accuracy' },
@@ -347,11 +353,14 @@ export default function Dashboard() {
   const quickActions    = QUICK_ACTIONS_BY_ROLE[roleId] || QUICK_ACTIONS_BY_ROLE.default
   const urgentCount     = actionItems.filter(a => a.urgent).length
 
-  // Admin — pipeline counts per stage
+  // Admin — pipeline counts per stage. cif_draft tenders aren't in the
+  // pipeline yet (see getVisibleTenders), so they're excluded from the
+  // denominator — otherwise they'd silently deflate every stage's percentage.
+  const pipelineTenderCount = tenders.filter(t => t.status !== 'cif_draft').length
   const pipelineCounts  = PIPELINE_STAGES.map(s => ({
     ...s,
     count: tenders.filter(t => t.status === s.key).length,
-    pct: tenders.length ? Math.round((tenders.filter(t => t.status === s.key).length / tenders.length) * 100) : 0,
+    pct: pipelineTenderCount ? Math.round((tenders.filter(t => t.status === s.key).length / pipelineTenderCount) * 100) : 0,
   }))
 
   // Theme-aware palette
@@ -545,7 +554,7 @@ export default function Dashboard() {
             </div>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full"
               style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: c.sub }}>
-              {tenders.length} total
+              {pipelineTenderCount} total
             </span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
@@ -734,6 +743,7 @@ export default function Dashboard() {
                           </button>
                           {menuOpen === tender.id && (() => {
                             const menuItems = {
+                              cif_draft:   [{ label: 'Resume CIF',         route: `/contract-strategy/${tender.id}` }],
                               draft:       [{ label: 'Edit ITT',           route: `/create-itt/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],
                               upload:      [{ label: 'Upload Bids',        route: `/upload/${tender.id}` },     { label: 'View in Tenders', route: '/tenders' }],
                               tech_eval:   [{ label: 'Technical Eval',     route: `/technical-eval/${tender.id}` }, { label: 'View in Tenders', route: '/tenders' }],

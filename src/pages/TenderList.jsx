@@ -181,7 +181,12 @@ export default function TenderList() {
     { key: 'closed',   label: lang === 'ar' ? 'مغلقة'          : 'Closed',       fn: td => ['closed','prequal_rejected'].includes(td.status) },
   ]
 
-  const filtered = tenders.filter(t => {
+  // cif_draft tenders (SOW generated, not yet proceeded to Strategy Templates)
+  // are WIP-only and resumed from the Contract Initiating Form's own picker —
+  // they never appear in the general Tender Tracking list, for any role.
+  const nonDraftTenders = tenders.filter(t => t.status !== 'cif_draft')
+
+  const filtered = nonDraftTenders.filter(t => {
     const tabFn = tabs.find(tab => tab.key === activeFilter)?.fn ?? (() => true)
     const tabFilter = activeFilter === 'all' ? true : tabFn(t)
     const searchFilter = t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase())
@@ -362,7 +367,7 @@ export default function TenderList() {
                 ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
                 : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
           >
-            {tab.label} <span className="ml-1 opacity-60">({tenders.filter(tab.fn).length})</span>
+            {tab.label} <span className="ml-1 opacity-60">({nonDraftTenders.filter(tab.fn).length})</span>
           </button>
         ))}
       </div>

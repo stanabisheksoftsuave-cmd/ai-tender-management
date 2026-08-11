@@ -11,6 +11,11 @@ const TenderContext = createContext()
 //   tech_eval → scm_gate1 → comm_eval → scm_gate2 → award (drafting)
 //             → scm_gate3 → active (winner contract + regret letters issued)
 const NEXT_STATUS = {
+  // A CIF that generated its SOW but hasn't proceeded to Strategy Templates
+  // yet (see ContractStrategy.jsx's picker). Normally promoted explicitly by
+  // "Proceed to Templates", not via advanceTender — kept here defensively so
+  // this stage never dead-ends if something does call advanceTender on it.
+  cif_draft:        { status: 'prequal_stage1', stage: 'Pre-Qualification — Bidder Matching' },
   draft:            { status: 'upload',      stage: 'Awaiting Ingestion' },
   upload:           { status: 'tech_eval',   stage: 'Technical Evaluation',  evalProgress: 'not_started' },
   // Bidder documents are uploaded up-front at ingestion, so evaluations advance

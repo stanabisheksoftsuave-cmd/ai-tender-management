@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Target, Building2, ShieldOff, ArrowRight, FileText, AlertCircle,
+  Target, Building2, ShieldOff, ArrowLeft, ArrowRight, FileText, AlertCircle,
   DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert,
-  UploadCloud, X, Paperclip, Sparkles, CheckCircle, RefreshCw,
-  Download, Edit3, ChevronRight, Wand2, Undo2
+  UploadCloud, X, Paperclip, Sparkles, RefreshCw,
+  Download, Edit3, ChevronRight, Wand2, Undo2, Plus, Bot, Check
 } from 'lucide-react'
+import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
@@ -125,6 +127,57 @@ function writeSowPath(doc, path, text) {
   }
 }
 
+/* ─────────── Full-document inline editing (Edit Scope) ───────────
+   Every section — free text, the Contract Details grid, or the
+   Responsibilities subsections — becomes one plain-text textarea while
+   editing, mirroring tender-management-frontend's SowViewer (every SOW
+   section there is uniformly a text block). `editTextToSection` is the
+   inverse of `sectionToEditText`, re-deriving the section's real shape from
+   the edited text on Save. */
+
+function sectionToEditText(section) {
+  if (section.content !== undefined) return section.content
+  if (section.items) {
+    return section.items.map(item => `${item.label}: ${item.value}`).join('\n')
+  }
+  if (section.subsections) {
+    return section.subsections
+      .map(sub => `${sub.title}:\n` + sub.items.map(item => `• ${item}`).join('\n'))
+      .join('\n\n')
+  }
+  return ''
+}
+
+function editTextToSection(section, text) {
+  if (section.content !== undefined) return { ...section, content: text }
+  if (section.items) {
+    const items = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => {
+        const sep = line.indexOf(':')
+        return sep === -1
+          ? { label: line, value: '' }
+          : { label: line.slice(0, sep).trim(), value: line.slice(sep + 1).trim() }
+      })
+    return { ...section, items: items.length ? items : section.items }
+  }
+  if (section.subsections) {
+    const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
+    const subsections = blocks.map(block => {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+      const [first, ...rest] = lines
+      return {
+        title: (first || '').replace(/:\s*$/, ''),
+        items: rest.map(l => l.replace(/^[•-]\s*/, '')),
+      }
+    })
+    return { ...section, subsections: subsections.length ? subsections : section.subsections }
+  }
+  return section
+}
+
 // applyAiInstruction now lives in src/utils/aiTextEdit.js so every select-to-edit
 // surface shares one engine.
 
@@ -143,6 +196,21 @@ export default function ContractStrategy() {
   const CONFIGURED_DEPARTMENTS = dropdownConfig.departments || []
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
+
+  // Tenders that already generated a SOW from this form but haven't yet
+  // proceeded to Strategy Templates — the "resume a draft" picker's data
+  // source. A brand-new tender only reaches `cif_draft` at that point (see
+  // `handleGenerate`); nothing is persisted before then.
+  const cifDraftTenders = useMemo(
+    () => tenders.filter(t => t.status === 'cif_draft'),
+    [tenders]
+  )
+  // "Start New" (from a non-empty picker) sets this to skip straight to the
+  // blank form without navigating — mirrors ITTCreation.jsx's own picker.
+  const [skipDraftPicker, setSkipDraftPicker] = useState(false)
+  // Auto-skips the picker when there is nothing to resume, same as the
+  // reference app's own Contract Initiating Form entry screen.
+  const showDraftPicker = !tenderId && !skipDraftPicker && cifDraftTenders.length > 0
 
   const [form, setForm] = useState({
     title:           existingTender?.title || '',
@@ -166,29 +234,38 @@ export default function ContractStrategy() {
   const [genStep, setGenStep] = useState(0)
   const [savedTenderId, setSavedTenderId] = useState(existingTender?.id || null)
   const [sowContent, setSowContent] = useState(null)
+  // Whole-document inline edit mode ("Edit Scope") — every section becomes a
+  // textarea (see sectionToEditText/editTextToSection), keyed by section index
+  // since sections have no stable id of their own.
   const [sowEditing, setSowEditing] = useState(false)
-  const [sowEditText, setSowEditText] = useState('')
+  const [draftTexts, setDraftTexts] = useState({})
 
-  // Inline AI editing: text selection inside the SOW preview opens a prompt popup
+  // Select-to-edit-with-AI: `selection` is the just-detected text (shows the
+  // floating "Edit with AI" button); confirming it moves the same shape into
+  // `aiEdit`, which opens the modal. Two steps, matching
+  // tender-management-frontend's SowViewer rather than popping a panel
+  // straight off the selection.
   const sowBodyRef = useRef(null)
-  const [sowSel, setSowSel] = useState(null)   // { path, start, end, text, top, left }
+  const [selection, setSelection] = useState(null) // { path, start, end, text, x, y }
+  const [aiEdit, setAiEdit] = useState(null)        // same shape, confirmed target
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
   const [sowUndo, setSowUndo] = useState(null) // previous sowContent, for one-step revert
 
-  const closeSowSel = useCallback(() => setSowSel(null), [])
+  const closeAiEditor = useCallback(() => {
+    setAiEdit(null)
+    setAiPrompt('')
+  }, [])
 
   useEffect(() => {
-    if (!sowSel) return
-    const onKey = e => { if (e.key === 'Escape') closeSowSel() }
+    if (!aiEdit) return
+    const onKey = e => { if (e.key === 'Escape' && !aiBusy) closeAiEditor() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [sowSel, closeSowSel])
+  }, [aiEdit, aiBusy, closeAiEditor])
 
-  // Overlays unwind before the step handler below, newest-first: the selection
-  // popover sits above the edit panel, so it must register last.
-  useDismissable(sowEditing, () => setSowEditing(false))
-  useDismissable(sowSel, closeSowSel)
+  // Dismissible via the app's shared Back button, like any other overlay.
+  useDismissable(!!aiEdit, closeAiEditor)
 
   // Step 1 is a transient animation, so both it and the SOW review unwind to the
   // form — stepping 2 -> 1 would just re-run generation.
@@ -203,11 +280,98 @@ export default function ContractStrategy() {
     return true
   }, [step])
 
+  // Auto-tick generation tasks. Hoisted above every early return (the role
+  // check, and the picker below) — `showDraftPicker` can flip mid-mount when
+  // "Start New" is clicked, and a hook declared after a return that can
+  // toggle like that violates the rules of hooks for real, not just as a
+  // lint nitpick.
+  useEffect(() => {
+    if (step !== 1) return
+    if (genStep >= SOW_GEN_TASKS.length) {
+      const timer = setTimeout(() => {
+        const sow = generateSowContent(form, savedTenderId)
+        setSowContent(sow)
+        // Save SOW content to tender
+        if (savedTenderId) {
+          updateTender(savedTenderId, { sowDocument: sow })
+        }
+        setStep(2) // Move to SOW Review
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+    const timer = setTimeout(() => setGenStep(g => g + 1), 600)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, genStep])
+
   if (user?.role?.id !== 'contract_holder') return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
       <ShieldOff size={32} />
       <p className="text-sm font-medium">{t('access.restricted')}</p>
       <p className="text-xs">Only Contract Holders can access this page.</p>
+    </div>
+  )
+
+  const backToDrafts = () => {
+    if (tenderId) navigate('/contract-strategy')
+    else setSkipDraftPicker(false)
+  }
+
+  // ══════════════ RESUME-A-DRAFT PICKER ══════════════
+  // Bare /contract-strategy with at least one cif_draft tender to resume —
+  // matches tender-management-frontend's Contract Initiating Form picker.
+  if (showDraftPicker) return (
+    <div className="space-y-5 w-full">
+      <Card branded className="p-5 olng-slide-up">
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+            <FileText size={16} style={{ color: '#0089cf' }} />
+          </div>
+          <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>Contract Initiating Form</h3>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          Resume a draft you already started, or begin a new Contract Initiating Form.
+        </p>
+      </Card>
+
+      <div className="space-y-3 olng-slide-up" style={{ animationDelay: '60ms' }}>
+        {cifDraftTenders.map(dt => (
+          <Card
+            key={dt.id}
+            branded
+            hover
+            className="p-4"
+            onClick={() => navigate(`/contract-strategy/${dt.id}`)}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                  <Briefcase size={16} style={{ color: '#0089cf' }} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{dt.id}</span>
+                    <Badge variant="draft">Draft</Badge>
+                  </div>
+                  <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1e293b' }}>{dt.title || 'Untitled Contract Initiating Form'}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {dt.department || 'No department set'}{dt.budget ? ` · ${dt.budget}` : ''}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 shrink-0" />
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setSkipDraftPicker(true)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all olng-slide-up"
+        style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', animationDelay: '90ms' }}
+      >
+        <Plus size={16} /> Start New Contract Initiating Form
+      </button>
     </div>
   )
 
@@ -272,14 +436,26 @@ export default function ContractStrategy() {
       addTender({
         id: newId,
         ...payload,
-        status: 'prequal_stage1',
-        stage: 'Pre-Qualification — Bidder Matching',
+        // Resumable via the picker until "Proceed to Templates" promotes it —
+        // Generate SOW no longer advances the tender past the CIF stage.
+        status: 'cif_draft',
+        stage: 'Contract Initiating Form',
         created: new Date().toISOString().split('T')[0],
         bidders: 0,
         bidderList: [],
         aiScore: null,
       })
       id = newId
+      // Move the URL onto this tender's id right away. Without this, the
+      // page is still on the bare /contract-strategy route — and the moment
+      // this new cif_draft tender lands in context, showDraftPicker's own
+      // `cifDraftTenders.length > 0` flips true and its early return would
+      // hijack the very next render away from the AI-generation step,
+      // bouncing back to the picker mid-flow instead of showing progress.
+      // Same route, same component (no `key`, see App.jsx's CreateIttRoute
+      // comment for the equivalent ITT case) — this does not remount and
+      // does not lose `step`/`form`/etc.
+      navigate(`/contract-strategy/${newId}`, { replace: true })
     }
 
     setSavedTenderId(id)
@@ -287,34 +463,41 @@ export default function ContractStrategy() {
     setStep(1) // Start AI generation
   }
 
-  // Auto-tick generation tasks
-  useEffect(() => {
-    if (step !== 1) return
-    if (genStep >= SOW_GEN_TASKS.length) {
-      const timer = setTimeout(() => {
-        const sow = generateSowContent(form, savedTenderId)
-        setSowContent(sow)
-        // Save SOW content to tender
-        if (savedTenderId) {
-          updateTender(savedTenderId, { sowDocument: sow })
-        }
-        setStep(2) // Move to SOW Review
-      }, 400)
-      return () => clearTimeout(timer)
-    }
-    const timer = setTimeout(() => setGenStep(g => g + 1), 600)
-    return () => clearTimeout(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, genStep])
-
   /** Capture a text selection inside the SOW preview and anchor the prompt popup to it */
-  const handleSowSelect = () => {
-    const selection = window.getSelection()
-    if (!selection || selection.isCollapsed || !selection.rangeCount) return
-    const range = selection.getRangeAt(0)
+  /** Detects a text selection inside the SOW preview — either a read-only
+   * `[data-sow-path]` node, or (while editing) inside a section's textarea —
+   * and stores it as the *pending* selection. Confirming it via the floating
+   * "Edit with AI" button is a separate step (`openAiEditor`). */
+  const handleSowSelect = (e) => {
+    if (sowEditing) {
+      const target = e.target
+      if (target.tagName !== 'TEXTAREA' || target.dataset.sectionIndex === undefined) {
+        setSelection(null)
+        return
+      }
+      const start = target.selectionStart
+      const end = target.selectionEnd
+      if (start === end) { setSelection(null); return }
+      const text = target.value.slice(start, end).trim()
+      if (!text) { setSelection(null); return }
+      setSelection({
+        path: `draft:${target.dataset.sectionIndex}`,
+        start, end, text,
+        x: e.clientX,
+        y: e.clientY - 8,
+      })
+      return
+    }
+
+    const domSelection = window.getSelection()
+    if (!domSelection || domSelection.isCollapsed || !domSelection.rangeCount) {
+      setSelection(null)
+      return
+    }
+    const range = domSelection.getRangeAt(0)
     const startEl = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer
     const host = startEl?.closest?.('[data-sow-path]')
-    if (!host || !sowBodyRef.current?.contains(host)) { setSowSel(null); return }
+    if (!host || !sowBodyRef.current?.contains(host)) { setSelection(null); return }
 
     // Offset of the selection start within the host's text
     const pre = document.createRange()
@@ -336,42 +519,62 @@ export default function ContractStrategy() {
       end = hostText.length
     }
     const text = hostText.slice(start, end)
-    if (!text.trim()) { setSowSel(null); return }
+    if (!text.trim()) { setSelection(null); return }
 
     const rect = range.getBoundingClientRect()
-    const bodyRect = sowBodyRef.current.getBoundingClientRect()
-    setSowSel({
+    setSelection({
       path: host.dataset.sowPath,
       start, end, text,
-      top: rect.bottom - bodyRect.top + 10,
-      left: Math.max(0, Math.min(rect.left - bodyRect.left, bodyRect.width - 400)),
+      x: rect.left + rect.width / 2,
+      y: rect.top,
     })
-    setAiPrompt('')
   }
 
-  /** Run the instruction against the selected text and splice the result back in */
+  /** Confirms the pending selection (from the floating button) and opens the
+   * "Edit with AI" modal for it. */
+  const openAiEditor = () => {
+    if (!selection) return
+    setAiEdit(selection)
+    setAiPrompt('')
+    setSelection(null)
+    window.getSelection()?.removeAllRanges()
+  }
+
+  /** Run the instruction against the selected text and splice the result back
+   * in — into `draftTexts` while editing, into `sowContent` otherwise. */
   const handleApplyAiEdit = () => {
-    if (!sowSel || !aiPrompt.trim() || aiBusy) return
+    if (!aiEdit || !aiPrompt.trim() || aiBusy) return
     setAiBusy(true)
     setTimeout(() => {
-      const original = readSowPath(sowContent, sowSel.path)
-      const selected = original.slice(sowSel.start, sowSel.end)
-      const rewritten = applyAiInstruction(selected, aiPrompt)
-      let next = original.slice(0, sowSel.start) + rewritten + original.slice(sowSel.end)
-      next = next.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n')
+      const rewritten = applyAiInstruction(aiEdit.text, aiPrompt)
 
-      const updatedSow = writeSowPath(sowContent, sowSel.path, next)
-      setSowUndo(sowContent)
-      setSowContent(updatedSow)
-      if (savedTenderId) updateTender(savedTenderId, { sowDocument: updatedSow })
-      // Keep the page description in sync when the Objective section is edited
-      if (sowSel.path === 'content:1') {
-        setField('description', next)
-        if (savedTenderId) updateTender(savedTenderId, { description: next })
+      if (aiEdit.path.startsWith('draft:')) {
+        const si = aiEdit.path.slice('draft:'.length)
+        setDraftTexts(prev => {
+          const original = prev[si] || ''
+          let next = original.slice(0, aiEdit.start) + rewritten + original.slice(aiEdit.end)
+          next = next.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n')
+          return { ...prev, [si]: next }
+        })
+      } else {
+        const original = readSowPath(sowContent, aiEdit.path)
+        let next = original.slice(0, aiEdit.start) + rewritten + original.slice(aiEdit.end)
+        next = next.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n')
+
+        const updatedSow = writeSowPath(sowContent, aiEdit.path, next)
+        setSowUndo(sowContent)
+        setSowContent(updatedSow)
+        if (savedTenderId) updateTender(savedTenderId, { sowDocument: updatedSow })
+        // Keep the page description in sync when the Objective section is edited
+        if (aiEdit.path === 'content:1') {
+          setField('description', next)
+          if (savedTenderId) updateTender(savedTenderId, { description: next })
+        }
       }
+
       window.getSelection()?.removeAllRanges()
       setAiBusy(false)
-      setSowSel(null)
+      setAiEdit(null)
       setAiPrompt('')
     }, 700)
   }
@@ -381,6 +584,42 @@ export default function ContractStrategy() {
     setSowContent(sowUndo)
     if (savedTenderId) updateTender(savedTenderId, { sowDocument: sowUndo })
     setSowUndo(null)
+  }
+
+  /** Enters whole-document edit mode — every section becomes a textarea. */
+  const handleEditScopeClick = () => {
+    const initial = {}
+    sowContent.sections.forEach((section, si) => {
+      initial[si] = sectionToEditText(section)
+    })
+    setDraftTexts(initial)
+    setSowEditing(true)
+  }
+
+  const handleCancelSowEdit = () => {
+    setSowEditing(false)
+    setDraftTexts({})
+  }
+
+  const handleSaveSowEdit = () => {
+    const updatedSections = sowContent.sections.map((section, si) => {
+      const text = draftTexts[si]
+      return text === undefined ? section : editTextToSection(section, text)
+    })
+    const updatedSow = { ...sowContent, sections: updatedSections }
+    setSowContent(updatedSow)
+    if (savedTenderId) updateTender(savedTenderId, { sowDocument: updatedSow })
+
+    // Section 1 ("Objective") mirrors the page's own Scope Overview field,
+    // same as an AI edit to it already did.
+    const objectiveText = draftTexts[1]
+    if (objectiveText !== undefined) {
+      setField('description', objectiveText)
+      if (savedTenderId) updateTender(savedTenderId, { description: objectiveText })
+    }
+
+    setSowEditing(false)
+    setDraftTexts({})
   }
 
   const handleDownloadSow = () => {
@@ -408,6 +647,16 @@ export default function ContractStrategy() {
   }
 
   const handleProceedToTemplates = () => {
+    // Only promote a tender still sitting at cif_draft — one already further
+    // along (opened here again via the sidebar's cross-nav picker) keeps its
+    // real pipeline status untouched.
+    const current = savedTenderId ? tenders.find(t => t.id === savedTenderId) : null
+    if (current?.status === 'cif_draft') {
+      updateTender(savedTenderId, {
+        status: 'prequal_stage1',
+        stage: 'Pre-Qualification — Bidder Matching',
+      })
+    }
     navigate(`/strategy-templates/${savedTenderId}`)
   }
 
@@ -427,6 +676,17 @@ export default function ContractStrategy() {
       {/* ══════════════ STEP 0: CONTRACT DETAILS FORM ══════════════ */}
       {step === 0 && (
         <>
+          {/* Back to drafts — only when there's a picker to return to */}
+          {cifDraftTenders.length > 0 && (
+            <button
+              onClick={backToDrafts}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all olng-slide-up"
+              style={{ color: '#64748b', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <ArrowLeft size={13} /> Back to drafts
+            </button>
+          )}
+
           {/* Header Card */}
           <Card branded className="p-5 olng-slide-up">
             <div className="flex items-center gap-2.5 mb-1">
@@ -655,13 +915,14 @@ export default function ContractStrategy() {
       {/* ══════════════ STEP 2: SOW REVIEW ══════════════ */}
       {step === 2 && sowContent && (
         <div className="space-y-5 olng-slide-up">
-          {/* SOW Header */}
-          <div className="flex items-center justify-between">
+          {/* SOW Header — bordered card, matches tender-management-frontend */}
+          <div
+            className="flex items-center justify-between"
+            style={{ background: '#fff', border: '1px solid #cce6f8', borderRadius: 8, padding: 16 }}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-                background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))'
-              }}>
-                <FileText size={20} style={{ color: '#0089cf' }} />
+              <div className="p-2 rounded-lg" style={{ background: 'rgba(0,137,207,0.1)', color: '#0089cf' }}>
+                <FileText size={20} />
               </div>
               <div>
                 <h2 className="font-bold" style={{ color: '#1e293b' }}>Statement of Work — Generated</h2>
@@ -670,158 +931,237 @@ export default function ContractStrategy() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg" style={{
-                background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)'
-              }}>
-                <CheckCircle size={12} /> AI Generated
-              </span>
-            </div>
+            <span
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
+              style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}
+            >
+              <Bot size={14} /> AI Generated
+            </span>
           </div>
 
-          {/* SOW Document Card */}
-          <Card branded className="p-0 overflow-hidden">
-            {/* Document title bar */}
-            <div className="px-6 py-4 flex items-center justify-between" style={{
-              background: 'linear-gradient(135deg, rgba(27,76,111,0.06), rgba(0,137,207,0.04))',
-              borderBottom: '1px solid rgba(0,137,207,0.1)'
-            }}>
-              <div>
-                <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>{sowContent.title}</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Reference: {sowContent.reference} · {form.contractMode} · {form.budget}</p>
-                <p className="flex items-center gap-1 text-[10.5px] mt-1 font-medium" style={{ color: '#0089cf' }}>
-                  <Wand2 size={10} /> Select any text in the document to edit it with AI
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {sowUndo && (
-                  <button
-                    onClick={handleUndoAiEdit}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
-                    style={{ color: '#64748b', border: '1px solid rgba(100,116,139,0.2)' }}
-                  >
-                    <Undo2 size={11} /> Undo AI Edit
-                  </button>
-                )}
-                <button
-                  onClick={() => { setSowEditing(!sowEditing); if (!sowEditing) setSowEditText(form.description) }}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
-                  style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}
-                >
-                  <Edit3 size={11} /> {sowEditing ? 'Cancel Edit' : 'Edit Scope'}
-                </button>
-                <button
-                  onClick={handleDownloadSow}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-white"
-                  style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}
-                >
-                  <Download size={11} /> Download SOW
-                </button>
-              </div>
-            </div>
+          {/* SOW Document Card — flat top accent border, no gradient title bar */}
+          <Card
+            className="p-0 overflow-hidden"
+            style={{ border: '1px solid rgba(0,137,207,0.2)', boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}
+          >
+            <div style={{ height: 4, background: '#0089cf' }} />
 
-            {/* Document body — select any text to open the AI instruction popup */}
             <div
               ref={sowBodyRef}
               onMouseUp={handleSowSelect}
-              className="relative px-6 py-5 space-y-5 text-sm leading-relaxed"
+              className="relative px-8 py-8 text-sm leading-relaxed"
               style={{ color: '#334155' }}
             >
-              {sowContent.sections.map((section, si) => (
-                <div key={si}>
-                  <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
-                    <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
-                    {section.heading}
-                  </h4>
+              <div className="mb-8">
+                <h2 className="text-xl font-bold mb-1" style={{ color: '#0089cf' }}>{sowContent.title}</h2>
+                <p className="text-sm text-slate-400">Reference: {sowContent.reference} · {form.budget}</p>
 
-                  {section.content && (
+                <div className="flex justify-between items-center mt-6 gap-4 flex-wrap">
+                  {!sowEditing ? (
                     <div
-                      data-sow-path={`content:${si}`}
-                      className="pl-4 text-[12.5px] whitespace-pre-line text-slate-600 leading-6 olng-sow-editable"
+                      className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded"
+                      style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)', border: '1px solid rgba(0,137,207,0.2)' }}
                     >
-                      {section.content}
+                      <Wand2 size={14} className="mr-1" /> Select any text in the document to edit it with AI
                     </div>
-                  )}
-
-                  {section.items && (
-                    <div className="pl-4 grid grid-cols-2 gap-2 mt-2">
-                      {section.items.map((item, ii) => (
-                        <div key={ii} className="flex items-center justify-between rounded-lg px-3 py-2" style={{
-                          background: 'rgba(236,244,252,0.5)',
-                          border: '1px solid rgba(0,137,207,0.08)'
-                        }}>
-                          <span className="text-[11px] text-slate-400">{item.label}</span>
-                          <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1e293b' }}>
-                            {item.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {section.subsections && (
-                    <div className="pl-4 space-y-3 mt-2">
-                      {section.subsections.map((sub, si2) => (
-                        <div key={si2}>
-                          <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1e293b' }}>{sub.title}</p>
-                          <ul className="space-y-1">
-                            {sub.items.map((item, ii) => (
-                              <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#0089cf' }} />
-                                <span data-sow-path={`sub:${si}:${si2}:${ii}`} className="olng-sow-editable">{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  ) : <div />}
+                  <div className="flex gap-3">
+                    {sowEditing ? (
+                      <>
+                        <Button variant="secondary" size="sm" onClick={handleCancelSowEdit} className="text-[11px] py-1.5 px-3">
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveSowEdit}
+                          className="text-[11px] py-1.5 px-3 flex items-center gap-1.5"
+                          style={{ background: '#0089cf', color: '#fff' }}
+                        >
+                          <Check size={12} /> Save Changes
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleEditScopeClick}
+                          className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                          style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', background: 'transparent' }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,137,207,0.06)' }}
+                          onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <Edit3 size={11} /> Edit Scope
+                        </button>
+                        {sowUndo && (
+                          <button
+                            onClick={handleUndoAiEdit}
+                            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                            style={{ color: '#64748b', border: '1px solid rgba(100,116,139,0.2)', background: 'transparent' }}
+                            onMouseOver={e => { e.currentTarget.style.background = 'rgba(100,116,139,0.06)' }}
+                            onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <Undo2 size={11} /> Undo AI Edit
+                          </button>
+                        )}
+                        <button
+                          onClick={handleDownloadSow}
+                          className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                          style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', background: 'transparent' }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,137,207,0.06)' }}
+                          onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <Download size={11} /> Download SOW
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))}
+              </div>
 
-              {/* ── AI instruction popup (anchored to the selected text) ── */}
-              {sowSel && (
-                <div
-                  onMouseUp={e => e.stopPropagation()}
-                  className="absolute z-30 w-[400px] rounded-xl olng-slide-up"
-                  style={{
-                    top: sowSel.top, left: sowSel.left,
-                    background: '#fff',
-                    border: '1px solid rgba(0,137,207,0.25)',
-                    boxShadow: '0 12px 32px rgba(27,76,111,0.18)',
-                  }}
-                >
-                  <div className="flex items-center justify-between px-3.5 py-2.5" style={{
-                    background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))',
-                    borderBottom: '1px solid rgba(0,137,207,0.12)',
-                  }}>
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: '#0089cf' }}>
-                      <Wand2 size={12} /> Edit with AI
+              <div className="space-y-8">
+                {sowContent.sections.map((section, si) => (
+                  <div key={si}>
+                    <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
+                      <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
+                      {section.heading}
+                    </h4>
+
+                    {sowEditing ? (
+                      <div className="pl-4">
+                        <textarea
+                          data-section-index={si}
+                          rows={Math.max(3, Math.ceil((draftTexts[si] || '').length / 70))}
+                          value={draftTexts[si] ?? ''}
+                          onChange={e => setDraftTexts(prev => ({ ...prev, [si]: e.target.value }))}
+                          className="w-full text-[12.5px] px-3 py-2.5 resize-y focus:outline-none transition-all olng-input"
+                        />
+                        <div className="flex items-center gap-1.5 mt-1.5 text-[10.5px] font-medium text-slate-400">
+                          <Wand2 size={11} /> Select any text to edit it with AI
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {section.content && (
+                          <div
+                            data-sow-path={`content:${si}`}
+                            className="pl-4 text-[12.5px] whitespace-pre-line text-slate-600 leading-6 olng-sow-editable"
+                          >
+                            {section.content}
+                          </div>
+                        )}
+
+                        {section.items && (
+                          <div className="pl-4 grid grid-cols-2 gap-2 mt-2">
+                            {section.items.map((item, ii) => (
+                              <div key={ii} className="flex items-center justify-between rounded-lg px-3 py-2" style={{
+                                background: 'rgba(236,244,252,0.5)',
+                                border: '1px solid rgba(0,137,207,0.08)'
+                              }}>
+                                <span className="text-[11px] text-slate-400">{item.label}</span>
+                                <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1e293b' }}>
+                                  {item.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {section.subsections && (
+                          <div className="pl-4 space-y-3 mt-2">
+                            {section.subsections.map((sub, si2) => (
+                              <div key={si2}>
+                                <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1e293b' }}>{sub.title}</p>
+                                <ul className="space-y-1">
+                                  {sub.items.map((item, ii) => (
+                                    <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#0089cf' }} />
+                                      <span data-sow-path={`sub:${si}:${si2}:${ii}`} className="olng-sow-editable">{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          {/* ── Floating "Edit with AI" button on text selection ── */}
+          {selection && (
+            <div
+              className="fixed z-40 flex flex-col items-center olng-scale-in"
+              style={{ left: selection.x, top: selection.y - 6, transform: 'translate(-50%, -100%)' }}
+            >
+              <button
+                onClick={openAiEditor}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-colors"
+                style={{ background: '#0089cf' }}
+              >
+                <Wand2 size={13} /> Edit with AI
+              </button>
+              <div className="-mt-1 h-2 w-2 rotate-45" style={{ background: '#0089cf' }} />
+            </div>
+          )}
+
+          {/* ── "Edit with AI" modal ── */}
+          {aiEdit && createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              onClick={() => { if (!aiBusy) closeAiEditor() }}
+            >
+              <div className="w-full max-w-md olng-scale-in" onClick={e => e.stopPropagation()}>
+                <Card branded className="p-0 overflow-hidden">
+                  <div
+                    className="flex items-center justify-between px-4 py-3"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))',
+                      borderBottom: '1px solid rgba(0,137,207,0.12)',
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: '#0089cf' }}>
+                      <Wand2 size={14} /> Edit with AI
                     </span>
-                    <button onClick={() => setSowSel(null)} className="text-slate-400 hover:text-slate-600">
-                      <X size={13} />
-                    </button>
+                    {!aiBusy && (
+                      <button onClick={closeAiEditor} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+                        <X size={16} />
+                      </button>
+                    )}
                   </div>
 
-                  <div className="p-3.5">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Selected text</p>
-                    <p className="text-[11px] text-slate-500 italic line-clamp-3 mb-3 pl-2" style={{ borderLeft: '2px solid rgba(0,137,207,0.3)' }}>
-                      {sowSel.text}
-                    </p>
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Selected text</p>
+                      <blockquote
+                        className="text-xs text-slate-500 italic line-clamp-3 pl-2.5 py-0.5"
+                        style={{ borderLeft: '2px solid rgba(0,137,207,0.3)' }}
+                      >
+                        {aiEdit.text}
+                      </blockquote>
+                    </div>
 
-                    <textarea
-                      autoFocus
-                      rows={2}
-                      value={aiPrompt}
-                      onChange={e => setAiPrompt(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyAiEdit() }
-                      }}
-                      placeholder="Tell AI how to update this… e.g. “make it more formal”, “shorten this”, “replace 14 days with 21 days”"
-                      className="w-full px-3 py-2 text-[12px] focus:outline-none resize-none transition-all olng-input"
-                    />
+                    <div>
+                      <label htmlFor="sow-ai-instruction" className="mb-1.5 block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                        Instruction
+                      </label>
+                      <textarea
+                        id="sow-ai-instruction"
+                        autoFocus
+                        rows={3}
+                        value={aiPrompt}
+                        onChange={e => setAiPrompt(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyAiEdit() }
+                        }}
+                        placeholder="Tell AI how to update this… e.g. “make it more formal”, “shorten this”, “replace 14 days with 21 days”"
+                        className="w-full px-3 py-2 text-xs focus:outline-none resize-none transition-all olng-input"
+                      />
+                    </div>
 
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {['Make it more formal', 'Shorten this', 'Expand with more detail', 'Convert to bullet points'].map(sug => (
                         <button
                           key={sug}
@@ -833,51 +1173,30 @@ export default function ContractStrategy() {
                         </button>
                       ))}
                     </div>
-
-                    <div className="flex justify-end gap-2 mt-3">
-                      <Button variant="secondary" onClick={() => setSowSel(null)} className="text-[11px] py-1.5 px-3">Cancel</Button>
-                      <Button
-                        variant="brand"
-                        disabled={!aiPrompt.trim() || aiBusy}
-                        onClick={handleApplyAiEdit}
-                        className="text-[11px] py-1.5 px-3 flex items-center gap-1.5"
-                      >
-                        {aiBusy
-                          ? <><RefreshCw size={11} className="animate-spin" /> Applying…</>
-                          : <><Sparkles size={11} /> Apply</>}
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </Card>
 
-          {/* Scope Edit Mode */}
-          {sowEditing && (
-            <Card branded accent className="p-5 olng-slide-up">
-              <h4 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#0089cf' }}>Edit Scope Overview</h4>
-              <textarea
-                rows={5}
-                value={sowEditText}
-                onChange={e => setSowEditText(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input"
-                placeholder="Update the scope overview..."
-              />
-              <div className="flex justify-end gap-2 mt-3">
-                <Button variant="secondary" onClick={() => setSowEditing(false)}>Cancel</Button>
-                <Button variant="brand" onClick={() => {
-                  setField('description', sowEditText)
-                  if (savedTenderId) updateTender(savedTenderId, { description: sowEditText })
-                  const updatedSow = generateSowContent({ ...form, description: sowEditText }, savedTenderId)
-                  setSowContent(updatedSow)
-                  if (savedTenderId) updateTender(savedTenderId, { sowDocument: updatedSow })
-                  setSowEditing(false)
-                }}>
-                  <RefreshCw size={12} /> Regenerate SOW
-                </Button>
+                  <div
+                    className="flex justify-end gap-2 px-4 py-3"
+                    style={{ borderTop: '1px solid rgba(0,137,207,0.1)', background: 'rgba(236,244,252,0.4)' }}
+                  >
+                    <Button variant="secondary" onClick={closeAiEditor} disabled={aiBusy} className="text-xs py-1.5 px-3">
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleApplyAiEdit}
+                      disabled={!aiPrompt.trim() || aiBusy}
+                      className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+                      style={{ background: '#0089cf', color: '#fff' }}
+                    >
+                      {aiBusy
+                        ? <><RefreshCw size={12} className="animate-spin" /> Applying…</>
+                        : <><Wand2 size={12} /> Apply AI Edit</>}
+                    </Button>
+                  </div>
+                </Card>
               </div>
-            </Card>
+            </div>,
+            document.body
           )}
 
           {/* Contract Summary Strip */}

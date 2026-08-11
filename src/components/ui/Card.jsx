@@ -1,4 +1,4 @@
-export default function Card({ children, className = '', hover = false, branded = false, glass = false, accent = false, ...props }) {
+export default function Card({ children, className = '', hover = false, branded = false, glass = false, accent = false, style, ...props }) {
   const extraClasses = [
     hover ? 'card-hover cursor-pointer' : '',
     branded ? 'olng-card-branded' : '',
@@ -13,6 +13,14 @@ export default function Card({ children, className = '', hover = false, branded 
         background: glass ? undefined : 'var(--color-surface)',
         border: glass ? undefined : '1px solid var(--color-border)',
         boxShadow: glass ? undefined : 'var(--color-shadow, 0 1px 4px rgba(0,0,0,0.1), 0 4px 20px rgba(0,0,0,0.1))',
+        // Merged, not spread after — a caller-provided `style` (e.g. an
+        // `animationDelay` for staggered entrances) must add to the card's
+        // own background/border/shadow, not silently replace them. Passing
+        // `style` through `...props` below did exactly that: two `style=`
+        // attributes on the same element don't merge, the later one wins
+        // outright, so every `<Card style={{...}}>` caller was rendering
+        // with no background, default browser border and no shadow.
+        ...style,
       }}
       {...props}
     >
