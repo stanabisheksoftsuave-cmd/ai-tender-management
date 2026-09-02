@@ -1206,7 +1206,6 @@ export default function ContractStrategy() {
               {[
                 { label: 'Tender', value: savedTenderId, icon: Target },
                 { label: 'Budget', value: form.budget, icon: DollarSign },
-                { label: 'Mode', value: form.contractMode, icon: Briefcase },
                 { label: 'Deadline', value: form.deadline, icon: Calendar },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-2">

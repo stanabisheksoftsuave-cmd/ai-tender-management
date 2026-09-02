@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -9,6 +10,7 @@ import { useAccess, staticRouteAllows } from '../../utils/permissions'
 import { MODULES } from '../../utils/permissionMatrix'
 import Badge from '../ui/Badge'
 import { tenderRef } from '../../utils/tenderRef'
+import { TEMPLATE_DEFS } from '../../pages/StrategyTemplatesDashboard'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
 const Icon = ({ src, size = 16, color }) => (
@@ -27,15 +29,15 @@ const Icon = ({ src, size = 16, color }) => (
   />
 )
 
-// Fixed strategy sub-items always shown
+// Fixed items always shown, ahead of the Strategy Templates sub-group.
 const STRATEGY_BASE_ITEMS = [
   { key: 'sow',                label: 'Contract Initiating Form' },
   { key: 'strategy-templates', label: 'Strategy Templates' },
-  { key: 'psf-strategy',       label: 'PSF Strategy' },
 ]
 
-// Template/workflow sub-items — shown only when included in the tender's selected templates.
-// Keys must match the template ids used on the Strategy Templates page (?form=<key>).
+// Individual templates render nested under "Strategy Templates" — shown only
+// when included in the tender's selected templates. Keys must match the
+// template ids used on the Strategy Templates page (?form=<key>).
 const STRATEGY_TEMPLATE_ITEMS = [
   { key: 'company-estimate',    label: 'Company Estimate' },
   { key: 'contract-risk',       label: 'Contract Risk' },
@@ -45,6 +47,10 @@ const STRATEGY_TEMPLATE_ITEMS = [
   { key: 'negotiation-strategy',label: 'Negotiation Strategy' },
   { key: 'pre-qual',            label: 'Pre-Qualification' },
 ]
+
+// PSF Strategy sits outside (after) the Strategy Templates sub-group — it
+// only unlocks once every selected template is complete.
+const PSF_STRATEGY_ITEM = { key: 'psf-strategy', label: 'PSF Strategy' }
 
 // A tender "created by the Contract Initiating Form" is one still inside the
 // Contract Holder's strategy flow: the CIF saves new tenders as prequal_stage1
@@ -173,15 +179,32 @@ export default function Sidebar() {
   const tenderIdFromUrl = pathParts.length > 2 ? pathParts[2] : null
   const activeTender = tenderIdFromUrl ? tenders.find(t => t.id === tenderIdFromUrl) : null
 
-  // Which templates the Contract Holder chose to include (defaults to all until acknowledged).
-  const allTemplateKeys = STRATEGY_TEMPLATE_ITEMS.map(it => it.key)
+  // Which templates the Contract Holder chose to include — hidden until the
+  // Strategy Templates acknowledgement gate has been confirmed, then only the
+  // selected ones appear (matches the Next.js reference's hiddenStrategyHrefs).
   const selectedTemplateKeys = Array.isArray(activeTender?.selectedTemplates)
     ? activeTender.selectedTemplates
-    : allTemplateKeys
+    : []
+  const visibleTemplateItems = STRATEGY_TEMPLATE_ITEMS.filter(it => selectedTemplateKeys.includes(it.key))
+
+  // A template is "complete" by the same rule the Strategy Templates page's own
+  // Proceed button uses: at least one row saved for form templates, or the
+  // tender still sitting in 'draft' for the non-form Pre-Qualification card.
+  const isTemplateItemComplete = (key) => {
+    const dataKey = TEMPLATE_DEFS.find(t => t.id === key)?.dataKey
+    if (dataKey) return (activeTender?.[dataKey]?.length || 0) > 0
+    return activeTender?.status === 'draft'
+  }
+  const allTemplatesComplete = visibleTemplateItems.length > 0
+    && visibleTemplateItems.every(it => isTemplateItemComplete(it.key))
+  // Only lock the visual once a tender is actually in view — without one there's
+  // nothing to evaluate completion against, so the picker flow below still applies
+  // and PSF Strategy's own page-level guard is what enforces the real block.
+  const psfLocked = !!tenderIdFromUrl && !allTemplatesComplete
 
   const strategySubItems = [
     ...STRATEGY_BASE_ITEMS,
-    ...STRATEGY_TEMPLATE_ITEMS.filter(it => selectedTemplateKeys.includes(it.key)),
+    ...visibleTemplateItems,
   ]
 
   // Tenders the Contract Holder started from the Contract Initiating Form —
@@ -251,6 +274,70 @@ export default function Sidebar() {
 
   const handleStrategyToggle = () => {
     setStrategyOpen(prev => !prev)
+  }
+
+  // One Contract Strategy sub-item — a template nests further in (`nested`); PSF
+  // Strategy renders inert with a lock icon (`locked`) until every selected
+  // template is complete, rather than navigating to a page that would just
+  // bounce the user back.
+  const renderStrategySubRow = (sub, { nested = false, locked = false } = {}) => {
+    const isSubActive = !locked && activeSubKey === sub.key
+    // Without a tenderId in the URL the sub-item cannot resolve a target, so it
+    // asks the user which CIF tender to open instead.
+    const needsTender = !tenderIdFromUrl && sub.key !== 'sow'
+    const targetPath = pathFor(sub.key, tenderIdFromUrl)
+
+    const row = (
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
+        style={{
+          marginLeft: nested ? '10px' : 0,
+          background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
+          color: locked ? 'rgba(255,255,255,0.25)' : (isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)'),
+          borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
+          cursor: locked ? 'not-allowed' : undefined,
+        }}
+        onMouseOver={e => { if (!isSubActive && !locked) e.currentTarget.style.background = hoverBg }}
+        onMouseOut={e => { if (!isSubActive && !locked) e.currentTarget.style.background = 'transparent' }}
+      >
+        {locked ? (
+          <Lock size={9} className="shrink-0" />
+        ) : (
+          <span className="w-1 h-1 rounded-full shrink-0" style={{
+            background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
+            boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
+          }} />
+        )}
+        {sub.label}
+      </div>
+    )
+
+    if (locked) {
+      return (
+        <div key={sub.key} title="Complete every selected Strategy Template first" aria-disabled="true">
+          {row}
+        </div>
+      )
+    }
+
+    if (needsTender) {
+      return (
+        <button
+          key={sub.key}
+          type="button"
+          onClick={() => setPickerItem(sub)}
+          className="block w-full text-start"
+        >
+          {row}
+        </button>
+      )
+    }
+
+    return (
+      <NavLink key={sub.key} to={targetPath} className="block">
+        {row}
+      </NavLink>
+    )
   }
 
   return (
@@ -353,55 +440,15 @@ export default function Sidebar() {
                   </svg>
                 </button>
 
-                {/* Children: sub-items */}
+                {/* Children: sub-items — CIF, then Strategy Templates with its
+                    selected templates nested beneath it, then PSF Strategy last. */}
                 {strategyOpen && (
                   <div className="mt-0.5 space-y-px" style={{ paddingLeft: isRtl ? 0 : '18px', paddingRight: isRtl ? '18px' : 0 }}>
                     {strategySubItems.map(sub => {
-                      const isSubActive = activeSubKey === sub.key
-
-                      // Without a tenderId in the URL the sub-item cannot resolve a
-                      // target, so it asks the user which CIF tender to open instead.
-                      const needsTender = !tenderIdFromUrl && sub.key !== 'sow'
-                      const targetPath = pathFor(sub.key, tenderIdFromUrl)
-
-                      const row = (
-                        <div
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
-                          style={{
-                            background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
-                            color: isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)',
-                            borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
-                          }}
-                          onMouseOver={e => { if (!isSubActive) e.currentTarget.style.background = hoverBg }}
-                          onMouseOut={e => { if (!isSubActive) e.currentTarget.style.background = 'transparent' }}
-                        >
-                          <span className="w-1 h-1 rounded-full shrink-0" style={{
-                            background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
-                            boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
-                          }} />
-                          {sub.label}
-                        </div>
-                      )
-
-                      if (needsTender) {
-                        return (
-                          <button
-                            key={sub.key}
-                            type="button"
-                            onClick={() => setPickerItem(sub)}
-                            className="block w-full text-start"
-                          >
-                            {row}
-                          </button>
-                        )
-                      }
-
-                      return (
-                        <NavLink key={sub.key} to={targetPath} className="block">
-                          {row}
-                        </NavLink>
-                      )
+                      const nested = visibleTemplateItems.some(it => it.key === sub.key)
+                      return renderStrategySubRow(sub, { nested })
                     })}
+                    {renderStrategySubRow(PSF_STRATEGY_ITEM, { locked: psfLocked })}
                   </div>
                 )}
               </div>

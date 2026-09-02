@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { tenderRef } from './tenderRef'
-import { COMMERCIAL_DRIVERS } from '../data/psfOptions'
+import { PSF_HEADER_FIELDS, PSF_NARRATIVE_FIELDS, EM_DASH } from '../data/psfTemplate'
 
 export function exportTenderPDF(tender) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -418,12 +418,26 @@ export function exportBidderFailReasonsPDF(tender, bidder, technical = null, opt
  * @param {object} tender
  * @param {object} psf     the generated PSF document (see PsfStrategy.jsx buildPsf)
  */
+/**
+ * Procurement Submission Form — Strategy.
+ *
+ * Walks every section of the template rather than a chosen few: the Contract
+ * Holder fills in around twenty of them, and an export that quietly carried
+ * only the header and the narrative would look complete while dropping the
+ * history, every checkbox group, the 21 milestones, the tenderer list and all
+ * the ICV rows.
+ *
+ * @param {object} tender
+ * @param {object} psf  the generated PSF document (see PsfStrategy.jsx buildPsf)
+ */
 export function exportPsfPDF(tender, psf = {}) {
   const { doc, L, W } = reportShell(tender, 'PROCUREMENT SUBMISSION FORM')
   let y = 78
 
+  const page = (needed = 8) => { if (y + needed > 275) { doc.addPage(); y = 30 } }
+
   const section = (label) => {
-    if (y > 250) { doc.addPage(); y = 30 }
+    page(14)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(100, 116, 139)
@@ -432,14 +446,14 @@ export function exportPsfPDF(tender, psf = {}) {
   }
 
   const row = (label, value) => {
-    if (y > 262) { doc.addPage(); y = 30 }
+    page()
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 116, 139)
     doc.text(label, L, y)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(15, 23, 42)
-    doc.text(String(value ?? '—'), L + W, y, { align: 'right' })
+    doc.text(String(value ?? EM_DASH) || EM_DASH, L + W, y, { align: 'right' })
     y += 7
   }
 
@@ -447,10 +461,56 @@ export function exportPsfPDF(tender, psf = {}) {
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(51, 65, 85)
-    doc.splitTextToSize(String(text || '—'), W).forEach(line => {
-      if (y > 268) { doc.addPage(); y = 30 }
+    doc.splitTextToSize(String(text || EM_DASH), W).forEach(line => {
+      page(6)
       doc.text(line, L, y)
       y += 5
+    })
+    y += 4
+  }
+
+  /* `[x] Ticked` / `[ ] Unticked`, so a reader sees both states. Three to a
+     row, matching the template's own columns. */
+  const checkboxes = (boxes = []) => {
+    const col = W / 3
+    boxes.forEach((box, i) => {
+      if (i % 3 === 0) page(6)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', box.checked ? 'bold' : 'normal')
+      doc.setTextColor(...(box.checked ? [15, 23, 42] : [148, 163, 184]))
+      const text = `[${box.checked ? 'x' : ' '}] ${box.label}`
+      doc.text(doc.splitTextToSize(text, col - 3)[0], L + (i % 3) * col, y)
+      if (i % 3 === 2 || i === boxes.length - 1) y += 5
+    })
+    y += 3
+  }
+
+  /* A wrapping two-or-three column table. Long requirement text is the reason
+     `row()` cannot carry these — it right-aligns a single line. */
+  const table = (headers, widths, rows) => {
+    // Column left edges: each starts where the previous one ended.
+    const xs = [L]
+    for (let i = 1; i < widths.length; i++) xs[i] = xs[i - 1] + widths[i - 1] * W
+    page(12)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(100, 116, 139)
+    headers.forEach((h, i) => doc.text(h.toUpperCase(), xs[i], y))
+    y += 4
+    doc.setDrawColor(226, 232, 240)
+    doc.line(L, y - 2, L + W, y - 2)
+
+    rows.forEach(cells => {
+      const wrapped = cells.map((cell, i) =>
+        doc.splitTextToSize(String(cell || EM_DASH), widths[i] * W - 3))
+      const height = Math.max(...wrapped.map(w => w.length)) * 4 + 2
+      page(height + 4)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(51, 65, 85)
+      wrapped.forEach((linesForCell, i) =>
+        linesForCell.forEach((line, n) => doc.text(line, xs[i], y + n * 4)))
+      y += height
     })
     y += 4
   }
@@ -462,30 +522,108 @@ export function exportPsfPDF(tender, psf = {}) {
   doc.text('[X] Strategy      [ ] Strategy Amendment      [ ] Award      [ ] Variation', L, y)
   y += 10
 
+  section('ATTACHMENTS')
+  if (!psf.attachments?.length) paragraph(EM_DASH)
+  else psf.attachments.forEach((name, i) => row(`${i + 1}.`, name))
+  y += 2
+
   section('SUBMISSION DETAILS')
-  row('Title', psf.title)
-  row('Contract / PR Number', psf.contractNumber)
-  row('Anticipated Value', psf.anticipatedValue)
-  row('Duration', psf.duration)
-  row('Source of Funds', psf.sourceOfFunds)
-  row('Cost Centre', psf.costCentre)
-  row('Expenditure Type', psf.expenditureType)
-  y += 4
+  PSF_HEADER_FIELDS.forEach(f => row(f.label, psf.header?.[f.key]))
+  y += 2
 
-  section('PROCUREMENT STRATEGY')
-  row('Contracting Model', psf.contractingModel)
-  row('Market Approach', psf.marketApproach)
-  row('Commercial Drivers', COMMERCIAL_DRIVERS
-    .filter(d => (psf.commercialDrivers || []).includes(d.id))
-    .map(d => d.label)
-    .join(', ') || 'None selected')
-  y += 4
+  section('HISTORY')
+  ;['previous', 'existing'].forEach(scope => {
+    const entry = psf.history?.[scope] || {}
+    row(`Award date of ${scope} Contract`, entry.awardDate)
+    row(`Expiry date of ${scope} Contract`, entry.expiryDate)
+    row(`Contractor Name (${scope})`, entry.contractorName)
+    row(`Method of procuring ${scope} Contract`, entry.method)
+    row(`ACV (${scope})`, entry.acv)
+    if (entry.actualSpend !== undefined) row('Actual Spend', entry.actualSpend)
+  })
+  row('Current Spend', psf.history?.currentSpend)
+  y += 2
 
-  section('BACKGROUND')
-  paragraph(psf.background)
+  section('REVIEWS / APPROVALS ESTABLISHED')
+  checkboxes(psf.reviews)
 
-  section('EXECUTIVE SUMMARY')
-  paragraph(psf.executiveSummary)
+  PSF_NARRATIVE_FIELDS.forEach(field => {
+    section(field.label.toUpperCase())
+    paragraph(psf.narrative?.[field.key])
+  })
+
+  section('ESTIMATE BASIS')
+  row('Confidence Level', psf.estimate?.confidenceLevel)
+  checkboxes(psf.estimate?.basis)
+
+  section('BENCHMARKING OF ESTIMATES')
+  paragraph(psf.narrative?.benchmarking)
+
+  section('TENDER PLAN')
+  checkboxes(psf.tenderPlan?.types)
+  row('New services required in place by', psf.tenderPlan?.requiredBy)
+  y += 2
+  table(
+    ['Milestone', 'Planned', 'Actual'],
+    [0.56, 0.22, 0.22],
+    (psf.tenderPlan?.milestones || []).map(m => [m.label, m.planned, m.actual]),
+  )
+  section('DEVIATIONS')
+  paragraph(psf.tenderPlan?.deviations)
+
+  section('TENDER STRATEGY')
+  checkboxes(psf.tenderStrategy)
+
+  section('COMPETITIVE — DROP LIST')
+  checkboxes(psf.dropLists?.competitive)
+  section('SINGLE SOURCE / OEM — DROP LIST')
+  checkboxes(psf.dropLists?.singleSourceOem)
+
+  section('PROPOSED BASIS FOR TENDER ASSESSMENTS')
+  row('Technical', psf.assessments?.technical)
+  row('Cut Off', psf.assessments?.cutOff)
+  row('Commercial', psf.assessments?.commercial)
+  y += 2
+
+  section('ALTERNATIVES CONSIDERED')
+  paragraph(psf.alternativesConsidered)
+  section('OTHER DETAILS')
+  paragraph(psf.assessmentOtherDetails)
+  section('OMANISATION IMPLICATIONS')
+  paragraph(psf.omanisationImplications)
+  section('OTHER DETAILS (OMANISATION)')
+  paragraph(psf.omanisationOtherDetails)
+
+  section('NEGOTIATION STRATEGY')
+  row('Applicability', psf.negotiation?.applicability)
+  y += 2
+  paragraph(psf.narrative?.negotiationDetails)
+  section('ADDITIONAL NOTES')
+  paragraph(psf.strategyAdditionalNotes)
+
+  section('TENDERER LIST')
+  row('Source of Tenderer List', psf.tendererList?.source)
+  y += 2
+  table(
+    ['S/No.', 'Contractor / Supplier', 'Pre-Qual Result', 'Justification'],
+    [0.08, 0.3, 0.2, 0.42],
+    (psf.tendererList?.rows || []).map((r, i) => [String(i + 1), r.reference, r.prequalResult, r.justification]),
+  )
+
+  section('JUSTIFICATION')
+  paragraph(psf.narrative?.tendererJustification)
+  section('ADDITIONAL NOTES')
+  paragraph(psf.tendererAdditionalNotes)
+  section('RECOMMENDATION / REQUEST')
+  paragraph(psf.narrative?.recommendation)
+
+  section('ICV REVIEW DETAIL')
+  paragraph(psf.icvReviewDetail)
+  table(
+    ['#', 'Requirement', 'Yes/No · %', 'Justification / Comments'],
+    [0.06, 0.44, 0.16, 0.34],
+    (psf.icvRequirements || []).map(r => [r.ordinal, r.requirement, r.answer, r.comment]),
+  )
 
   const assignmentBlocks = [
     {

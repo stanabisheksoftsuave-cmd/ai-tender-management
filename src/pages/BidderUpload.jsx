@@ -855,7 +855,6 @@ export default function BidderUpload() {
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor[tender.status] || 'bg-slate-100 text-slate-600'}`}>{stageLabel[tender.status] || tender.stage}</span>
-                    {tender.status === 'upload' && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-600 text-white animate-pulse">Ready for Upload</span>}
                   </div>
                   <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
                   <div className="flex items-center gap-4 mt-2">

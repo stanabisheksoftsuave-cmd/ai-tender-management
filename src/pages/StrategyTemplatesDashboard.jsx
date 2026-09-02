@@ -19,45 +19,48 @@ import { tenderRef } from '../utils/tenderRef'
 /* ─── Form field definitions for each template ─── */
 
 const COMPANY_ESTIMATE_FIELDS = [
-  { id: 'itemDescription', label: 'Item / Service Description', type: 'text', placeholder: 'e.g. Supply of Gas Turbine Filters', span: 2 },
-  { id: 'quantity', label: 'Quantity', type: 'number', placeholder: 'e.g. 10' },
-  { id: 'unit', label: 'Unit of Measure', type: 'select', options: ['Each', 'Lot', 'Set', 'Meter', 'Kg', 'Hours', 'Days', 'Lump Sum'] },
-  { id: 'unitRate', label: 'Estimated Unit Rate', type: 'number', placeholder: 'e.g. 5000' },
-  { id: 'totalEstimate', label: 'Total Estimate', type: 'computed', compute: (row) => ((row.quantity || 0) * (row.unitRate || 0)).toLocaleString('en-US') },
+  { id: 'itemDescription', label: 'Item / Service Description', type: 'text', required: true, placeholder: 'e.g. Supply of Gas Turbine Filters', span: 2 },
+  { id: 'quantity', label: 'Est. Quantity', type: 'number', required: true, placeholder: 'e.g. 10' },
+  { id: 'unit', label: 'UOM (Unit of Measure)', type: 'text', required: true, placeholder: 'e.g. Each, Lot, Set' },
+  { id: 'unitRate', label: 'Unit Price (price of 1 piece)', type: 'number', required: true, placeholder: 'e.g. 5000' },
   { id: 'contingency', label: 'Contingency %', type: 'number', placeholder: 'e.g. 10' },
-  { id: 'remarks', label: 'Remarks / Assumptions', type: 'text', placeholder: 'Any assumptions or notes', span: 2 },
+  { id: 'totalEstimate', label: 'Total Price (1 piece × quantity)', type: 'computed', compute: (row) => ((row.quantity || 0) * (row.unitRate || 0)).toLocaleString('en-US') },
+  { id: 'benchmarkUnitPrice', label: 'Benchmark Unit Price', type: 'number', required: true, placeholder: 'e.g. 4800' },
+  { id: 'benchmarkPercentageDifference', label: 'Percentage % Difference', type: 'text', required: true, placeholder: 'e.g. +4.2%' },
+  { id: 'benchmarkSource', label: 'Source of Benchmark', type: 'text', required: true, placeholder: 'e.g. Previous contract rates, market survey', span: 2 },
+  { id: 'remarks', label: 'Remarks / Assumptions', type: 'textarea', placeholder: 'Any assumptions or notes', span: 2 },
 ]
 
 const CONTRACT_RISK_FIELDS = [
-  { id: 'riskCategory', label: 'Risk Category', type: 'select', options: ['Commercial', 'Operational', 'Financial', 'Legal', 'Schedule', 'QHSSE', 'Technical', 'Reputational'] },
-  { id: 'riskDescription', label: 'Risk Description', type: 'text', placeholder: 'Describe the identified risk', span: 2 },
-  { id: 'likelihood', label: 'Likelihood', type: 'select', options: ['Very Low', 'Low', 'Medium', 'High', 'Very High'] },
-  { id: 'impact', label: 'Impact', type: 'select', options: ['Negligible', 'Minor', 'Moderate', 'Major', 'Critical'] },
-  { id: 'riskRating', label: 'Risk Rating', type: 'computed', compute: (row) => {
-    const l = ['Very Low','Low','Medium','High','Very High'].indexOf(row.likelihood)+1
-    const i = ['Negligible','Minor','Moderate','Major','Critical'].indexOf(row.impact)+1
-    const score = l * i
-    if (score <= 4) return 'Low'
-    if (score <= 9) return 'Medium'
-    if (score <= 16) return 'High'
-    return 'Critical'
+  { id: 'riskCategory', label: 'Risk Category', type: 'select', required: true, options: ['Commercial', 'Technical', 'Operational', 'Schedule', 'Legal', 'HSE'] },
+  { id: 'activity', label: 'Activity', type: 'text', required: true, placeholder: 'e.g. Contract Award & Procurement' },
+  { id: 'riskDescription', label: 'Contract Risk Description', type: 'textarea', required: true, placeholder: 'Describe the identified contract risk', span: 2 },
+  { id: 'consequence', label: 'Credible Potential Consequence', type: 'textarea', required: true, placeholder: 'Potential impact or consequence if the risk materialises', span: 2 },
+  { id: 'likelihood', label: 'Risk Likelihood', type: 'select', required: true, options: ['Low', 'Medium', 'High'] },
+  { id: 'impact', label: 'Risk Impact', type: 'select', required: true, options: ['Low', 'Medium', 'High'] },
+  { id: 'riskScore', label: 'Risk Score (RAM)', type: 'text', placeholder: 'e.g. M-5' },
+  { id: 'riskRating', label: 'Risk Level (H/M/L)', type: 'computed', compute: (row) => {
+    if (!row.likelihood || !row.impact) return '—'
+    if (row.likelihood === 'High' && row.impact === 'High') return 'High'
+    if (row.likelihood === 'Low' && row.impact === 'Low') return 'Low'
+    return 'Medium'
   }},
-  { id: 'mitigation', label: 'Mitigation / Control Measure', type: 'text', placeholder: 'How to mitigate this risk', span: 2 },
-  { id: 'owner', label: 'Risk Owner', type: 'text', placeholder: 'e.g. Contract Holder' },
+  { id: 'owner', label: 'Risk Owner / Manager', type: 'text', placeholder: 'e.g. Contract Holder / Manager' },
+  { id: 'mitigation', label: 'Existing Mitigation and Controls and where Included', type: 'textarea', required: true, placeholder: 'Existing controls and clause/document references', span: 2 },
+  { id: 'additionalMitigation', label: 'Additional Mitigation and Controls and where to be Included', type: 'textarea', placeholder: 'Additional planned mitigations and where they will be included', span: 2 },
 ]
 
-// Categories follow Section H — In Country Value Requirements, part B.3
-// ("Instructions to prepare ICV Plan").
 const ICV_FIELDS = [
-  { id: 'icvCategory', label: 'ICV Category', type: 'select', options: [
-    'Investment in Fixed Assets in Oman',
-    'Omanisation in the Workforce',
-    'Local Sourcing of Goods',
-    'Local Sourcing of Subcontracted Services',
+  { id: 'icvCategory', label: 'ICV Category', type: 'select', required: true, options: [
+    'Local Fabrication',
+    'Omanisation (Skilled)',
+    'Local Subcontracting',
+    'Materials Procurement',
+    'Training & Development',
   ]},
-  { id: 'description', label: 'Description / Commitment', type: 'text', placeholder: 'e.g. Local fabrication of spool pieces at Sohar facility', span: 2 },
-  { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', placeholder: 'e.g. 500000' },
-  { id: 'icvSpend', label: 'In-Country Spend', type: 'number', placeholder: 'e.g. 350000' },
+  { id: 'description', label: 'Description / Commitment', type: 'textarea', required: true, placeholder: 'e.g. Local fabrication of spool pieces at Sohar facility', span: 2 },
+  { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', required: true, placeholder: 'e.g. 500000' },
+  { id: 'icvSpend', label: 'In-Country Spend', type: 'number', required: true, placeholder: 'e.g. 350000' },
   { id: 'icvPercent', label: 'ICV %', type: 'computed', compute: (row) => {
     if (!row.plannedSpend || !row.icvSpend) return '—'
     return ((row.icvSpend / row.plannedSpend) * 100).toFixed(1) + '%'
@@ -78,14 +81,14 @@ const ICV_FIELDS = [
 // into three parts, each a Must or a Want, weighted, with a 0–3 scoring band.
 // Musts carry a minimum score; Wants do not.
 const TECHNICAL_EVAL_MATRIX_FIELDS = [
-  { id: 'part', label: 'Part', type: 'select', options: [
+  { id: 'part', label: 'Part', type: 'select', required: true, options: [
     'Part 1: QHSE',
     'Part 2: Contract-Specific',
     'Part 3: Contract-Generic',
   ]},
-  { id: 'criteriaType', label: 'Must / Want', type: 'select', options: ['Must', 'Want'] },
-  { id: 'criterion', label: 'Criterion', type: 'text', placeholder: 'e.g. Methodology Statement — manner and sequence of executing the Work', span: 2 },
-  { id: 'weight', label: 'Weight', type: 'number', placeholder: 'e.g. 10' },
+  { id: 'criteriaType', label: 'Must / Want', type: 'select', required: true, options: ['Must', 'Want'] },
+  { id: 'criterion', label: 'Criterion', type: 'textarea', required: true, placeholder: 'e.g. Methodology Statement — manner and sequence of executing the Work', span: 2 },
+  { id: 'weight', label: 'Weight', type: 'number', required: true, placeholder: 'e.g. 10' },
   { id: 'minScore', label: 'Min. Score (Musts only)', type: 'number', placeholder: 'e.g. 2' },
   { id: 'band1', label: 'Score 1 — Description', type: 'text', placeholder: 'e.g. Submission shows lack of understanding of Work', span: 2 },
   { id: 'band2', label: 'Score 2 — Description', type: 'text', placeholder: 'e.g. Submission shows a competent understanding of Work', span: 2 },
@@ -102,30 +105,33 @@ const TECHNICAL_EVAL_MATRIX_FIELDS = [
 ]
 
 const HSE_RISK_FIELDS = [
-  { id: 'hazard', label: 'Hazard Identification', type: 'text', placeholder: 'Describe the hazard', span: 2 },
-  { id: 'activity', label: 'Associated Activity', type: 'text', placeholder: 'e.g. Welding at Height' },
-  { id: 'consequence', label: 'Potential Consequence', type: 'select', options: ['Near Miss', 'First Aid', 'Medical Treatment', 'Lost Time Injury', 'Permanent Disability', 'Fatality'] },
-  { id: 'existingControls', label: 'Existing Controls', type: 'text', placeholder: 'Current safety measures', span: 2 },
-  { id: 'residualLikelihood', label: 'Residual Likelihood', type: 'select', options: ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'] },
-  { id: 'residualSeverity', label: 'Residual Severity', type: 'select', options: ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'] },
+  { id: 'hazard', label: 'Hazard Identification', type: 'text', required: true, placeholder: 'Describe the hazard', span: 2 },
+  { id: 'activity', label: 'Associated Activity', type: 'text', required: true, placeholder: 'e.g. Welding at Height' },
+  { id: 'consequence', label: 'Potential Consequence', type: 'select', required: true, options: ['First Aid Case', 'Medical Treatment', 'Lost Time Injury', 'Permanent Disability', 'Fatality'] },
+  { id: 'existingControls', label: 'Existing Controls', type: 'textarea', placeholder: 'Current safety measures', span: 2 },
+  { id: 'residualLikelihood', label: 'Residual Likelihood', type: 'select', required: true, options: ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'] },
+  { id: 'residualSeverity', label: 'Residual Severity', type: 'select', required: true, options: ['Minor', 'Moderate', 'Major', 'Catastrophic'] },
   { id: 'residualRisk', label: 'Residual Risk Level', type: 'computed', compute: (row) => {
+    // The reference seeds this field statically (no live formula, and its own
+    // three sample rows don't fit any consistent likelihood × severity rule) —
+    // these thresholds are ours, scaled to the 5 × 4 grid its option lists give.
     const l = ['Rare','Unlikely','Possible','Likely','Almost Certain'].indexOf(row.residualLikelihood)+1
-    const s = ['Insignificant','Minor','Moderate','Major','Catastrophic'].indexOf(row.residualSeverity)+1
+    const s = ['Minor','Moderate','Major','Catastrophic'].indexOf(row.residualSeverity)+1
+    if (!l || !s) return '—'
     const score = l * s
-    if (score <= 4) return 'Low'
-    if (score <= 9) return 'Medium'
-    if (score <= 16) return 'High'
-    return 'Extreme'
+    if (score <= 6) return 'Low'
+    if (score <= 12) return 'Medium'
+    return 'High'
   }},
-  { id: 'additionalControls', label: 'Additional Controls Required', type: 'text', placeholder: 'Extra measures to reduce risk', span: 2 },
+  { id: 'additionalControls', label: 'Additional Controls Required', type: 'textarea', placeholder: 'Extra measures to reduce risk', span: 2 },
 ]
 
 const NEGOTIATION_STRATEGY_FIELDS = [
-  { id: 'theme', label: 'Theme', type: 'select', options: ['Specification', 'Quality', 'HSE', 'Lead Time', 'T&Cs', 'Liquidated Damages', 'Demand', 'Spare Part Quantity', 'Cost Price', 'Payments', 'ICV', 'Job Seekers / Omanization', 'Training & Interns', 'Other initiatives'] },
-  { id: 'negotiationPoints', label: 'Negotiation Points', type: 'text', placeholder: 'Describe the points of negotiation', span: 2 },
+  { id: 'theme', label: 'Theme', type: 'text', required: true, placeholder: 'e.g. Cost Price, Liquidated Damages, Payments' },
+  { id: 'negotiationPoints', label: 'Negotiation Points', type: 'textarea', required: true, placeholder: 'Describe the points of negotiation', span: 2 },
   { id: 'aspiration', label: 'Aspiration', type: 'text', placeholder: 'Best possible outcome' },
-  { id: 'target', label: 'Target', type: 'text', placeholder: 'Realistic target' },
-  { id: 'walkAway', label: 'Walk-Away', type: 'text', placeholder: 'Minimum acceptable outcome' },
+  { id: 'target', label: 'Target', type: 'text', required: true, placeholder: 'Realistic target' },
+  { id: 'walkAway', label: 'Walk-Away', type: 'text', required: true, placeholder: 'Minimum acceptable outcome' },
   { id: 'finalAchievement', label: 'Final Negotiation Achievement', type: 'text', placeholder: 'Actual outcome (updated post-negotiation)' },
 ]
 
@@ -227,6 +233,9 @@ function generateAiPrefill(templateId, tender) {
           unit: 'Each',
           unitRate: '12000',
           contingency: '10',
+          benchmarkUnitPrice: '11500',
+          benchmarkPercentageDifference: '+4.3%',
+          benchmarkSource: 'Previous contract rates, Q2 2026',
           remarks: 'AI Suggested — Based on similar contract benchmarks and market analysis',
         },
         {
@@ -235,6 +244,9 @@ function generateAiPrefill(templateId, tender) {
           unit: 'Lump Sum',
           unitRate: '35000',
           contingency: '15',
+          benchmarkUnitPrice: '33000',
+          benchmarkPercentageDifference: '+6.1%',
+          benchmarkSource: 'Market survey — three comparable vendors',
           remarks: 'AI Suggested — Includes mobilisation, testing and handover',
         },
         {
@@ -243,6 +255,9 @@ function generateAiPrefill(templateId, tender) {
           unit: 'Days',
           unitRate: '450',
           contingency: '5',
+          benchmarkUnitPrice: '430',
+          benchmarkPercentageDifference: '+4.7%',
+          benchmarkSource: 'Previous contract rates',
           remarks: 'AI Suggested — Based on estimated project duration',
         },
       ]
@@ -251,34 +266,46 @@ function generateAiPrefill(templateId, tender) {
       return [
         {
           riskCategory: 'Schedule',
+          activity: 'Contract Award & Procurement',
           riskDescription: `Delay in delivery of critical materials for ${title} due to supply chain disruptions`,
+          consequence: 'Schedule slippage on downstream milestones and possible liquidated-damages exposure',
           likelihood: 'Medium',
-          impact: 'Major',
-          mitigation: 'Establish alternative supplier list; include liquidated damages clause; early procurement of long-lead items',
+          impact: 'High',
+          riskScore: 'M-6',
           owner: 'Contract Holder',
+          mitigation: 'Establish alternative supplier list; include liquidated damages clause; early procurement of long-lead items',
+          additionalMitigation: 'AI Suggested — Add expediting clause and dual-source critical long-lead items in the contract',
         },
         {
           riskCategory: 'Commercial',
+          activity: 'Price Review & Cost Control',
           riskDescription: 'Price escalation due to market volatility affecting project budget',
+          consequence: 'Cost overrun against approved budget, requiring supplementary funding approval',
           likelihood: 'High',
-          impact: 'Moderate',
-          mitigation: 'Include price adjustment mechanism; fix prices for critical items; maintain contingency reserve',
+          impact: 'Medium',
+          riskScore: 'M-8',
           owner: 'Commercial Manager',
+          mitigation: 'Include price adjustment mechanism; fix prices for critical items; maintain contingency reserve',
+          additionalMitigation: 'AI Suggested — Cap escalation index exposure and review quarterly against market indices',
         },
         {
-          riskCategory: 'QHSSE',
+          riskCategory: 'HSE',
+          activity: 'Site Execution & Safety Compliance',
           riskDescription: 'Non-compliance with Oman LNG safety standards during execution',
+          consequence: 'Site incident, work stoppage, or regulatory non-conformance',
           likelihood: 'Low',
-          impact: 'Critical',
-          mitigation: 'Mandatory QHSSE induction for all personnel; regular safety audits; stop-work authority for safety violations',
+          impact: 'High',
+          riskScore: 'H-5',
           owner: 'QHSSE Manager',
+          mitigation: 'Mandatory QHSSE induction for all personnel; regular safety audits; stop-work authority for safety violations',
+          additionalMitigation: 'AI Suggested — Add third-party HSE audit at contract mid-point',
         },
       ]
 
     case 'icv':
       return [
         {
-          icvCategory: 'Local Sourcing of Goods',
+          icvCategory: 'Materials Procurement',
           description: 'AI Suggested — Procure consumables and spares from Omani-registered suppliers holding Certificates of Omani Origin',
           plannedSpend: '450000',
           icvSpend: '288000',
@@ -287,7 +314,7 @@ function generateAiPrefill(templateId, tender) {
           evidence: 'Certificate of Omani Origin per purchase order; supplier CR verification',
         },
         {
-          icvCategory: 'Omanisation in the Workforce',
+          icvCategory: 'Omanisation (Skilled)',
           description: 'AI Suggested — Omani nationals in supervisory and technical positions per Appendix G position list',
           plannedSpend: '320000',
           icvSpend: '208000',
@@ -296,7 +323,7 @@ function generateAiPrefill(templateId, tender) {
           evidence: 'Ministry of Labour records and monthly payroll returns',
         },
         {
-          icvCategory: 'Local Sourcing of Subcontracted Services',
+          icvCategory: 'Local Subcontracting',
           description: 'AI Suggested — Subcontract inspection and calibration scope to Oman-based service providers',
           plannedSpend: '180000',
           icvSpend: '90000',
@@ -648,6 +675,12 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
                     className="w-full px-3 py-2 text-sm focus:outline-none transition-all olng-input bg-white"
                   >
                     <option value="">Select...</option>
+                    {/* A value saved before an option-list change (e.g. an old risk
+                        category) won't be in field.options — keep it selectable so
+                        the stored row still displays instead of silently blanking. */}
+                    {row[field.id] && !field.options.includes(row[field.id]) && (
+                      <option value={row[field.id]}>{row[field.id]}</option>
+                    )}
                     {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 ) : field.type === 'number' ? (
@@ -657,6 +690,14 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
                     onChange={e => updateRow(rowIdx, field.id, e.target.value)}
                     placeholder={field.placeholder}
                     className="w-full px-3 py-2 text-sm focus:outline-none transition-all olng-input"
+                  />
+                ) : field.type === 'textarea' ? (
+                  <textarea
+                    value={row[field.id] || ''}
+                    onChange={e => updateRow(rowIdx, field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm focus:outline-none transition-all olng-input resize-y"
                   />
                 ) : (
                   <input

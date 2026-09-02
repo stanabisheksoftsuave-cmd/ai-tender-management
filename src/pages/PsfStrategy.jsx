@@ -2,21 +2,28 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Bot, Sparkles, CheckCircle, FileText, UploadCloud, Download, ChevronRight, ChevronDown,
-  ShieldOff, ClipboardCheck, X, UserCheck, Briefcase,
+  ShieldOff, ClipboardCheck, X, UserCheck,
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import SearchableSelect from '../components/ui/SearchableSelect'
-import AiEditableTextarea from '../components/ui/AiEditableTextarea'
+import {
+  PsfSection, PsfSubHeading, PsfField, PsfNarrative, PsfNote, PsfCheckboxGrid,
+  PsfHistoryTable, PsfMilestoneTable, PsfTendererTable, PsfIcvTable,
+} from '../components/psf/PsfFields'
 import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useBackHandler } from '../context/NavigationContext'
-import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
 import { exportPsfPDF } from '../utils/exportPDF'
 import { TEMPLATE_DEFS } from './StrategyTemplatesDashboard'
-import { CONTRACTING_MODELS, MARKET_APPROACHES, COMMERCIAL_DRIVERS } from '../data/psfOptions'
+import {
+  EM_DASH, toCheckboxes, PSF_REVIEW_OPTIONS, PSF_ESTIMATE_BASIS_OPTIONS,
+  PSF_DEFAULT_CONFIDENCE_LEVEL, PSF_TENDER_PLAN_TYPES, PSF_MILESTONE_LABELS,
+  PSF_TENDER_STRATEGY_OPTIONS, PSF_COMPETITIVE_DROP_LIST, PSF_SINGLE_SOURCE_DROP_LIST,
+  PSF_TENDERER_ROW_COUNT, PSF_ICV_REQUIREMENTS, PSF_HEADER_FIELDS, PSF_NARRATIVE_FIELDS,
+} from '../data/psfTemplate'
 import { tenderRef } from '../utils/tenderRef'
 
 /*
@@ -44,53 +51,184 @@ const EXTRA_PSF_DOCS = [
   { id: 'other-documents',             title: 'Other Documents' },
 ]
 
-// Mirrors the PSF Strategy document's header block.
-/* Backfill the strategy fields on a PSF drafted before they existed. */
-function withStrategyDefaults(psf) {
-  if (!psf) return null
+/*
+ * Assembles the Procurement Submission Form from the tender and the files
+ * uploaded on step 0. Structure mirrors `PSF Strategy.docx` from `Attachments:`
+ * onward — see src/data/psfTemplate.js for the section inventory.
+ *
+ * The template marks a dozen fields in red with instructions like "AI to
+ * generate background from previous contracts". Those are rendered as drafted
+ * prose the Contract Holder edits, never as the instruction itself.
+ */
+
+/** The template's HISTORY tables start blank apart from the zeroed money rows. */
+function emptyHistory(includeActualSpend) {
+  const base = { awardDate: '', expiryDate: '', contractorName: '', method: '', acv: '0.00' }
+  return includeActualSpend ? { ...base, actualSpend: '0.00' } : base
+}
+
+/* Every red field's drafted prose, in one place so the wording is reviewable. */
+function buildNarrative(tender, uploads) {
+  const title = tender?.title || 'This requirement'
+  const value = tender?.budget || EM_DASH
+  const department = tender?.department || 'the requesting department'
+  const category = tender?.tenderType || 'the applicable'
+  const uploaded = Object.keys(uploads || {}).length
+  const bidders = tender?.bidders ?? 0
+
   return {
-    ...psf,
-    contractingModel: CONTRACTING_MODELS.includes(psf.contractingModel)
-      ? psf.contractingModel
-      : CONTRACTING_MODELS[0],
-    marketApproach: MARKET_APPROACHES.includes(psf.marketApproach)
-      ? psf.marketApproach
-      : MARKET_APPROACHES[0],
-    commercialDrivers: Array.isArray(psf.commercialDrivers)
-      ? psf.commercialDrivers
-      : COMMERCIAL_DRIVERS.filter(d => d.defaultChecked).map(d => d.id),
+    background:
+      `${title} is being tendered by ${department} with an anticipated value of ${value}. ` +
+      `Pre-qualification returned ${bidders} qualified bidder(s) following QHSE, technical and ` +
+      `administrative assessment${tender?.financialAssessmentRequired ? ', together with a financial assessment completed by the Contract Engineer' : ''}. ` +
+      `The strategy templates listed in this submission were completed and re-submitted as supporting evidence.`,
+
+    justification:
+      `The requirement is being taken to tender to secure continuity of supply for ${department} ` +
+      `under a ${category.toLowerCase()} category award. The contract strategy, company estimate and ` +
+      `risk assessments prepared for this tender support proceeding on the basis set out below.`,
+
+    scopeOverview:
+      `Approval is sought to proceed to tender for ${title} under ${category} category. The contract ` +
+      `strategy, company estimate, risk assessments and negotiation approach have been reviewed. ` +
+      `${uploaded} supporting document(s) accompany this form. The recommended award route is set out ` +
+      `in the tender strategy section below.`,
+
+    manpowerRequirements:
+      `Manpower requirements follow the scope of work prepared for ${title}. No dedicated Oman LNG ` +
+      `headcount is created by this award; the contractor supplies personnel for the duration of the contract.`,
+
+    goodsServicesRequirements:
+      `Goods and services requirements are as set out in the scope of work, priced against the company ` +
+      `estimate of ${(tender?.companyEstimate || []).length} line item(s) and covered by the technical ` +
+      `evaluation matrix's ${(tender?.technicalEvalMatrix || []).length} criterion(s).`,
+
+    otherRequirements:
+      `${(tender?.contractRiskAssessment || []).length} contract risk(s) and ` +
+      `${(tender?.hseRiskAssessment || []).length} HSE hazard(s) have been assessed for this scope, ` +
+      `together with ${(tender?.icvPlan || []).length} ICV commitment(s). Any residual requirement is ` +
+      `carried in the tender documents.`,
+
+    benchmarking:
+      `The estimate has been benchmarked against previous contract rates and available market ` +
+      `intelligence for comparable scope, with escalation applied to bring historic rates to current ` +
+      `terms. The company estimate is the basis for the anticipated value of ${value}.`,
+
+    negotiationDetails:
+      `Negotiation will follow the approved negotiation template, covering the ` +
+      `${(tender?.negotiationStrategy || []).length} negotiation theme(s) prepared for this tender and ` +
+      `informed by the proposed scope of work, market intelligence, the company estimate and the ICV ` +
+      `requirements set out in this submission.`,
+
+    tendererJustification:
+      `Tender Board is kindly requested to endorse the bidder list below, drawn from the ERP and JSRS ` +
+      `registry and assessed at pre-qualification against the QHSE, technical and administrative criteria.`,
+
+    recommendation:
+      `Tender Board is kindly requested to endorse the sourcing strategy, the bidder list, the technical ` +
+      `evaluation matrix, the company estimate and the negotiation strategy for ${title}, at an ` +
+      `anticipated value of ${value}.`,
   }
 }
 
+/* The TENDERER LIST seeds from whichever bidders pre-qualification carried through. */
+function buildTendererRows(tender) {
+  const qualified = (tender?.prequalBidders || []).filter(b => !b.droppedAt)
+  const seeded = qualified.map((b, i) => ({
+    id: `tenderer-${i}`,
+    reference: b.name,
+    prequalResult: 'Qualified',
+    justification: 'Met the QHSE, technical and administrative pre-qualification criteria.',
+  }))
+  // The template's blank rows stay available to type into either way.
+  const blanks = Array.from({ length: PSF_TENDERER_ROW_COUNT }, (_, i) => ({
+    id: `tenderer-blank-${i}`, reference: '', prequalResult: '', justification: '',
+  }))
+  return [...seeded, ...blanks]
+}
+
 function buildPsf(tender, uploads) {
-  const value = tender?.budget || '—'
   return {
-    title: tender?.title || '—',
-    contractNumber: tenderRef(tender) || '—',
-    anticipatedValue: value,
-    duration: tender?.duration || '—',
-    sourceOfFunds: tender?.costCode ? `Cost Centre ${tender.costCode}` : 'Operating Budget',
-    costCentre: tender?.costCode || '—',
-    expenditureType: tender?.tenderType === 'Goods' ? 'Capital Expenditure' : 'Operating Expenditure',
-    // The CIF's own Contract Mode (Lump Sum / Reimbursable / Unit Rate) is a
-    // different vocabulary from the PSF's contracting models, so it is only
-    // carried over when it happens to name one of them.
-    contractingModel: CONTRACTING_MODELS.includes(tender?.contractMode)
-      ? tender.contractMode
-      : CONTRACTING_MODELS[0],
-    marketApproach: MARKET_APPROACHES[0],
-    commercialDrivers: COMMERCIAL_DRIVERS.filter(d => d.defaultChecked).map(d => d.id),
-    background:
-      `${tender?.title || 'This requirement'} is being tendered by ${tender?.department || 'the requesting department'} ` +
-      `with an anticipated value of ${value}. Pre-qualification returned ${tender?.bidders ?? 0} qualified bidder(s) ` +
-      `following QHSE, technical and administrative assessment` +
-      `${tender?.financialAssessmentRequired ? ', together with a financial assessment completed by the Contract Engineer' : ''}. ` +
-      `The strategy templates listed below were completed and re-submitted as supporting evidence for this submission.`,
-    executiveSummary:
-      `Approval is sought to proceed to tender for ${tender?.title || 'this requirement'} under ` +
-      `${tender?.tenderType || 'the applicable'} category. The contract strategy, company estimate, risk assessments and ` +
-      `negotiation approach have been reviewed and are attached. ${Object.keys(uploads).length} supporting document(s) ` +
-      `accompany this form. Recommended award route is competitive tender against the pre-qualified bidder list.`,
+    attachments: Object.values(uploads || {}).map(f => f?.name).filter(Boolean),
+
+    header: {
+      title: tender?.title || EM_DASH,
+      contractNumber: tenderRef(tender) || EM_DASH,
+      anticipatedValue: tender?.budget || EM_DASH,
+      duration: tender?.duration || EM_DASH,
+      sourceOfFunds: tender?.costCode ? `Cost Centre ${tender.costCode}` : 'Operating Budget',
+      costCentre: tender?.costCode || EM_DASH,
+      expenditureType: tender?.tenderType === 'Goods' ? 'Capital Expenditure' : 'Operating Expenditure',
+    },
+
+    history: { previous: emptyHistory(true), existing: emptyHistory(false), currentSpend: '' },
+
+    reviews: toCheckboxes(PSF_REVIEW_OPTIONS),
+
+    narrative: buildNarrative(tender, uploads),
+
+    estimate: {
+      confidenceLevel: PSF_DEFAULT_CONFIDENCE_LEVEL,
+      basis: toCheckboxes(PSF_ESTIMATE_BASIS_OPTIONS),
+    },
+
+    tenderPlan: {
+      types: toCheckboxes(PSF_TENDER_PLAN_TYPES),
+      requiredBy: tender?.deadline || '',
+      milestones: PSF_MILESTONE_LABELS.map((label, i) => ({
+        // Index-suffixed: the template repeats "PSF Submitted to CPL for
+        // Review", so the label alone is not a unique key.
+        id: `milestone-${i}`, label, planned: '', actual: '',
+      })),
+      deviations: '',
+    },
+
+    tenderStrategy: toCheckboxes(PSF_TENDER_STRATEGY_OPTIONS),
+
+    dropLists: {
+      competitive: toCheckboxes(PSF_COMPETITIVE_DROP_LIST),
+      singleSourceOem: toCheckboxes(PSF_SINGLE_SOURCE_DROP_LIST),
+    },
+
+    assessments: { technical: '', cutOff: '', commercial: '' },
+
+    alternativesConsidered:
+      'Default competitive strategy or OEM, therefore no alternative has been considered.',
+    assessmentOtherDetails: '',
+    omanisationImplications: '',
+    omanisationOtherDetails: '',
+
+    negotiation: { applicability: 'Applicable (see below)' },
+    strategyAdditionalNotes: '',
+
+    tendererList: { source: '', rows: buildTendererRows(tender) },
+    tendererAdditionalNotes: '',
+
+    icvReviewDetail: '',
+    icvRequirements: PSF_ICV_REQUIREMENTS.map(row => ({
+      id: `icv-${row.ordinal}`, ...row, answer: '', comment: '',
+    })),
+  }
+}
+
+/*
+ * A PSF saved before the template sections existed is flat — `background` and
+ * `executiveSummary` at the top level and nothing else. Rebuild it on the full
+ * shape rather than let the review UI read `psf.narrative.background` off
+ * undefined, carrying across the two prose fields the Holder may have edited.
+ */
+function normalisePsf(psf, tender, uploads) {
+  if (!psf) return null
+  if (psf.narrative && Array.isArray(psf.reviews)) return psf
+  const rebuilt = buildPsf(tender, uploads)
+  return {
+    ...rebuilt,
+    header: { ...rebuilt.header, ...(psf.title ? { title: psf.title } : {}) },
+    narrative: {
+      ...rebuilt.narrative,
+      ...(psf.background ? { background: psf.background } : {}),
+      ...(psf.executiveSummary ? { scopeOverview: psf.executiveSummary } : {}),
+    },
   }
 }
 
@@ -102,31 +240,31 @@ const ASSIGNMENT_GROUPS = [
   {
     key: 'ce',
     roleId: 'pof',
-    title: 'Assign Contract Engineers',
-    requirement: '— at least one required',
+    title: 'Contract Engineers',
+    short: 'CE',
     noun: 'Contract Engineers',
     empty: 'No active Contract Engineers',
-    note: 'Once submitted, the Contract Holder can create the ITT, and every assigned Contract Engineer picks it up for the ITT Draft and commercial stages.',
+    note: 'Picks this up for the ITT Draft and commercial stages.',
     tenderKey: 'assignedContractEngineers',
   },
   {
     key: 'hse',
     roleId: 'hse',
-    title: 'Assign HSE',
-    requirement: '— optional',
+    title: 'HSE',
+    short: 'HSE',
     noun: 'HSE Officers',
     empty: 'No active HSE Officers',
-    note: 'Recorded on the PSF so the owner of Section C — QHSSE Requirements is known when the ITT is drafted.',
+    note: 'Owns Section C — QHSSE Requirements on the ITT.',
     tenderKey: 'assignedHseOfficers',
   },
   {
     key: 'icv',
     roleId: 'icv',
-    title: 'Assign ICV',
-    requirement: '— optional',
+    title: 'ICV',
+    short: 'ICV',
     noun: 'ICV Leads',
     empty: 'No active ICV Leads',
-    note: 'Recorded on the PSF so the owner of Section H — ICV Requirements is known when the ITT is drafted.',
+    note: 'Owns Section H — ICV Requirements on the ITT.',
     tenderKey: 'assignedIcvLeads',
   },
 ]
@@ -152,7 +290,7 @@ export default function PsfStrategy() {
   const [step, setStep] = useState(tender?.psfDocument ? 2 : 0)
   const [genStep, setGenStep] = useState(0)
   const [uploads, setUploads] = useState(tender?.psfUploads || {})
-  const [psf, setPsf] = useState(() => withStrategyDefaults(tender?.psfDocument))
+  const [psf, setPsf] = useState(() => normalisePsf(tender?.psfDocument, tender, tender?.psfUploads || {}))
   const [submitting, setSubmitting] = useState(false)
   const [assignedIds, setAssignedIds] = useState(() => ({
     ce: Array.isArray(tender?.assignedContractEngineers)
@@ -166,11 +304,39 @@ export default function PsfStrategy() {
   const pickedIn = (key) => (usersByGroup[key] || [])
     .filter(u => (assignedIds[key] || []).some(id => String(id) === String(u.id)))
     .map(u => ({ id: u.id, name: u.name }))
-  const assignedCeIds = assignedIds.ce
+  // The template hands the tender to all three roles, so submit needs all three.
+  const isFullyAssigned = ASSIGNMENT_GROUPS.every(g => (assignedIds[g.key] || []).length > 0)
+  /* Who this went to, once submitted — all three roles, not just the engineers. */
+  const assignmentSummary = ASSIGNMENT_GROUPS
+    .map(g => {
+      const names = (tender?.[g.tenderKey]
+        || (g.key === 'ce' ? [tender?.assignedContractEngineer].filter(Boolean) : []))
+        .map(c => c.name).join(', ')
+      return names ? (g.key === 'ce' ? names : `${names} (${g.short})`) : null
+    })
+    .filter(Boolean).join(', ') || EM_DASH
   const [templatesOpen, setTemplatesOpen] = useState(true)
 
   const qualifiedBidders = (tender?.prequalBidders || []).filter(b => !b.droppedAt)
   const hasPreQual = (tender?.prequalBidders?.length || 0) > 0
+
+  // PSF only makes sense once every Strategy Template the Contract Holder
+  // selected is complete — the Strategy Templates page's own Proceed button
+  // already enforces this, but a direct URL visit bypasses that.
+  const selectedCardIds = Array.isArray(tender?.selectedTemplates)
+    ? tender.selectedTemplates
+    : [...TEMPLATE_DEFS.map(t => t.id), 'pre-qual']
+  const templatesComplete = selectedCardIds.length > 0 && selectedCardIds.every(id => {
+    if (id === 'pre-qual') return tender?.status === 'draft'
+    const dataKey = TEMPLATE_DEFS.find(t => t.id === id)?.dataKey
+    return dataKey ? (tender?.[dataKey]?.length || 0) > 0 : true
+  })
+
+  useEffect(() => {
+    if (tender && !tender.psfCompleted && !templatesComplete) {
+      navigate(`/strategy-templates/${tenderId}`)
+    }
+  }, [tender, templatesComplete, tenderId, navigate])
 
   useBackHandler(() => {
     if (step === 2 && !tender?.psfCompleted) { setStep(0); return true }
@@ -208,6 +374,10 @@ export default function PsfStrategy() {
     </div>
   )
 
+  // The effect above is already sending this back to Strategy Templates —
+  // render nothing rather than flash the PSF page for a frame first.
+  if (!tender.psfCompleted && !templatesComplete) return null
+
   const handleUpload = (templateId, file) => {
     if (!file) return
     const next = { ...uploads, [templateId]: { name: file.name, size: file.size, uploadedAt: new Date().toISOString().split('T')[0] } }
@@ -222,18 +392,28 @@ export default function PsfStrategy() {
     updateTender(tender.id, { psfUploads: next })
   }
 
-  const downloadTemplate = (template) => {
-    const rows = tender?.[template.dataKey] || []
-    exportTemplateExcel(template, rows, tender)
-  }
-
   const startGeneration = () => { setGenStep(0); setStep(1) }
 
-  const setPsfField = (key, value) => setPsf(prev => ({ ...prev, [key]: value }))
+  // The document is nested now, so edits address a path rather than a key.
+  const setPsfPath = (path, value) => setPsf(prev => {
+    const next = { ...prev }
+    let node = next
+    for (let i = 0; i < path.length - 1; i++) {
+      node[path[i]] = Array.isArray(node[path[i]]) ? [...node[path[i]]] : { ...node[path[i]] }
+      node = node[path[i]]
+    }
+    node[path[path.length - 1]] = value
+    return next
+  })
+  /* Flip one tick box in a checkbox group, leaving the rest as they were. */
+  const toggleIn = (boxes, id, checked) =>
+    boxes.map(box => (box.id === id ? { ...box, checked } : box))
+  // A submitted PSF is the approved record — every field goes read-only.
+  const readOnly = !!tender?.psfCompleted
 
   const handleSubmit = () => {
     const ces = pickedIn('ce')
-    if (ces.length === 0) return
+    if (!isFullyAssigned) return
     setSubmitting(true)
     setTimeout(() => {
       updateTender(tender.id, {
@@ -298,7 +478,7 @@ export default function PsfStrategy() {
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Re-upload completed strategy templates</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Download each template, complete or verify it offline, then upload it back. Every included template must be
+                Complete or verify each template offline, then upload it back. Every included template must be
                 uploaded before the PSF Strategy can be generated.
               </p>
             </div>
@@ -348,10 +528,6 @@ export default function PsfStrategy() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <Button variant="secondary" size="sm" onClick={() => downloadTemplate(template)}>
-                        <Download size={13} /> Download
-                      </Button>
-
                       {up ? (
                         <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
                           <CheckCircle size={13} />
@@ -397,11 +573,6 @@ export default function PsfStrategy() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {hasPreQual && (
-                      <Button variant="secondary" size="sm" onClick={() => exportPreQualSummaryExcel(tender, qualifiedBidders)}>
-                        <Download size={13} /> Download
-                      </Button>
-                    )}
                     {up ? (
                       <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
                         <CheckCircle size={13} />
@@ -500,170 +671,371 @@ export default function PsfStrategy() {
       {/* ── Step 2: review & submit ── */}
       {step === 2 && psf && (
         <>
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <ClipboardCheck size={15} className="text-[var(--color-primary)]" />
-              <h3 className="text-sm font-semibold text-slate-800">Procurement Submission Form — Strategy</h3>
-            </div>
+          {/* ── Attachments ── */}
+          <PsfSection title="Attachments">
+            {psf.attachments.length === 0 ? (
+              <p className="text-xs text-slate-400">
+                No attachments yet — files added on the upload stage appear here.
+              </p>
+            ) : (
+              <ol className="list-inside list-decimal space-y-1 text-sm text-slate-700">
+                {psf.attachments.map((name, i) => (
+                  // Index-keyed: the same file can legitimately be attached
+                  // against two rows, so the name alone is not unique.
+                  <li key={`${i}-${name}`} className="truncate">{name}</li>
+                ))}
+              </ol>
+            )}
+          </PsfSection>
 
+          {/* ── Submission details ── */}
+          <PsfSection title="Procurement Submission Form — Strategy">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                ['title', 'Title'],
-                ['contractNumber', 'Contract / PR Number'],
-                ['anticipatedValue', 'Anticipated Value'],
-                ['duration', 'Duration'],
-                ['sourceOfFunds', 'Source of Funds'],
-                ['costCentre', 'Cost Centre'],
-                ['expenditureType', 'Expenditure Type'],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <label className="text-[11px] font-medium text-slate-600 mb-1 block">{label}</label>
-                  <input
-                    value={psf[key] || ''}
-                    onChange={e => setPsfField(key, e.target.value)}
-                    disabled={tender.psfCompleted}
-                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-500"
+              {PSF_HEADER_FIELDS.map(field => (
+                <PsfField
+                  key={field.key}
+                  label={field.label}
+                  value={psf.header[field.key] || ''}
+                  readOnly={readOnly}
+                  onChange={v => setPsfPath(['header', field.key], v)}
+                />
+              ))}
+            </div>
+          </PsfSection>
+
+          {/* ── History ── */}
+          <PsfSection title="History">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <PsfSubHeading>Previous contract</PsfSubHeading>
+                <PsfHistoryTable
+                  scope="previous"
+                  entry={psf.history.previous}
+                  readOnly={readOnly}
+                  onChange={patch => setPsfPath(['history', 'previous'], { ...psf.history.previous, ...patch })}
+                />
+              </div>
+              <div>
+                <PsfSubHeading>Existing contract</PsfSubHeading>
+                <PsfHistoryTable
+                  scope="existing"
+                  entry={psf.history.existing}
+                  readOnly={readOnly}
+                  onChange={patch => setPsfPath(['history', 'existing'], { ...psf.history.existing, ...patch })}
+                />
+                <div className="mt-3">
+                  <PsfField
+                    label="Current Spend"
+                    value={psf.history.currentSpend}
+                    readOnly={readOnly}
+                    onChange={v => setPsfPath(['history', 'currentSpend'], v)}
                   />
                 </div>
+              </div>
+            </div>
+          </PsfSection>
+
+          {/* ── Reviews / approvals ── */}
+          <PsfSection title="Reviews / Approvals Established">
+            <PsfCheckboxGrid
+              options={psf.reviews}
+              readOnly={readOnly}
+              onToggle={(id, checked) => setPsfPath(['reviews'], toggleIn(psf.reviews, id, checked))}
+            />
+          </PsfSection>
+
+          {/* ── The red "AI to generate…" fields ── */}
+          <PsfSection title="Submission Narrative">
+            <div className="space-y-4">
+              {PSF_NARRATIVE_FIELDS.map(field => (
+                <PsfNarrative
+                  key={field.key}
+                  label={field.label}
+                  rows={field.rows}
+                  value={psf.narrative[field.key] || ''}
+                  readOnly={readOnly}
+                  onChange={v => setPsfPath(['narrative', field.key], v)}
+                />
               ))}
             </div>
-          </Card>
+          </PsfSection>
 
-          {/* How the work is contracted and taken to market, and what the
-              strategy is optimising for. */}
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Briefcase size={15} className="text-[var(--color-primary)]" />
-              <h3 className="text-sm font-semibold text-slate-800">Procurement Strategy</h3>
+          {/* ── Estimate basis & benchmarking ── */}
+          <PsfSection title="Estimate Basis">
+            <div className="max-w-xs mb-3">
+              <PsfField
+                label="Confidence Level"
+                value={psf.estimate.confidenceLevel}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['estimate', 'confidenceLevel'], v)}
+              />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                ['contractingModel', 'Contracting Model', CONTRACTING_MODELS],
-                ['marketApproach', 'Market Approach', MARKET_APPROACHES],
-              ].map(([key, label, options]) => (
-                <div key={key}>
-                  <label className="text-[11px] font-medium text-slate-600 mb-1 block">{label}</label>
-                  <select
-                    value={psf[key] || ''}
-                    onChange={e => setPsfField(key, e.target.value)}
-                    disabled={tender.psfCompleted}
-                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-500"
-                  >
-                    {options.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-
+            <PsfCheckboxGrid
+              options={psf.estimate.basis}
+              readOnly={readOnly}
+              onToggle={(id, checked) => setPsfPath(['estimate', 'basis'], toggleIn(psf.estimate.basis, id, checked))}
+            />
             <div className="mt-4">
-              <p className="text-[11px] font-medium text-slate-600 mb-1.5">Commercial Drivers</p>
-              <div className="flex flex-wrap gap-2">
-                {COMMERCIAL_DRIVERS.map(driver => {
-                  const on = (psf.commercialDrivers || []).includes(driver.id)
+              <PsfNarrative
+                label="Benchmarking of Estimates"
+                rows={4}
+                value={psf.narrative.benchmarking || ''}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['narrative', 'benchmarking'], v)}
+              />
+            </div>
+          </PsfSection>
+
+          {/* ── Tender plan ── */}
+          <PsfSection title="Tender Plan">
+            <PsfCheckboxGrid
+              options={psf.tenderPlan.types}
+              readOnly={readOnly}
+              onToggle={(id, checked) => setPsfPath(['tenderPlan', 'types'], toggleIn(psf.tenderPlan.types, id, checked))}
+            />
+            <div className="max-w-xs mt-3 mb-4">
+              <PsfField
+                label="New services required in place / on site by"
+                value={psf.tenderPlan.requiredBy}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['tenderPlan', 'requiredBy'], v)}
+              />
+            </div>
+            <PsfMilestoneTable
+              milestones={psf.tenderPlan.milestones}
+              readOnly={readOnly}
+              onChange={(id, patch) => setPsfPath(
+                ['tenderPlan', 'milestones'],
+                psf.tenderPlan.milestones.map(m => (m.id === id ? { ...m, ...patch } : m)),
+              )}
+            />
+            <div className="mt-4">
+              <PsfNote
+                label="Deviations"
+                value={psf.tenderPlan.deviations}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['tenderPlan', 'deviations'], v)}
+              />
+            </div>
+          </PsfSection>
+
+          {/* ── Tender strategy & drop lists ── */}
+          <PsfSection title="Tender Strategy">
+            <PsfCheckboxGrid
+              options={psf.tenderStrategy}
+              readOnly={readOnly}
+              onToggle={(id, checked) => setPsfPath(['tenderStrategy'], toggleIn(psf.tenderStrategy, id, checked))}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+              <div>
+                <PsfSubHeading>Competitive — drop list</PsfSubHeading>
+                <PsfCheckboxGrid
+                  columns={1}
+                  options={psf.dropLists.competitive}
+                  readOnly={readOnly}
+                  onToggle={(id, checked) => setPsfPath(['dropLists', 'competitive'], toggleIn(psf.dropLists.competitive, id, checked))}
+                />
+              </div>
+              <div>
+                <PsfSubHeading>Single source / OEM — drop list</PsfSubHeading>
+                <PsfCheckboxGrid
+                  columns={1}
+                  options={psf.dropLists.singleSourceOem}
+                  readOnly={readOnly}
+                  onToggle={(id, checked) => setPsfPath(['dropLists', 'singleSourceOem'], toggleIn(psf.dropLists.singleSourceOem, id, checked))}
+                />
+              </div>
+            </div>
+          </PsfSection>
+
+          {/* ── Assessment basis ── */}
+          <PsfSection title="Proposed Basis for Tender Assessments">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[['technical', 'Technical'], ['cutOff', 'Cut Off'], ['commercial', 'Commercial']].map(([key, label]) => (
+                <PsfField
+                  key={key}
+                  label={label}
+                  value={psf.assessments[key]}
+                  readOnly={readOnly}
+                  onChange={v => setPsfPath(['assessments', key], v)}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <PsfNote
+                label="Alternatives Considered"
+                value={psf.alternativesConsidered}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['alternativesConsidered'], v)}
+              />
+              <PsfNote
+                label="Other Details"
+                value={psf.assessmentOtherDetails}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['assessmentOtherDetails'], v)}
+              />
+              <PsfNote
+                label="Omanisation Implications"
+                value={psf.omanisationImplications}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['omanisationImplications'], v)}
+              />
+              <PsfNote
+                label="Other Details (Omanisation)"
+                value={psf.omanisationOtherDetails}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['omanisationOtherDetails'], v)}
+              />
+            </div>
+          </PsfSection>
+
+          {/* ── Negotiation strategy ── */}
+          <PsfSection title="Negotiation Strategy (OEM & single source only)">
+            <div className="max-w-sm mb-4">
+              <PsfField
+                label="Applicability"
+                value={psf.negotiation.applicability}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['negotiation', 'applicability'], v)}
+              />
+            </div>
+            <PsfNarrative
+              label="Negotiation Strategy Details"
+              rows={4}
+              value={psf.narrative.negotiationDetails || ''}
+              readOnly={readOnly}
+              onChange={v => setPsfPath(['narrative', 'negotiationDetails'], v)}
+            />
+            <div className="mt-4">
+              <PsfNote
+                label="Additional Notes"
+                value={psf.strategyAdditionalNotes}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['strategyAdditionalNotes'], v)}
+              />
+            </div>
+          </PsfSection>
+
+          {/* ── Tenderer list ── */}
+          <PsfSection title="Tenderer List">
+            <div className="max-w-md mb-4">
+              <PsfField
+                label="Source of Tenderer List"
+                value={psf.tendererList.source}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['tendererList', 'source'], v)}
+              />
+            </div>
+            <PsfTendererTable
+              rows={psf.tendererList.rows}
+              readOnly={readOnly}
+              onChange={(id, patch) => setPsfPath(
+                ['tendererList', 'rows'],
+                psf.tendererList.rows.map(r => (r.id === id ? { ...r, ...patch } : r)),
+              )}
+            />
+            <div className="mt-4 space-y-4">
+              <PsfNarrative
+                label="Justification"
+                rows={4}
+                value={psf.narrative.tendererJustification || ''}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['narrative', 'tendererJustification'], v)}
+              />
+              <PsfNote
+                label="Additional Notes"
+                value={psf.tendererAdditionalNotes}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['tendererAdditionalNotes'], v)}
+              />
+              <PsfNarrative
+                label="Recommendation / Request"
+                rows={4}
+                value={psf.narrative.recommendation || ''}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['narrative', 'recommendation'], v)}
+              />
+            </div>
+          </PsfSection>
+
+          {/* ── ICV review ── */}
+          <PsfSection title="ICV Review Detail">
+            <div className="mb-4">
+              <PsfNote
+                label="ICV Review Detail"
+                value={psf.icvReviewDetail}
+                readOnly={readOnly}
+                onChange={v => setPsfPath(['icvReviewDetail'], v)}
+              />
+            </div>
+            <PsfIcvTable
+              rows={psf.icvRequirements}
+              readOnly={readOnly}
+              onChange={(id, patch) => setPsfPath(
+                ['icvRequirements'],
+                psf.icvRequirements.map(r => (r.id === id ? { ...r, ...patch } : r)),
+              )}
+            />
+          </PsfSection>
+
+          {/* ── Assign Team: the three owning roles, one card, side by side ── */}
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <UserCheck size={15} className="text-[var(--color-primary)]" />
+              <h3 className="text-sm font-semibold text-slate-800">Assign Team</h3>
+              <span className="text-[11px] text-slate-400">— all three required</span>
+            </div>
+
+            {tender.psfCompleted ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <CheckCircle size={14} /> Assigned to {assignmentSummary}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {ASSIGNMENT_GROUPS.map(group => {
+                  const options = usersByGroup[group.key] || []
+                  const picked = assignedIds[group.key] || []
                   return (
-                    <label
-                      key={driver.id}
-                      className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
-                        tender.psfCompleted ? 'cursor-default' : 'cursor-pointer'
-                      } ${on
-                        ? 'border-[var(--color-primary)]/40 bg-[var(--color-primary)]/8 text-[var(--color-primary)]'
-                        : 'border-slate-200 bg-white text-slate-500'}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        disabled={tender.psfCompleted}
-                        onChange={() => setPsfField(
-                          'commercialDrivers',
-                          on
-                            ? (psf.commercialDrivers || []).filter(id => id !== driver.id)
-                            : [...(psf.commercialDrivers || []), driver.id],
-                        )}
-                        className="accent-[var(--color-primary)]"
+                    <div key={group.key}>
+                      <label className="text-[11px] font-medium text-slate-600 mb-1 block">
+                        {group.title} <span className="font-secondary text-red-400">*</span>
+                      </label>
+                      <SearchableSelect
+                        multiple
+                        value={picked}
+                        onChange={vals => setGroupIds(group.key, vals)}
+                        options={options}
+                        getValue={u => u.id}
+                        getLabel={u => u.name}
+                        getSubLabel={u => u.username}
+                        placeholder={`Select ${group.noun}…`}
+                        searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
+                        emptyText={group.empty}
+                        ariaLabel={group.title}
                       />
-                      {driver.label}
-                    </label>
+                      {picked.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
+                            <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-2 py-0.5 rounded-full">
+                              {u.name}
+                              <button
+                                onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
+                                className="hover:text-red-500"
+                                title="Remove"
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
+                    </div>
                   )
                 })}
               </div>
-            </div>
+            )}
           </Card>
-
-          <Card className="p-5 space-y-4">
-            {[['background', 'Background'], ['executiveSummary', 'Executive Summary']].map(([key, label]) => (
-              <div key={key}>
-                <label className="text-[11px] font-medium text-slate-600 mb-1 flex items-center gap-1.5">
-                  {label}
-                  <span className="text-[10px] text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-1.5 py-0.5 rounded-full">AI drafted</span>
-                </label>
-                <AiEditableTextarea
-                  value={psf[key] || ''}
-                  onChange={val => setPsfField(key, val)}
-                  disabled={tender.psfCompleted}
-                  rows={5}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white leading-relaxed focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-500"
-                />
-              </div>
-            ))}
-          </Card>
-
-          {/* Who picks this tender up once the PSF is submitted — one group per
-              owning role: Contract Engineer, HSE and ICV. */}
-          {ASSIGNMENT_GROUPS.map(group => {
-            const options = usersByGroup[group.key] || []
-            const picked = assignedIds[group.key] || []
-            const submitted = (tender[group.tenderKey]
-              || (group.key === 'ce' ? [tender.assignedContractEngineer].filter(Boolean) : []))
-            return (
-              <Card key={group.key} className="p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <UserCheck size={15} className="text-[var(--color-primary)]" />
-                  <h3 className="text-sm font-semibold text-slate-800">{group.title}</h3>
-                  <span className="text-[11px] text-slate-400">{group.requirement}</span>
-                </div>
-                {tender.psfCompleted ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                    <CheckCircle size={14} />
-                    Assigned to {submitted.map(c => c.name).join(', ') || '—'}
-                  </div>
-                ) : (
-                  <div className="max-w-sm">
-                    <SearchableSelect
-                      multiple
-                      value={picked}
-                      onChange={vals => setGroupIds(group.key, vals)}
-                      options={options}
-                      getValue={u => u.id}
-                      getLabel={u => u.name}
-                      getSubLabel={u => u.username}
-                      placeholder={`Select ${group.noun}…`}
-                      searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
-                      emptyText={group.empty}
-                      ariaLabel={group.title}
-                    />
-                    {picked.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
-                          <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-2 py-0.5 rounded-full">
-                            {u.name}
-                            <button
-                              onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
-                              className="hover:text-red-500"
-                              title="Remove"
-                            >
-                              <X size={11} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
-                  </div>
-                )}
-              </Card>
-            )
-          })}
 
           <Card className="p-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -687,7 +1059,7 @@ export default function PsfStrategy() {
                 {tender.psfCompleted ? (
                   <Button variant="secondary" onClick={() => navigate('/tenders')}>Back to Tender List</Button>
                 ) : (
-                  <Button disabled={submitting || assignedCeIds.length === 0} onClick={handleSubmit}>
+                  <Button disabled={submitting || !isFullyAssigned} onClick={handleSubmit}>
                     {submitting ? 'Submitting…' : 'Submit'} <ChevronRight size={14} />
                   </Button>
                 )}

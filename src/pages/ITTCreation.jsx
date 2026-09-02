@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import JSZip from 'jszip'
 import {
   Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
-  FileText, AlertCircle, Download,
+  FileText, FileSpreadsheet, AlertCircle, Download, ClipboardCheck,
   UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
   Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil
 } from 'lucide-react'
@@ -25,6 +25,8 @@ import { resolveFlow } from '../components/itt/sectionFlow'
 import { cloneB2Classes, renderB2Text } from '../components/itt/b2Classes'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { tenderRef } from '../utils/tenderRef'
+import { TEMPLATE_DEFS } from './StrategyTemplatesDashboard'
+import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
 
 // Who fills which ITT section. Contract Holder owns the SOW & methodology; HSE
 // owns QHSSE; ICV owns the ICV requirements; the Contract Engineer owns the
@@ -107,10 +109,21 @@ export default function ITTCreation() {
   const { user } = useAuth()
   const approverName = user?.name || 'Contract Engineer'
   const approverRole = user?.role?.label || 'Contract Engineer'
-  const approverInitials = approverName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const steps = [t('itt.step1'), t('itt.step2'), t('itt.step3'), t('itt.step4')]
 
   const existingTender = tenderId ? tenders.find(t => t.id === tenderId) : null
+
+  // The Strategy Templates completed before PSF submission, each with the rows
+  // the Contract Holder actually filled in — shown so the Contract Engineer can
+  // download the originals without leaving ITT creation.
+  const generatedTemplates = useMemo(() => TEMPLATE_DEFS
+    .map(template => ({ template, rows: existingTender?.[template.dataKey] || [] }))
+    .filter(t => t.rows.length > 0), [existingTender])
+
+  // Pre-Qualification is a separate document, not a TEMPLATE_DEFS row template —
+  // shown alongside the generated templates when this tender has prequal data.
+  const qualifiedBidders = (existingTender?.prequalBidders || []).filter(b => !b.droppedAt)
+  const hasPreQual = (existingTender?.prequalBidders?.length || 0) > 0
 
   // Direct access to /create-itt (no tenderId) shouldn't jump straight into a
   // blank form — a draft tender must be picked first. Only tenders that have
@@ -193,7 +206,6 @@ export default function ITTCreation() {
   // Guards the re-default below: it fires once per role + tender, so a section
   // the user picked by hand (including a view-only one) is never clobbered.
   const defaultedForRef = useRef(`${roleId}|${existingTender?.id || ''}`)
-  const [approvalNote, setApprovalNote] = useState('')
   const [ittApproved, setIttApproved] = useState(false)
   const [form, setForm] = useState(initialForm)
   const [showErrors, setShowErrors] = useState(false)
@@ -510,12 +522,6 @@ export default function ITTCreation() {
     b2TimerRef.current = setTimeout(flushB2, 600)
   }
 
-  // Export step -> back to the section board. Shared by the in-page "Back to
-  // Sections" button and the global Back button.
-  const goToSectionsFromExport = () => {
-    setStep(2)
-  }
-
   // Re-entering details means the draft has to be written again on the next
   // generation pass, otherwise edits made here never reach the tender record.
   const goToProjectDetails = () => {
@@ -527,11 +533,7 @@ export default function ITTCreation() {
   // Global Back unwinds this wizard inside-out: section -> major step -> route.
   useBackHandler(() => {
     if (showDraftPicker) return false
-    if (step === 3) {
-      if (ittApproved) return false // export already advanced the tender — terminal
-      goToSectionsFromExport()
-      return true
-    }
+    if (step === 3) return false // export already advanced the tender — terminal
     if (step === 2) {
       if (isCreator) { goToProjectDetails(); return true }
       return false
@@ -632,18 +634,9 @@ export default function ITTCreation() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{dt.id}</span>
+              {/* Cost code and draft state only — no provenance or assignee chips. */}
+              <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{tenderRef(dt)}</span>
               <Badge variant="draft">{dt.stage || 'Draft — Pending Export'}</Badge>
-              {dt.bidderList?.length > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
-                  From Pre-Qualification · {dt.bidderList.length} qualified
-                </span>
-              )}
-              {(dt.assignedContractEngineers || (dt.assignedContractEngineer ? [dt.assignedContractEngineer] : [])).length > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,137,207,0.1)', color: '#0089cf' }}>
-                  Assigned to {(dt.assignedContractEngineers || [dt.assignedContractEngineer]).map(c => c.name).join(', ')}
-                </span>
-              )}
             </div>
             <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1e293b' }}>{dt.title || 'Untitled tender'}</p>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -1130,6 +1123,74 @@ export default function ITTCreation() {
             </Card>
           )}
 
+          {/* Generated Templates — the completed Strategy Templates and, if this
+              tender came from Pre-Qualification, the PQQ summary — from before
+              PSF submission, each downloadable so the Contract Engineer has them
+              without leaving this page. */}
+          {(generatedTemplates.length > 0 || hasPreQual) && (
+            <Card branded accent className="p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                  <FileSpreadsheet size={16} style={{ color: '#0089cf' }} />
+                </div>
+                Generated Templates
+              </h3>
+              <div className="space-y-2">
+                {hasPreQual && (
+                  <div
+                    className="flex items-center gap-3 p-3 rounded-lg"
+                    style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,137,207,0.1)' }}>
+                      <ClipboardCheck size={15} style={{ color: '#0089cf' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>Pre-Qualification Document</p>
+                      <p className="text-xs text-slate-400">
+                        {qualifiedBidders.length} qualified bidder{qualifiedBidders.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => exportPreQualSummaryExcel(existingTender, qualifiedBidders)}
+                      title="Download Pre-Qualification Document as Excel"
+                      aria-label="Download Pre-Qualification Document as Excel"
+                      className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
+                      style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
+                    >
+                      <Download size={12} /> Excel
+                    </button>
+                  </div>
+                )}
+                {generatedTemplates.map(({ template, rows }) => (
+                  <div
+                    key={template.id}
+                    className="flex items-center gap-3 p-3 rounded-lg"
+                    style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${template.color}15` }}>
+                      <template.icon size={15} style={{ color: template.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{template.title}</p>
+                      <p className="text-xs text-slate-400">
+                        {rows.length} {template.rowLabel?.toLowerCase() || 'row'}{rows.length === 1 ? '' : 's'} completed
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => exportTemplateExcel(template, rows, existingTender)}
+                      title={`Download ${template.title} as Excel`}
+                      aria-label={`Download ${template.title} as Excel`}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
+                      style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
+                    >
+                      <Download size={12} /> Excel
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Handoff Documents Section — if pre-qual documents exist */}
           {existingTender?.handoffDocuments && Object.keys(existingTender.handoffDocuments).length > 0 && (
             <Card branded accent className="p-6">
@@ -1436,7 +1497,11 @@ export default function ITTCreation() {
                     {allSectionsComplete ? 'Every owner has approved their required sections — draft and export the ITT to share with bidders.' : `${requiredPending} required section(s) still awaiting owner approval.`}
                   </p>
                 </div>
-                <Button variant="brand" disabled={!allSectionsComplete} onClick={() => setStep(3)}>
+                <Button variant="brand" disabled={!allSectionsComplete} onClick={() => {
+                  if (draftTenderId) advanceTender(draftTenderId)
+                  setIttApproved(true)
+                  setStep(3)
+                }}>
                   <ChevronRight size={14} /> Draft &amp; Export ITT
                 </Button>
               </div>
@@ -1470,127 +1535,9 @@ export default function ITTCreation() {
       )}
 
       {/* ── Step 3: Export ITT ── */}
-      {step === 3 && !ittApproved && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 olng-slide-up">
-          {/* Export status */}
-          <Card branded className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="olng-export-icon">
-                <Download size={20} />
-              </div>
-              <div>
-                <h3 className="font-semibold" style={{ color: '#1e293b' }}>Ready to Export</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{draftTenderId} ready for external review</p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {[
-                { label: 'Prepared By', value: approverName, sub: approverRole, icon: User },
-                { label: 'Prepared On', value: new Date().toISOString().split('T')[0], sub: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' local time', icon: Clock },
-                { label: 'Sections Completed', value: `${effectiveFlow.length} of ${effectiveFlow.length}`, sub: 'All sections filled in', icon: Layers },
-              ].map(item => (
-                <div key={item.label} className="rounded-xl px-4 py-3 flex items-start gap-3" style={{
-                  background: 'linear-gradient(135deg, rgba(236,244,252,0.6), rgba(0,137,207,0.04))',
-                  border: '1px solid rgba(0,137,207,0.08)'
-                }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'rgba(0,137,207,0.08)' }}>
-                    <item.icon size={14} style={{ color: '#0089cf' }} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider mb-0.5 font-semibold" style={{ color: '#94a3b8' }}>{item.label}</p>
-                    <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{item.value}</p>
-                    {item.sub && <p className="text-xs text-slate-400">{item.sub}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-start gap-2.5 olng-info-alert px-3.5 py-3 text-xs">
-              <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: '#0089cf' }} />
-              <span>Export the ITT document for external review, then upload the finalised version to proceed.</span>
-            </div>
-          </Card>
-
-          {/* Export panel */}
-          <Card branded className="p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0" style={{
-                background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))',
-                color: '#0089cf'
-              }}>
-                {approverInitials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{approverName}</p>
-                <p className="text-xs text-slate-400">{approverRole}</p>
-              </div>
-              <Badge variant="info">Exporter</Badge>
-            </div>
-
-            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#0089cf' }}>ITT Summary</p>
-            <div className="mb-4 space-y-0">
-              {[
-                { label: 'Tender ID', value: draftTenderId || '—' },
-                { label: 'Project', value: form.title },
-                { label: 'Budget', value: form.budget },
-                { label: 'Department', value: form.department },
-                { label: 'Sections', value: `${effectiveFlow.length} sections · all completed` },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between py-2 text-xs" style={{ borderBottom: '1px solid rgba(0,137,207,0.08)' }}>
-                  <span className="text-slate-400">{item.label}</span>
-                  <span className="font-semibold" style={{ color: '#1e293b' }}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mb-4">
-              <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>Export Notes (Optional)</label>
-              <AiEditableTextarea
-                value={approvalNote}
-                onChange={setApprovalNote}
-                rows={3}
-                placeholder="Add notes for the external reviewer..."
-                className="w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input"
-              />
-            </div>
-
-            {zipError && (
-              <div className="mb-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-600">
-                <AlertCircle size={13} className="mt-0.5 shrink-0" />
-                {zipError}
-              </div>
-            )}
-
-            <div className="flex gap-2 mb-2">
-              <Button
-                variant="secondary"
-                className="flex-1 justify-center"
-                disabled={downloadingZip}
-                onClick={handleDownloadIttPackage}
-              >
-                {downloadingZip ? <RefreshCw size={15} className="animate-spin" /> : <PackageCheck size={15} />}
-                {downloadingZip ? 'Building Package…' : 'Download ITT Package (.zip)'}
-              </Button>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1 justify-center" onClick={goToSectionsFromExport}>
-                Back to Sections
-              </Button>
-              <Button variant="brand" className="flex-1 justify-center" onClick={() => {
-                if (draftTenderId) advanceTender(draftTenderId)
-                setIttApproved(true)
-              }}>
-                <Download size={15} /> Export ITT
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* ── ITT Exported & Created ── */}
-      {step === 3 && ittApproved && (
+      {/* ── ITT Exported & Created — the tender is advanced and marked exported the
+           moment "Draft & Export ITT" is clicked, so step 3 always lands here. ── */}
+      {step === 3 && (
         <Card branded className="p-12 text-center olng-scale-in">
           <div className="olng-success-ring mx-auto mb-5">
             <CheckCircle size={32} style={{ color: '#0089cf' }} />
