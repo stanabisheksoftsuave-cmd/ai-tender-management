@@ -8,6 +8,7 @@ import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useHomePath } from '../utils/permissions'
 import { exportClosureReportPDF } from '../utils/exportPDF'
+import { tenderRef } from '../utils/tenderRef'
 
 const CHECKLIST = [
   { id: 'deliverables', label: 'Final Deliverables Check' },
@@ -56,7 +57,7 @@ export default function ContractClosure() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{td.id}</span>
+                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
                       <Badge variant="contract_closure">{td.stage}</Badge>
                     </div>
                     <h3 className="text-sm font-semibold text-slate-800 truncate">{td.title}</h3>
@@ -93,7 +94,7 @@ export default function ContractClosure() {
     <div className="space-y-5">
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
           <Badge variant="contract_closure">Closure In Progress</Badge>
         </div>
         <h3 className="font-semibold text-slate-800">{tender.title}</h3>

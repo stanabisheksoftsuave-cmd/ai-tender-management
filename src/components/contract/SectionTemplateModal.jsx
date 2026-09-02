@@ -4,6 +4,7 @@ import ErrorBoundary from '../ErrorBoundary'
 import SectionFillStep from '../itt/SectionFillStep'
 import B2ClassEditor from '../itt/B2ClassEditor'
 import { cloneB2Classes } from '../itt/b2Classes'
+import { tenderRef } from '../../utils/tenderRef'
 
 const FileText = p => (
   <svg width={p.size || 16} height={p.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -44,7 +45,7 @@ export default function SectionTemplateModal({
           <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100 shrink-0">
             <div className="min-w-0">
               <h3 className="font-semibold text-slate-800">{title}</h3>
-              <p className="text-xs text-slate-400 truncate">{section.title} · {tender?.id}</p>
+              <p className="text-xs text-slate-400 truncate">{section.title} · {tenderRef(tender)}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {sections?.length > 1 && onSectionChange && (

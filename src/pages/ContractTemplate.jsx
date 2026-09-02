@@ -11,6 +11,7 @@ import { useHomePath } from '../utils/permissions'
 import { useTenders } from '../context/TenderContext'
 import { useBackHandler } from '../context/NavigationContext'
 import { awardOutcome, openRegretLetter } from '../utils/contractDocs'
+import { tenderRef } from '../utils/tenderRef'
 
 // ── Inline SVG icons ──────────────────────────────────────────────────────────
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
@@ -144,7 +145,7 @@ export default function ContractTemplate() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="award">Contract Drafting</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>

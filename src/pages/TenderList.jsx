@@ -10,6 +10,7 @@ import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useDismissable, useBackHandler } from '../context/NavigationContext'
 import { exportTenderPDF } from '../utils/exportPDF'
+import { tenderRef } from '../utils/tenderRef'
 
 const REASSIGN_OPTIONS = [
   { status: 'upload',      stage: 'Awaiting Ingestion',      label: 'Bid Ingestion' },
@@ -203,7 +204,7 @@ export default function TenderList() {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 className="font-bold text-slate-800 text-base">Reassign Stage</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{reassignModal.id} — {reassignModal.title}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{tenderRef(reassignModal)} — {reassignModal.title}</p>
               </div>
               <button onClick={() => setReassignModal(null)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
@@ -257,7 +258,7 @@ export default function TenderList() {
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="font-bold text-slate-800 text-base">Reassign Evaluator</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{evalModal.id} — {evalModal.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{tenderRef(evalModal)} — {evalModal.title}</p>
                 </div>
                 <button onClick={() => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
@@ -395,7 +396,7 @@ export default function TenderList() {
                     onClick={() => setExpanded(expanded === td.id ? null : td.id)}
                   >
                     <td className="px-4 py-3">
-                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{td.id}</span>
+                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-slate-800">{td.title}</p>

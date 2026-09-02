@@ -119,7 +119,7 @@ export default function Login() {
       onClick={() => showThemes && setShowThemes(false)}>
 
       {/* ── LEFT PANEL ──────────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 relative overflow-hidden"
+      <div className="hidden lg:flex w-1/2 flex-col justify-center p-12 relative overflow-hidden"
         style={{ background: theme === 'olng'
           ? 'linear-gradient(145deg, #1b4c6f 0%, #0d3352 50%, #0089cf 100%)'
           : 'linear-gradient(135deg, #0A0F1E 0%, #0D1530 60%, #0A1628 100%)' }}>
@@ -202,26 +202,6 @@ export default function Login() {
           </p>
         </div>
 
-        {/* ── Stats row ── */}
-        <div className="relative z-10">
-          <div className="flex items-end gap-10 mb-10">
-            {[
-              { value: '142',   label: t('login.statActive') },
-              { value: '2B',    label: t('login.statValue') },
-              { value: '1,280', label: t('login.statVendors') },
-            ].map((s, i) => (
-              <div key={i}>
-                <div className="text-3xl font-extrabold text-white leading-none">{s.value}</div>
-                <div className="text-[9px] font-semibold tracking-widest text-slate-500 mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Footer text */}
-          <p className="text-[10px] text-slate-600 tracking-wider">
-            {t('login.footer')}
-          </p>
-        </div>
       </div>
 
       {/* ── RIGHT PANEL ─────────────────────────────────────────────────────── */}
@@ -510,11 +490,6 @@ export default function Login() {
               </div>
             )}
           </div>
-
-          {/* Footer */}
-          <p className="text-center text-[9px] tracking-widest mt-6" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1' }}>
-            {t('login.footer')}
-          </p>
         </div>
       </div>
     </div>

@@ -24,6 +24,7 @@ import { B1_CATEGORY_MAP } from '../components/itt/b1Categories'
 import { resolveFlow } from '../components/itt/sectionFlow'
 import { cloneB2Classes, renderB2Text } from '../components/itt/b2Classes'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { tenderRef } from '../utils/tenderRef'
 
 // Who fills which ITT section. Contract Holder owns the SOW & methodology; HSE
 // owns QHSSE; ICV owns the ICV requirements; the Contract Engineer owns the
@@ -123,6 +124,9 @@ export default function ITTCreation() {
   // (Contract Holder, HSE, ICV, Contract Engineer) each fill their own sections.
   const isCreator  = roleId === 'contract_holder'
   const isExporter = roleId === 'pof'
+  // Contract Engineer, HSE and ICV review and approve sections here rather
+  // than author an ITT — the page reads as a review desk for them.
+  const isIttReviewer = ['pof', 'hse', 'icv'].includes(roleId)
 
   // The Contract Holder picks any PSF-complete tender to generate its ITT. The
   // section-owner / exporter roles (HSE / ICV / Contract Engineer) only see
@@ -547,6 +551,13 @@ export default function ITTCreation() {
 
   const [downloadingZip, setDownloadingZip] = useState(false)
   const [zipError, setZipError] = useState(null)
+  // The exported ITT has to actually leave the browser before the flow lets go of
+  // it — View in Tender List stays shut until the package is downloaded. Tracked
+  // as the tender it was downloaded for: this page is not remounted between
+  // tenders (see App.jsx's CreateIttRoute), so a plain boolean would stay latched
+  // and let the next tender's export skip the download entirely.
+  const [downloadedForTenderId, setDownloadedForTenderId] = useState(null)
+  const packageDownloaded = !!draftTenderId && downloadedForTenderId === draftTenderId
 
   const handleDownloadIttPackage = async () => {
     setDownloadingZip(true)
@@ -574,6 +585,7 @@ export default function ITTCreation() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+      setDownloadedForTenderId(draftTenderId)
     } catch (err) {
       setZipError(err.message || 'Failed to build the ITT package. Please try again.')
     } finally {
@@ -664,7 +676,7 @@ export default function ITTCreation() {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{existingTender.id}</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{tenderRef(existingTender)}</span>
                 <Badge variant="draft">{existingTender.stage || 'Draft'}</Badge>
               </div>
               <p className="text-sm font-semibold mt-1" style={{ color: '#1e293b' }}>{existingTender.title || 'Untitled tender'}</p>
@@ -693,10 +705,12 @@ export default function ITTCreation() {
         <div className="olng-slide-up">
           <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1e293b' }}>
             <Inbox size={20} style={{ color: '#0089cf' }} />
-            Create ITT
+            {isIttReviewer ? 'ITT Review & Approve' : 'Create ITT'}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.
+            {isIttReviewer
+              ? <>Select a tender to review and approve your <strong>ITT</strong> sections.</>
+              : <>Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.</>}
           </p>
         </div>
 
@@ -705,7 +719,7 @@ export default function ITTCreation() {
             <div className="w-11 h-11 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
               <ShieldAlert size={18} style={{ color: '#0089cf' }} />
             </div>
-            <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>No tenders ready for ITT creation</p>
+            <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>{isIttReviewer ? 'No ITTs waiting on your review' : 'No tenders ready for ITT creation'}</p>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-md mx-auto">
               A tender must complete the <strong>PSF Strategy</strong> (Procurement Submission Form) step before its ITT can be created.
               Finish Strategy Templates and submit the PSF for a tender, then it will appear here.
@@ -848,7 +862,7 @@ export default function ITTCreation() {
                 <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
                   <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                     {f.label}
-                    {f.required && <span style={{ color: '#0089cf' }}>*</span>}
+                    {f.required && <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>}
                   </label>
                   {f.options ? (
                     <select
@@ -932,7 +946,7 @@ export default function ITTCreation() {
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1e293b' }}>
                     Project Description / Key Requirements
-                    <span style={{ color: '#0089cf' }}>*</span>
+                    <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
                   </label>
                   {/* Mode toggle */}
                   <div className="flex gap-0.5 rounded-lg p-0.5" style={{ background: 'rgba(0,137,207,0.06)', border: '1px solid rgba(0,137,207,0.1)' }}>
@@ -1374,7 +1388,14 @@ export default function ITTCreation() {
                       isFirst={currentIndex === 0}
                       isLast={isLastOwn}
                       nextLabel="Review & Approve"
-                      lastLabel={isLastOwn ? 'Approve & Send to Contract Engineer' : undefined}
+                      /* The Contract Engineer is the recipient — it approves its
+                         own sections rather than sending them to itself, and once
+                         they are all approved the button is spent: Draft & Export
+                         below takes over as soon as every other owner is done. */
+                      lastLabel={isLastOwn
+                        ? (isExporter ? 'Review & Approve' : 'Approve & Send to Contract Engineer')
+                        : undefined}
+                      nextDisabled={isExporter && isLastOwn && isSectionComplete(current)}
                       standInNotice={current.isStandIn && (
                         <div className="mb-4 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs olng-info-alert" style={{ borderLeft: '3px solid #e69c00' }}>
                           <AlertCircle size={13} className="mt-0.5 shrink-0" style={{ color: '#e69c00' }} />
@@ -1589,10 +1610,15 @@ export default function ITTCreation() {
               {downloadingZip ? <RefreshCw size={15} className="animate-spin" /> : <PackageCheck size={15} />}
               {downloadingZip ? 'Building Package…' : 'Download ITT Package (.zip)'}
             </Button>
-            <Button variant="brand" onClick={() => navigate('/tenders')}>
+            <Button variant="brand" disabled={!packageDownloaded} onClick={() => navigate('/tenders')}>
               <FileText size={15} /> View in Tender List
             </Button>
           </div>
+          {!packageDownloaded && (
+            <p className="text-[11px] mt-3" style={{ color: '#94a3b8' }}>
+              Download the ITT package to continue.
+            </p>
+          )}
         </Card>
       )}
     </div>

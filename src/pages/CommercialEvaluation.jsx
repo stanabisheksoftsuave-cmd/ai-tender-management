@@ -65,6 +65,7 @@ import { useNavigation, useBackHandler } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
 import { canEvaluate, isUnassignedSide } from '../utils/evalAssignment'
 import { openHtmlDoc, clarificationRequestDoc } from '../utils/docGen'
+import { tenderRef } from '../utils/tenderRef'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
 const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -765,7 +766,7 @@ export default function CommercialEvaluation() {
                 <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="evaluation">Commercial Evaluation</Badge>
               <EvaluationTypeBadge meta={typeMeta} />
               {isParallel && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Parallel</span>}

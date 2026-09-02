@@ -2,6 +2,7 @@ export const tenders = [
   // ── Technical Evaluation ──────────────────────────────────────────────────
   {
     id: 'ITT-2025-001',
+    costCode: 'CC-2025-001',
     title: 'Cloud Infrastructure Upgrade — Government National Data Centre',
     department: 'Information Technology Authority (ITA)',
     budget: 'OMR 923,000',
@@ -17,6 +18,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-007',
+    costCode: 'CC-2025-007',
     title: 'Muscat Smart City IoT Sensors & Connectivity Platform',
     department: 'Muscat Municipality',
     budget: 'OMR 577,000',
@@ -32,6 +34,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-008',
+    costCode: 'CC-2025-008',
     title: 'National Data Centre Modernisation & Virtualisation',
     department: 'Information Technology Authority (ITA)',
     budget: 'OMR 808,000',
@@ -49,6 +52,7 @@ export const tenders = [
   // ── Commercial Evaluation ─────────────────────────────────────────────────
   {
     id: 'ITT-2025-006',
+    costCode: 'CC-2025-006',
     title: 'Muscat Expressway Bridge Rehabilitation — Phase 3',
     department: 'Ministry of Transport, Communications & IT',
     budget: 'OMR 1,539,000',
@@ -64,6 +68,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-009',
+    costCode: 'CC-2025-009',
     title: 'Government Vehicle Fleet Management & Tracking System',
     department: 'Ministry of Transport, Communications & IT',
     budget: 'OMR 462,000',
@@ -79,6 +84,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-010',
+    costCode: 'CC-2025-010',
     title: 'Ministry of Health Integrated Information System',
     department: 'Ministry of Health',
     budget: 'OMR 1,347,000',
@@ -99,6 +105,7 @@ export const tenders = [
   // assigned to the Contract Engineer exactly like any other tender.
   {
     id: 'ITT-2025-021',
+    costCode: 'CC-2025-021',
     title: 'Turnaround & Shutdown Services Call-Off Contract',
     department: 'Maintenance',
     budget: 'OMR 27,820,707',
@@ -122,6 +129,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-022',
+    costCode: 'CC-2025-022',
     title: 'Printing, Branding & Media Services Call-Off Contract',
     department: 'Supply Chain',
     budget: 'OMR 89,104',
@@ -144,6 +152,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-023',
+    costCode: 'CC-2025-023',
     title: 'TM-24-1345 Thermal Spray Cladding Services — Train 3 Shutdown',
     department: 'Operations',
     budget: 'USD 1,059,332',
@@ -175,6 +184,7 @@ export const tenders = [
   // evaluator queues, which filter on the assignment.
   {
     id: 'ITT-2025-013',
+    costCode: 'CC-2025-013',
     title: 'Oman National Railway Signalling & Control System',
     department: 'Oman Rail',
     budget: 'OMR 2,770,000',
@@ -196,6 +206,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-014',
+    costCode: 'CC-2025-014',
     title: 'Al Ghubrah Desalination Plant SCADA Upgrade',
     department: 'Oman Electricity Transmission Company',
     budget: 'OMR 1,731,000',
@@ -216,6 +227,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-015',
+    costCode: 'CC-2025-015',
     title: 'Civil Defence Integrated Emergency Response Platform',
     department: 'Civil Defence & Ambulance Authority',
     budget: 'OMR 693,000',
@@ -244,6 +256,7 @@ export const tenders = [
   // ── Other Stages ───────────────────────────────────────────────────────────
   {
     id: 'ITT-2025-003',
+    costCode: 'CC-2025-003',
     title: 'Government Integrated ERP System Implementation (Oracle Fusion)',
     department: 'Ministry of Finance',
     budget: 'OMR 1,231,000',
@@ -258,6 +271,7 @@ export const tenders = [
   // ── Post-Award Phases ──────────────────────────────────────────────────────
   {
     id: 'ITT-2025-016',
+    costCode: 'CC-2025-016',
     title: 'Salalah Port Container Terminal Automation',
     department: 'Ministry of Transport, Communications & IT',
     budget: 'OMR 1,120,000',
@@ -270,6 +284,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-017',
+    costCode: 'CC-2025-017',
     title: 'Duqm Refinery Fire Safety Systems Upgrade',
     department: 'Oman Electricity Transmission Company',
     budget: 'OMR 640,000',
@@ -282,6 +297,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-018',
+    costCode: 'CC-2025-018',
     title: 'Nizwa Regional Hospital Medical Equipment Supply',
     department: 'Ministry of Health',
     budget: 'OMR 845,000',
@@ -310,6 +326,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-019',
+    costCode: 'CC-2025-019',
     title: 'Sohar Industrial Estate Fibre Backbone Rollout',
     department: 'Information Technology Authority (ITA)',
     budget: 'OMR 398,000',
@@ -328,6 +345,7 @@ export const tenders = [
   // straight from the sidebar, not only via a dashboard/Tender Tracking link.
   {
     id: 'ITT-2025-011',
+    costCode: 'CC-2025-011',
     title: 'Sur Port Cargo Terminal — Crane & Handling Equipment',
     tenderType: 'Goods',
     department: 'Ministry of Transport, Communications & IT',
@@ -351,6 +369,7 @@ export const tenders = [
   },
   {
     id: 'ITT-2025-020',
+    costCode: 'CC-2025-020',
     title: 'Buraimi Border Crossing Security Systems Upgrade',
     tenderType: 'Works',
     department: 'Royal Oman Police',

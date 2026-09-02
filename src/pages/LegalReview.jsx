@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
+import { tenderRef } from '../utils/tenderRef'
 
 // ── Legal review criteria ────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ export default function LegalReview() {
                 <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="legal_review">Legal Review</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
@@ -192,7 +193,7 @@ export default function LegalReview() {
                   </div>
                   <div className="flex items-center gap-4 mt-0.5">
                     <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Hash size={10} /> LR-{tender.id}-{String(idx + 1).padStart(2, '0')}
+                      <Hash size={10} /> LR-{tenderRef(tender)}-{String(idx + 1).padStart(2, '0')}
                     </span>
                     <span className="text-[11px] text-emerald-600">{okCount} compliant</span>
                     {partCount > 0 && <span className="text-[11px] text-amber-600">{partCount} partial</span>}

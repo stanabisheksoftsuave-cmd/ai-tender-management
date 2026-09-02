@@ -13,6 +13,7 @@ import { openHtmlDoc, scoreRationaleDoc, failReasonDoc, scoreNarrative, scoreEvi
 import { exportBidderFailReasonsPDF } from '../utils/exportPDF'
 import { useHomePath } from '../utils/permissions'
 import { canEvaluate, isUnassignedSide } from '../utils/evalAssignment'
+import { tenderRef } from '../utils/tenderRef'
 
 const Svg = ({ size=16, sw=1.6, style, className='', children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -597,7 +598,7 @@ export default function TechnicalEvaluation() {
             <ArrowLeft size={12} /> Back
           </button>
           <span className="text-slate-300">/</span>
-          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
         </div>
 
         <Card className="p-8 text-center space-y-6">
@@ -1242,7 +1243,7 @@ export default function TechnicalEvaluation() {
                 <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="evaluation">Technical Evaluation</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
@@ -2079,7 +2080,7 @@ export default function TechnicalEvaluation() {
     <div style="background:linear-gradient(135deg,#1b4c6f,#0089cf);color:white;padding:40px 48px">
       <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Technical Evaluation Report</div>
       <div style="font-size:22px;font-weight:700;margin-bottom:4px">${tender.title}</div>
-      <div style="font-size:13px;opacity:.8">${tender.id} · ${tender.department} · Generated ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+      <div style="font-size:13px;opacity:.8">${tenderRef(tender)} · ${tender.department} · Generated ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
       <div style="display:flex;gap:24px;margin-top:20px;flex-wrap:wrap">
         <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Total Bidders</div><div style="font-size:16px;font-weight:700">${displayBidders.length}</div></div>
         <div><div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Eligible</div><div style="font-size:16px;font-weight:700">${eligibleBidders.length}</div></div>

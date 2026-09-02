@@ -7,12 +7,16 @@
  * and imports AuthContext for its hooks. Parking the shared data here keeps that
  * pair from forming an import cycle.
  *
- * A level is one of 'NONE' | 'READ' | 'ACTION' | 'CRUD'. For *routing* the only
+ * A level is one of 'NONE' | 'READ' | 'CRUD'. For *routing* the only
  * distinction that matters is NONE vs. everything else; the finer levels are kept
  * so a page can still ask "may this role act, or only look?".
  */
 
-export const LEVELS = ['NONE', 'READ', 'ACTION', 'CRUD']
+// 'ACTION' (Read + Action) was retired — Access Control now grants Read Only or
+// Full Access. It is absent here on purpose: sanitiseRow() drops levels it does
+// not understand, so a matrix stored while ACTION existed falls back to the
+// module's default rather than showing a level nothing can set any more.
+export const LEVELS = ['NONE', 'READ', 'CRUD']
 
 export const MODULES = [
   { key: 'user_management',   label: 'User Management'       },
@@ -84,7 +88,7 @@ export const DEFAULT_MATRIX = {
   pof:             { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'CRUD', ingestion:'CRUD', tech_eval:'NONE', comm_eval:'CRUD', scm_review:'NONE',   contract_creation:'CRUD' },
   contract_holder: { user_management:'NONE', task_assignment:'CRUD', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'CRUD', comm_eval:'NONE', scm_review:'NONE',   contract_creation:'NONE' },
   // Supply Chain acts on all three approval gates but authors nothing.
-  scm:             { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'ACTION', contract_creation:'NONE' },
+  scm:             { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'NONE', tender_export:'NONE', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'CRUD', contract_creation:'NONE' },
   hse:             { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE',   contract_creation:'NONE' },
   icv:             { user_management:'NONE', task_assignment:'NONE', audit_log:'NONE', itt_creation:'CRUD', tender_export:'READ', ingestion:'NONE', tech_eval:'NONE', comm_eval:'NONE', scm_review:'NONE',   contract_creation:'NONE' },
 }
@@ -96,13 +100,18 @@ export const MATRIX_STORAGE_KEY = 'atm_matrix'
 export const MATRIX_VERSION_KEY = 'atm_matrix_v'
 // Bump when DEFAULT_MATRIX changes in a way that a stored blob must not override.
 // v2 = the matrix became the real route gate.
-export const MATRIX_VERSION = '2'
+// v3 = 'ACTION' retired; built-in rows holding it are re-seeded from the defaults.
+export const MATRIX_VERSION = '3'
 
-// Keep only module keys we still ship, and only levels we understand.
+// Keep only module keys we still ship, and only levels we understand. A cell
+// stored as the retired 'ACTION' is carried across as CRUD rather than dropped:
+// dropping it would fall through to the all-NONE base for a custom role and
+// silently revoke access an admin had deliberately granted.
+const migrateLevel = (lv) => (lv === 'ACTION' ? 'CRUD' : lv)
 const sanitiseRow = (row) => Object.fromEntries(
   MODULE_KEYS
-    .filter(k => LEVELS.includes(row?.[k]))
-    .map(k => [k, row[k]])
+    .filter(k => LEVELS.includes(migrateLevel(row?.[k])))
+    .map(k => [k, migrateLevel(row[k])])
 )
 
 /*

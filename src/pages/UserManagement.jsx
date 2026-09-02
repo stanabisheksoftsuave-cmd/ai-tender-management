@@ -6,6 +6,7 @@ import { MODULES, MODULE_ROUTES, emptyModuleLevels, levelOf } from '../utils/per
 import { useTenders } from '../context/TenderContext'
 import { useTheme } from '../context/ThemeContext'
 import { useDismissable, useBackHandler } from '../context/NavigationContext'
+import { tenderRef } from '../utils/tenderRef'
 
 // ── SVG primitive ────────────────────────────────────────────────────────────
 const Svg = ({ size = 16, sw = 1.6, style, className = '', children }) => (
@@ -99,9 +100,8 @@ const DEFAULT_ROLES = [
 // and the sidebar gate on them too — see the Access Control tab below.
 
 const LEVEL_OPTIONS = [
-  { val: 'READ',   label: 'Read Only',     activeColor: '#64748B' },
-  { val: 'ACTION', label: 'Read + Action', activeColor: 'var(--color-primary)' },
-  { val: 'CRUD',   label: 'Full Access',   activeColor: '#059669' },
+  { val: 'READ',   label: 'Read Only',   activeColor: '#64748B' },
+  { val: 'CRUD',   label: 'Full Access', activeColor: '#059669' },
 ]
 
 const TABS = [
@@ -157,16 +157,16 @@ export default function UserManagement() {
   // What this page shows is decided by the role's Access Control level for the
   // user_management module — never by its role id, or an admin's grant would open
   // the route and then show nothing. NONE never gets here (the router blocks it),
-  // READ is Dropdowns only (the Business Admin's deliberate view), ACTION adds the
-  // Users and Access Control tabs read-only, CRUD makes them editable.
+  // READ is Dropdowns only (the Business Admin's deliberate view), CRUD adds the
+  // Users and Access Control tabs, editable.
   const roleId       = currentUser?.role?.id
   const umLevel      = levelOf(matrix, roleId, 'user_management')
-  const canAdminSee  = umLevel === 'ACTION' || umLevel === 'CRUD'
+  const canAdminSee  = umLevel === 'CRUD'
   const canAdminEdit = umLevel === 'CRUD'
   // "Reassign Tasks" is its own capability flag (task_assignment owns no route),
   // and it writes to tenders — so it needs both that flag and write access here.
   const taskLevel    = levelOf(matrix, roleId, 'task_assignment')
-  const canReassign  = canAdminEdit && (taskLevel === 'ACTION' || taskLevel === 'CRUD')
+  const canReassign  = canAdminEdit && taskLevel === 'CRUD'
 
   const visibleTabs = TABS.filter(t => canAdminSee || t.id === 'dropdowns')
   const defaultTab  = visibleTabs[0]?.id || 'dropdowns'
@@ -385,10 +385,9 @@ export default function UserManagement() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = [
-    { label: 'Total Users',    value: users.length,                                    sub: `${users.filter(u => u.status==='active').length} active`,  Icon: IcoUsers },
-    { label: 'Roles Defined',  value: roles.length,                                    sub: `${new Set(users.map(u=>u.roleId)).size} in use`,            Icon: IcoShield },
-    { label: 'Active Now',     value: users.filter(u => u.status === 'active').length,  sub: 'Logged in today',                                           Icon: IcoCheckCircle },
-    { label: 'Pending Invite', value: 0,                                                sub: 'Awaiting signup',                                           Icon: IcoMail },
+    { label: 'Total Users',   value: users.length,                                   Icon: IcoUsers },
+    { label: 'Active Users',  value: users.filter(u => u.status === 'active').length, Icon: IcoCheckCircle },
+    { label: 'Roles Defined', value: roles.length,                                   Icon: IcoShield },
   ]
 
   return (
@@ -415,7 +414,7 @@ export default function UserManagement() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((s, i) => (
           <div key={i} className="rounded-2xl p-5 flex items-start gap-3"
             style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow }}>
@@ -425,8 +424,7 @@ export default function UserManagement() {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: sub }}>{s.label}</p>
-              <p className="text-2xl font-extrabold leading-none mb-0.5" style={{ color: text }}>{s.value}</p>
-              <p className="text-[11px]" style={{ color: sub }}>{s.sub}</p>
+              <p className="text-2xl font-extrabold leading-none" style={{ color: text }}>{s.value}</p>
             </div>
           </div>
         ))}
@@ -595,7 +593,6 @@ export default function UserManagement() {
             <span className="text-xs font-semibold" style={{ color: sub }}>Permission levels:</span>
             {[
               { label: 'Read Only',     bg: 'rgba(100,116,139,0.1)', color: '#64748B' },
-              { label: 'Read + Action', bg: 'var(--color-primary)12', color: 'var(--color-primary)' },
               { label: 'Full Access',   bg: 'rgba(5,150,105,0.1)',   color: '#059669' },
             ].map(l => (
               <span key={l.label} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
@@ -973,7 +970,7 @@ export default function UserManagement() {
                   <div key={t.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
                     style={{ background: surfBg, border: `1px solid ${border}` }}>
                     <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
-                      style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>{t.id}</span>
+                      style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>{tenderRef(t)}</span>
                     <span className="text-xs truncate" style={{ color: text }}>{t.title}</span>
                   </div>
                 ))}
@@ -1196,7 +1193,7 @@ function MFoot({ onCancel, onConfirm, label, disabled, danger, border, muted }) 
 function MLabel({ text, required, color }) {
   return (
     <p className="text-xs font-semibold" style={{ color }}>
-      {text}{required && <span style={{ color: '#EF4444' }}> *</span>}
+      {text}{required && <span className="font-secondary" style={{ color: '#EF4444' }}> *</span>}
     </p>
   )
 }

@@ -9,6 +9,7 @@ import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { useBackHandler, useDismissable } from '../context/NavigationContext'
+import { tenderRef } from '../utils/tenderRef'
 
 
 const stageColor = {
@@ -760,7 +761,7 @@ export default function BidderUpload() {
                   {/* Tender header */}
                   <div className={`px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${uploaded ? 'bg-emerald-50' : 'bg-orange-50'}`}>
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono text-slate-400 bg-white/70 px-2 py-0.5 rounded shrink-0">{tender.id}</span>
+                      <span className="text-xs font-mono text-slate-400 bg-white/70 px-2 py-0.5 rounded shrink-0">{tenderRef(tender)}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isTech ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
                         {reportLabel} Eval Report
                       </span>
@@ -852,7 +853,7 @@ export default function BidderUpload() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor[tender.status] || 'bg-slate-100 text-slate-600'}`}>{stageLabel[tender.status] || tender.stage}</span>
                     {tender.status === 'upload' && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-600 text-white animate-pulse">Ready for Upload</span>}
                   </div>
@@ -889,7 +890,7 @@ export default function BidderUpload() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+                        <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
                         <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">{tender.stage}</span>
                       </div>
                       <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
@@ -944,7 +945,7 @@ export default function BidderUpload() {
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+                          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
                           <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
                             {tender.stage}
                           </span>
@@ -979,7 +980,7 @@ export default function BidderUpload() {
           <Lock size={36} />
           <p className="text-sm font-semibold text-slate-700">Document upload not available</p>
           <p className="text-xs text-center max-w-xs">
-            <span className="font-mono text-slate-500">{selectedTender.id}</span> is currently in the <strong>{selectedTender.stage}</strong> stage.
+            <span className="font-mono text-slate-500">{tenderRef(selectedTender)}</span> is currently in the <strong>{selectedTender.stage}</strong> stage.
             Only tenders in <strong>Awaiting Ingestion</strong> can receive document uploads.
           </p>
         </div>
@@ -995,14 +996,14 @@ export default function BidderUpload() {
           <ArrowLeft size={14} /> {tenderId ? t('common.backToList') : t('common.backToList2')}
         </button>
         <span className="text-slate-200">|</span>
-        <span className="text-xs text-slate-400">{selectedTender.id}</span>
+        <span className="text-xs text-slate-400">{tenderRef(selectedTender)}</span>
       </div>
 
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{selectedTender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(selectedTender)}</span>
               <Badge variant="upload">Ingestion</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{selectedTender.title}</h3>
@@ -1109,7 +1110,7 @@ export default function BidderUpload() {
 
                   {/* Contact person + phone */}
                   <div className="flex items-center gap-3 mb-1">
-                    <p className="text-xs text-slate-500">{b.contact} · {t('ing.contact')}</p>
+                    <p className="text-xs text-slate-500">{t('ing.contact')} · {b.contact}</p>
                     {b.phone && (
                       <span className="flex items-center gap-1 text-xs text-slate-400">
                         <Phone size={10} /> {b.phone}
@@ -1139,7 +1140,7 @@ export default function BidderUpload() {
                             <div className="flex items-center gap-1.5 mb-1">
                               <span className={`w-5 h-5 rounded flex items-center justify-center ${bg}`}><Icon size={11} className={color} /></span>
                               <span className="text-[11px] font-semibold text-slate-600">{label}</span>
-                              <span className="text-red-400 text-[11px]">*</span>
+                              <span className="font-secondary text-red-400 text-[11px]">*</span>
                             </div>
                             {doc ? (
                               <div className="flex items-center justify-between gap-1">
@@ -1231,7 +1232,7 @@ export default function BidderUpload() {
             </div>
             <div className="px-5 py-4 space-y-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">{t('ing.companyName')} <span className="text-red-400">*</span></label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">{t('ing.companyName')} <span className="font-secondary text-red-400">*</span></label>
                 <input
                   value={bidderForm.company}
                   onChange={e => { setBidderForm(f => ({ ...f, company: e.target.value })); setBidderErrors(er => ({ ...er, company: '' })) }}
@@ -1250,7 +1251,7 @@ export default function BidderUpload() {
                 {bidderErrors.company && <p className="text-[10px] text-red-500 mt-0.5">{bidderErrors.company}</p>}
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">{t('ing.contactPerson')} <span className="text-red-400">*</span></label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">{t('ing.contactPerson')} <span className="font-secondary text-red-400">*</span></label>
                 <input
                   value={bidderForm.contact}
                   onChange={e => { setBidderForm(f => ({ ...f, contact: e.target.value })); setBidderErrors(er => ({ ...er, contact: '' })) }}
@@ -1314,7 +1315,7 @@ export default function BidderUpload() {
               {/* Technical Evaluator — Contract Holder */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Technical Evaluator <span className="text-slate-400 font-medium">(Contract Holder)</span> <span className="text-red-400">*</span>
+                  Technical Evaluator <span className="text-slate-400 font-medium">(Contract Holder)</span> <span className="font-secondary text-red-400">*</span>
                 </label>
                 <SearchableSelect
                   value={assignments.techEval}
@@ -1336,7 +1337,7 @@ export default function BidderUpload() {
               {/* Commercial Evaluator — Contract Engineer */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Commercial Evaluator <span className="text-slate-400 font-medium">(Contract Engineer)</span> <span className="text-red-400">*</span>
+                  Commercial Evaluator <span className="text-slate-400 font-medium">(Contract Engineer)</span> <span className="font-secondary text-red-400">*</span>
                 </label>
                 <SearchableSelect
                   value={assignments.commEval}

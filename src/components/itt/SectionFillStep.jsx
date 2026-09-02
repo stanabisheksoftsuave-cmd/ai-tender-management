@@ -17,7 +17,7 @@ const POPUP_H = 300
 // bodyMaxHeight caps the scrolling document area. The wizard gives it most of
 // the viewport; a caller that nests this inside its own chrome (the contract
 // page's review popup) passes something smaller so the whole card still fits.
-export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange, bodyMaxHeight = '62vh' }) {
+export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, nextDisabled = false, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange, bodyMaxHeight = '62vh' }) {
   const [load, setLoad] = useState({ docxUrl: null, model: null, error: null })
   const [values, setValues] = useState([])
   const debounceRef = useRef(null)
@@ -506,7 +506,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
                   Skip (optional) <ChevronRight size={14} />
                 </Button>
               )}
-              <Button variant="brand" onClick={handleNext} disabled={loading} className="flex items-center gap-2">
+              <Button variant="brand" onClick={handleNext} disabled={loading || nextDisabled} className="flex items-center gap-2">
                 {isLast
                   ? (lastLabel ? <>{lastLabel} <CheckCircle2 size={15} /></> : <>Proceed to Export <Download size={15} /></>)
                   : (nextLabel ? <>{nextLabel} <CheckCircle2 size={15} /></> : <>Save & Continue <ChevronRight size={15} /></>)}

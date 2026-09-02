@@ -24,6 +24,7 @@ import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import { technicalCriteria } from '../data/mockData'
+import { tenderRef } from '../utils/tenderRef'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // The three approval gates owned by Supply Chain.
@@ -188,37 +189,37 @@ const getActionItems = (roleId, tenders) => {
   if (roleId === 'tech_eval') {
     const mine = tenders.filter(t => t.status === 'tech_eval')
     return [
-      ...mine.filter(t => t.evalProgress === 'in_progress').map(t => ({ label: `Complete Technical Evaluation — ${t.id}: ${t.title}`, urgent: true })),
-      ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Start Evaluation — ${t.id}: ${t.title}`, urgent: false })),
+      ...mine.filter(t => t.evalProgress === 'in_progress').map(t => ({ label: `Complete Technical Evaluation — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+      ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Start Evaluation — ${tenderRef(t)}: ${t.title}`, urgent: false })),
     ]
   }
   if (roleId === 'comm_eval') {
     const mine = tenders.filter(t => t.status === 'comm_eval')
     return [
-      ...mine.filter(t => t.evalProgress === 'in_progress').map(t => ({ label: `Complete Commercial Evaluation — ${t.id}: ${t.title}`, urgent: true })),
-      ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Start Evaluation — ${t.id}: ${t.title}`, urgent: false })),
+      ...mine.filter(t => t.evalProgress === 'in_progress').map(t => ({ label: `Complete Commercial Evaluation — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+      ...mine.filter(t => t.evalProgress === 'not_started').map(t => ({ label: `Start Evaluation — ${tenderRef(t)}: ${t.title}`, urgent: false })),
     ]
   }
   if (roleId === 'scm') {
     const gateLabel = { scm_gate1: 'Approve Technical Evaluation', scm_gate2: 'Take Award Decision', scm_gate3: 'Approve Contract Draft' }
     return tenders
       .filter(t => SCM_GATE_STATUSES.includes(t.status))
-      .map(t => ({ label: `${gateLabel[t.status]} — ${t.id}: ${t.title}`, urgent: t.status === 'scm_gate3' }))
+      .map(t => ({ label: `${gateLabel[t.status]} — ${tenderRef(t)}: ${t.title}`, urgent: t.status === 'scm_gate3' }))
   }
   if (roleId === 'pof') return [
-    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Complete Financial Assessment — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'draft').map(t  => ({ label: `Export ITT for External Review — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'upload').map(t => ({ label: `Upload Bidder Proposals — ${t.id}: ${t.title}`, urgent: false })),
-    ...tenders.filter(t => t.status === 'award').map(t  => ({ label: `Create Contract — ${t.id}: ${t.title}`, urgent: false })),
-    ...tenders.filter(t => t.status === 'legal_review').map(t  => ({ label: `Awaiting Legal Review — ${t.id}: ${t.title}`, urgent: false })),
-    ...tenders.filter(t => t.status === 'contract_execution').map(t  => ({ label: `Sign Contract — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'active').map(t  => ({ label: `Manage Active Contract — ${t.id}: ${t.title}`, urgent: false })),
-    ...tenders.filter(t => t.status === 'contract_closure').map(t  => ({ label: `Close Contract — ${t.id}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Complete Financial Assessment — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'draft').map(t  => ({ label: `Export ITT for External Review — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'upload').map(t => ({ label: `Upload Bidder Proposals — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'award').map(t  => ({ label: `Create Contract — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'legal_review').map(t  => ({ label: `Awaiting Legal Review — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'contract_execution').map(t  => ({ label: `Sign Contract — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'active').map(t  => ({ label: `Manage Active Contract — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'contract_closure').map(t  => ({ label: `Close Contract — ${tenderRef(t)}: ${t.title}`, urgent: false })),
   ]
   if (roleId === 'contract_holder') return [
-    ...tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3'].includes(t.status)).map(t => ({ label: `Continue Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'prequal_final_review').map(t => ({ label: `Review & Submit Pre-Qualification — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Awaiting Contract Engineer's Financial Assessment — ${t.id}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => ['prequal_stage1','prequal_stage2','prequal_stage3'].includes(t.status)).map(t => ({ label: `Continue Pre-Qualification — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'prequal_final_review').map(t => ({ label: `Review & Submit Pre-Qualification — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'prequal_stage4').map(t => ({ label: `Awaiting Contract Engineer's Financial Assessment — ${tenderRef(t)}: ${t.title}`, urgent: false })),
   ]
   if (roleId === 'it_admin') return [
     { label: 'Review new user registrations', urgent: false },
@@ -230,9 +231,9 @@ const getActionItems = (roleId, tenders) => {
       (t.status === 'comm_eval' && !t.assignedCommEval)
     )
     return [
-      ...unassigned.map(t => ({ label: `Assign evaluator — ${t.id}: ${t.title}`, urgent: true })),
-      ...tenders.filter(t => t.status === 'draft').map(t => ({ label: `ITT pending export — ${t.id}: ${t.title}`, urgent: false })),
-      ...tenders.filter(t => t.status === 'award').map(t => ({ label: `Award recommended — ${t.id}: ${t.title}`, urgent: false })),
+      ...unassigned.map(t => ({ label: `Assign evaluator — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+      ...tenders.filter(t => t.status === 'draft').map(t => ({ label: `ITT pending export — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+      ...tenders.filter(t => t.status === 'award').map(t => ({ label: `Award recommended — ${tenderRef(t)}: ${t.title}`, urgent: false })),
     ]
   }
   // Fallback — system-level alerts
@@ -241,9 +242,9 @@ const getActionItems = (roleId, tenders) => {
     (t.status === 'comm_eval' && !t.assignedCommEval)
   )
   return [
-    ...unassigned.map(t => ({ label: `Assign evaluator — ${t.id}: ${t.title}`, urgent: true })),
-    ...tenders.filter(t => t.status === 'draft').map(t => ({ label: `ITT pending export — ${t.id}: ${t.title}`, urgent: false })),
-    ...tenders.filter(t => t.status === 'award').map(t => ({ label: `Award recommended — ${t.id}: ${t.title}`, urgent: false })),
+    ...unassigned.map(t => ({ label: `Assign evaluator — ${tenderRef(t)}: ${t.title}`, urgent: true })),
+    ...tenders.filter(t => t.status === 'draft').map(t => ({ label: `ITT pending export — ${tenderRef(t)}: ${t.title}`, urgent: false })),
+    ...tenders.filter(t => t.status === 'award').map(t => ({ label: `Award recommended — ${tenderRef(t)}: ${t.title}`, urgent: false })),
   ]
 }
 
@@ -459,7 +460,9 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* ── Ask AI + Quick Actions (side by side) ── */}
+      {/* ── Ask AI + Quick Actions (side by side) — not for the IT Admin, which
+             administers the platform rather than working tenders on it. ── */}
+      {!isItAdmin && (
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* Ask AI — 3 cols */}
@@ -539,6 +542,7 @@ export default function Dashboard() {
         </div>
 
       </div>
+      )}
 
       {/* ── Admin: Workflow Pipeline Overview ── */}
       {isAdmin && (
@@ -700,7 +704,7 @@ export default function Dashboard() {
                         style={{ color: 'var(--color-primary)' }}
                         onClick={() => navigate('/tenders')}
                       >
-                        {tender.id}
+                        {tenderRef(tender)}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 overflow-hidden">

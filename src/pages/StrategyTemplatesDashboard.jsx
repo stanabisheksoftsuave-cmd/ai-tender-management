@@ -14,6 +14,7 @@ import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
+import { tenderRef } from '../utils/tenderRef'
 
 /* ─── Form field definitions for each template ─── */
 
@@ -136,7 +137,7 @@ export const TEMPLATE_DEFS = [
     title: 'Company Estimate',
     description: 'Estimate project costs, quantities, unit rates, and contingencies.',
     icon: DollarSign,
-    color: '#10b981',
+    color: '#0089cf',
     fields: COMPANY_ESTIMATE_FIELDS,
     dataKey: 'companyEstimate',
     rowLabel: 'Line Item',
@@ -148,7 +149,7 @@ export const TEMPLATE_DEFS = [
     title: 'Contract Risk Assessment',
     description: 'Identify, evaluate and plan mitigations for contract risks.',
     icon: ShieldAlert,
-    color: '#ef4444',
+    color: '#0089cf',
     fields: CONTRACT_RISK_FIELDS,
     dataKey: 'contractRiskAssessment',
     rowLabel: 'Risk',
@@ -160,7 +161,7 @@ export const TEMPLATE_DEFS = [
     title: 'ICV',
     description: 'Plan In-Country Value: local sourcing, Omanisation and in-Oman investment.',
     icon: BarChart2,
-    color: '#3b82f6',
+    color: '#0089cf',
     fields: ICV_FIELDS,
     dataKey: 'icvPlan',
     rowLabel: 'ICV Commitment',
@@ -171,7 +172,7 @@ export const TEMPLATE_DEFS = [
     title: 'Technical Evaluation Matrix',
     description: 'Define weighted Must/Want criteria and scoring bands for technical evaluation.',
     icon: ClipboardList,
-    color: '#0891b2',
+    color: '#0089cf',
     fields: TECHNICAL_EVAL_MATRIX_FIELDS,
     dataKey: 'technicalEvalMatrix',
     rowLabel: 'Criterion',
@@ -183,7 +184,7 @@ export const TEMPLATE_DEFS = [
     title: 'HSE Risk Assessment',
     description: 'Identify hazards and assess HSE risks with control measures.',
     icon: CheckSquare,
-    color: '#f59e0b',
+    color: '#0089cf',
     fields: HSE_RISK_FIELDS,
     dataKey: 'hseRiskAssessment',
     rowLabel: 'Hazard',
@@ -195,7 +196,7 @@ export const TEMPLATE_DEFS = [
     title: 'Negotiation Strategy',
     description: 'Plan aspirations, targets, and walk-away points for negotiations.',
     icon: Users,
-    color: '#8b5cf6',
+    color: '#0089cf',
     fields: NEGOTIATION_STRATEGY_FIELDS,
     dataKey: 'negotiationStrategy',
     rowLabel: 'Negotiation Theme',
@@ -458,7 +459,7 @@ function buildTemplatePayload(template, rows, tender) {
   )
   return {
     title: template.title,
-    tenderRef: tender?.id || '',
+    tenderRef: tenderRef(tender),
     tenderTitle: tender?.title || '',
     rowLabel: template.rowLabel || 'Item',
     headers,
@@ -629,7 +630,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
               <div key={field.id} className={field.span === 2 ? 'col-span-2' : ''}>
                 <label className="text-[11px] font-semibold mb-1.5 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {field.label}
-                  {field.required && <span style={{ color: template.color }}>*</span>}
+                  {field.required && <span className="font-secondary" style={{ color: template.color }}>*</span>}
                 </label>
 
                 {field.type === 'computed' ? (
@@ -687,7 +688,7 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
   )
 }
 
-function SowPreviewer({ sowDocument, onSave }) {
+function SowPreviewer({ sowDocument, reference, onSave }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedSow, setEditedSow] = useState(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -741,8 +742,8 @@ function SowPreviewer({ sowDocument, onSave }) {
             <FileText size={18} style={{ color: '#0089cf' }} />
           </div>
           <div>
-            <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>Statement of Work — {doc.title}</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Reference: {doc.reference} · Generated {doc.date}</p>
+            <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>{doc.title}</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Reference: {reference || doc.reference} · Generated {doc.generatedDate}</p>
           </div>
         </div>
         
@@ -981,7 +982,7 @@ export default function StrategyTemplatesDashboard() {
             </div>
             <div>
               <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>Select Required Templates</h3>
-              <p className="text-[11px] text-slate-400">{existingTender.id} — confirm which strategies to include</p>
+              <p className="text-[11px] text-slate-400">{tenderRef(existingTender)} — confirm which strategies to include</p>
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-2 mb-5">
@@ -1046,7 +1047,7 @@ export default function StrategyTemplatesDashboard() {
             <Layout size={16} style={{ color: '#0089cf' }} />
           </div>
           <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
-            {existingTender ? `Strategies — ${existingTender.id}` : 'Strategies'}
+            {existingTender ? `Strategies — ${existingTender.costCode || existingTender.id}` : 'Strategies'}
           </h3>
         </div>
         <p className="text-xs text-slate-500 mt-1">
@@ -1058,6 +1059,7 @@ export default function StrategyTemplatesDashboard() {
       {!activeForm && existingTender?.sowDocument && (
         <SowPreviewer 
           sowDocument={existingTender.sowDocument} 
+          reference={existingTender.costCode || existingTender.id}
           onSave={(newSow) => updateTender(existingTender.id, { sowDocument: newSow })} 
         />
       )}

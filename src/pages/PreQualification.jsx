@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Users, Bot, Send, ShieldOff, FileText, ArrowLeft, CheckCircle,
+  Users, Bot, ShieldOff, FileText, ArrowLeft, CheckCircle,
   XCircle, Download, Award, ChevronRight, UploadCloud, Ban, Wallet, RotateCcw,
   UserPlus, Plus, Save, Search, UserCheck, X,
 } from 'lucide-react'
@@ -20,6 +20,7 @@ import { useNavigation, useBackHandler, useDismissable } from '../context/Naviga
 import { useHomePath } from '../utils/permissions'
 import { buildFilledDocxBlob } from '../utils/docxTemplate'
 import { exportPreQualSummaryPDF, exportBidderFailReasonsPDF } from '../utils/exportPDF'
+import { tenderRef } from '../utils/tenderRef'
 
 const PREQUAL_STATUSES = ['prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4', 'prequal_final_review', 'prequal_rejected']
 
@@ -43,6 +44,33 @@ const STAGE_OWNER = {
   prequal_stage4:       'pof',
   prequal_final_review: 'contract_holder',
   prequal_rejected:     'contract_holder',
+}
+
+// Stage 1 no longer asks the Contract Holder to pick a Work Category — the SOW
+// analysis settles it. These keywords stand in for the real classifier: the
+// tender's own scope is read for the terms that separate one registry category
+// from another, with the title weighted over the supporting fields. Nothing
+// recognisable falls back to the first category.
+const CATEGORY_KEYWORDS = {
+  'Mechanical & Piping Works':    ['mechanical', 'piping', 'pipeline', 'valve', 'turbine', 'rotating', 'compressor', 'shutdown', 'turnaround', 'cladding', 'welding', 'pump', 'spare part'],
+  'Fire & Safety Systems':        ['fire', 'extinguish', 'ppe', 'protective equipment', 'safety equipment', 'alarm', 'emergency response'],
+  'Marine & Civil Works':         ['marine', 'jetty', 'quay', 'dredg', 'civil works', 'bridge', 'road', 'expressway', 'construction', 'building'],
+  'Electrical & Instrumentation': ['electrical', 'instrument', 'substation', 'switchgear', 'cabling', 'scada', 'signalling', 'metering', 'power distribution'],
+  'IT & Communications':          ['ict', 'digital', 'software', 'cloud', 'data centre', 'data center', 'cyber', 'telecom', 'communication', 'iot', 'information system', 'information technology', 'network', 'platform', 'automation', 'erp'],
+}
+
+function detectWorkCategory(tender) {
+  const title = (tender?.title || '').toLowerCase()
+  const rest = [tender?.tenderType, tender?.department, tender?.description]
+    .filter(Boolean).join(' ').toLowerCase()
+  let best = null
+  let bestScore = 0
+  for (const category of WORK_CATEGORIES) {
+    const score = (CATEGORY_KEYWORDS[category] || []).reduce(
+      (n, k) => n + (title.includes(k) ? 2 : 0) + (rest.includes(k) ? 1 : 0), 0)
+    if (score > bestScore) { best = category; bestScore = score }
+  }
+  return best || WORK_CATEGORIES[0]
 }
 
 const PQQ_SECTION = {
@@ -173,7 +201,6 @@ export default function PreQualification() {
   // Stage 2 local state
   const [pqqAnswers, setPqqAnswers] = useState(null)
   const [generating, setGenerating] = useState(false)
-  const [generated, setGenerated] = useState(false)
 
   // Stage 3 local state
   const [processingId, setProcessingId] = useState(null)
@@ -195,10 +222,10 @@ export default function PreQualification() {
     const bidders = (tender?.prequalBidders || []).filter(b => !b.droppedAt)
     return new Set(bidders.filter(b => stage3Overall(b) === 'pass' && stage4Overall(b) === 'pass').map(b => b.id))
   })
-  const toggleInclude = id =>
+  const setInclude = (id, include) =>
     setIncludedIds(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
+      if (include) next.add(id); else next.delete(id)
       return next
     })
 
@@ -206,9 +233,6 @@ export default function PreQualification() {
   // bidder matching instead of leaving for the strategy templates. Returns false
   // once there is no earlier stage, letting route-level back take over.
   const goToPrevStage = () => {
-    // `generated` is stage 2's own sub-view and is not reset when the tender
-    // advances, so only honour it while stage 2 is actually on screen.
-    if (generated && tender?.status === 'prequal_stage2') { setGenerated(false); return true }
     const i = PREQUAL_STAGE_FLOW.findIndex(s => s.status === tender?.status)
     if (i <= 0) return false
     const prev = PREQUAL_STAGE_FLOW[i - 1]
@@ -229,13 +253,19 @@ export default function PreQualification() {
   useEffect(() => {
     if (matching) {
       const t = setTimeout(() => {
+        const category = detectWorkCategory(tender)
         setMatching(false)
+        setWorkCategory(category)
         setMatched(true)
-        setSelectedIds(erpBidders.filter(b => b.category === workCategory).map(b => b.id))
+        setSelectedIds(erpBidders.filter(b => b.category === category).map(b => b.id))
       }, 1100)
       return () => clearTimeout(t)
     }
-  }, [matching, workCategory])
+    // `matching` alone gates this — `tender` is read fresh inside the timeout,
+    // and depending on it would restart the timer (and wipe the user's ticks)
+    // every time anything in TenderContext writes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matching])
 
   const roleId = user?.role?.id
   // The Contract Engineer is here only for the financial assessment he owns.
@@ -280,7 +310,7 @@ export default function PreQualification() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{td.id}</span>
+                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
                       <Badge variant={td.status}>{td.stage}</Badge>
                     </div>
                     <h3 className="text-sm font-semibold text-slate-800 truncate">{td.title}</h3>
@@ -414,14 +444,12 @@ export default function PreQualification() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      setGenerated(true)
+      // The questionnaire is downloaded and distributed in one step — no
+      // interstitial confirmation card, straight on to Response Review.
+      updateTender(tender.id, { status: 'prequal_stage3', stage: 'Pre-Qualification — Response Review' })
     } finally {
       setGenerating(false)
     }
-  }
-
-  const distributeQuestionnaire = () => {
-    updateTender(tender.id, { status: 'prequal_stage3', stage: 'Pre-Qualification — Response Review' })
   }
 
   const handleResponseFileChosen = (bidderId, file) => {
@@ -699,7 +727,7 @@ export default function PreQualification() {
                 <ArrowLeft size={12} /> Strategies
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant={tender.status}>{tender.stage}</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
@@ -714,9 +742,9 @@ export default function PreQualification() {
           <Card className="p-5 space-y-4">
             <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Stage 1 — Bidder Matching</h4>
             <p className="text-xs text-slate-500">
-              Upload the tender's Statement of Work and select a Work Category. Optionally attach the ERP and
-              JSRS bidder lists for the record. The system will match the ERP &amp; JSRS bidder registry against
-              this tender's scope before pre-qualification is issued.
+              Upload the tender's Statement of Work. Optionally attach the ERP and JSRS bidder lists for the
+              record. The system reads the Work Category off the SOW and matches the ERP &amp; JSRS bidder
+              registry against this tender's scope before pre-qualification is issued.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
@@ -742,16 +770,6 @@ export default function PreQualification() {
                   <span className="text-slate-600 truncate">{jsrsListFileName || 'Choose file to upload...'}</span>
                   <input type="file" className="hidden" onChange={e => setJsrsListFileName(e.target.files?.[0]?.name || '')} />
                 </label>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 mb-1 block">Work Category</label>
-                <select
-                  value={workCategory}
-                  onChange={e => { setWorkCategory(e.target.value); setMatched(false) }}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 bg-white"
-                >
-                  {WORK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
               </div>
             </div>
             {!matched && (
@@ -815,8 +833,6 @@ export default function PreQualification() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-slate-800">{b.name}</span>
                             <span className="text-xs text-slate-400">{b.country}</span>
-                            <span title={`ERP registration ${b.regNo}`} className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">ERP</span>
-                            {b.jsrsNo && <span title={`JSRS registration ${b.jsrsNo}`} className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">JSRS</span>}
                             {isMatch && <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Category Match</span>}
                           </div>
                           <p className="text-[11px] text-slate-400 mt-0.5">{b.category} · {b.natureOfBusiness}</p>
@@ -857,32 +873,19 @@ export default function PreQualification() {
             </div>
           </Card>
 
-          {!generated ? (
-            <SectionFillStep
-              section={PQQ_SECTION}
-              answers={pqqAnswers}
-              onAnswersChange={(_, values) => setPqqAnswers(values)}
-              onNext={handleGeneratePqq}
-              onBack={() => { if (!goToPrevStage()) goBack() }}
-              isLast
-              standInNotice={generating && (
-                <div className="mb-3 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                  <Bot size={12} /> Preparing questionnaire export…
-                </div>
-              )}
-            />
-          ) : (
-            <Card className="p-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                  <CheckCircle size={14} /> Questionnaire generated and downloaded — ready to distribute.
-                </div>
-                <Button onClick={distributeQuestionnaire}>
-                  <Send size={13} /> Distribute to Bidders
-                </Button>
+          <SectionFillStep
+            section={PQQ_SECTION}
+            answers={pqqAnswers}
+            onAnswersChange={(_, values) => setPqqAnswers(values)}
+            onNext={handleGeneratePqq}
+            onBack={() => { if (!goToPrevStage()) goBack() }}
+            isLast
+            standInNotice={generating && (
+              <div className="mb-3 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <Bot size={12} /> Preparing questionnaire export…
               </div>
-            </Card>
-          )}
+            )}
+          />
         </>
       )}
 
@@ -1267,10 +1270,22 @@ export default function PreQualification() {
                               {overall === 'fail' && <Badge variant="error"><XCircle size={10} /> Fail</Badge>}
                             </div>
                             {isCE && overall === 'fail' && (
-                              <button onClick={() => handleRequestFinancialReupload(bidder.id)}
-                                className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors mt-1 font-semibold w-full">
-                                Reupload Bidders Documents
-                              </button>
+                              <>
+                                <button onClick={() => handleRequestFinancialReupload(bidder.id)}
+                                  className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors mt-1 font-semibold w-full">
+                                  Reupload Bidders Documents
+                                </button>
+                                <button
+                                  onClick={() => exportBidderFailReasonsPDF(tender, bidder, null, {
+                                    reasons: bidder.stage4Reasons,
+                                    heading: 'FINANCIAL ASSESSMENT FAILURE REASONING',
+                                    suffix: 'Financial-FailReasoning',
+                                  })}
+                                  className="flex items-center justify-center gap-1 text-[10px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 hover:bg-slate-50 transition-colors mt-1 mb-1 font-semibold w-full"
+                                >
+                                  <Download size={10} /> Export Reason
+                                </button>
+                              </>
                             )}
                             <span className="text-[10px] text-slate-400 font-normal">{bidder.country} · {bidder.category}</span>
                           </div>
@@ -1331,6 +1346,9 @@ export default function PreQualification() {
             </Card>
           )}
 
+          {/* Stage 4 belongs to the Contract Engineer — the Contract Holder is only
+              looking in, and gets the summary and its export at final review. */}
+          {isCE && (
           <Card className={`p-4 transition-opacity ${!allStage4Assessed ? 'opacity-60' : ''}`}>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
@@ -1342,20 +1360,14 @@ export default function PreQualification() {
                 </p>
               </div>
               <div className="flex gap-2">
-                {allStage4Assessed && (
-                  <Button variant="secondary" onClick={() => exportPreQualSummaryPDF(tender, financialPassers)}>
-                    <Download size={13} /> Export Pre-Qual Summary
-                  </Button>
-                )}
-                {isCE && (
-                  <Button disabled={!allStage4Assessed || finalizing} onClick={sendBackToHolder}>
-                    {finalizing ? 'Processing…' : 'Return to Contract Holder'}
-                    {!finalizing && <ChevronRight size={14} />}
-                  </Button>
-                )}
+                <Button disabled={!allStage4Assessed || finalizing} onClick={sendBackToHolder}>
+                  {finalizing ? 'Processing…' : 'Return to Contract Holder'}
+                  {!finalizing && <ChevronRight size={14} />}
+                </Button>
               </div>
             </div>
           </Card>
+          )}
         </>
       )}
 
@@ -1407,13 +1419,29 @@ export default function PreQualification() {
                           : <Badge variant="error"><XCircle size={10} /> Fail</Badge>}
                       </td>
                       <td className="p-3 text-center">
-                        <button
-                          onClick={() => !isCE && toggleInclude(bidder.id)}
-                          disabled={isCE}
-                          className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all disabled:opacity-60 ${included ? 'border-emerald-300 text-emerald-700 bg-emerald-50 ring-1 ring-emerald-300' : 'border-slate-200 text-slate-500 bg-white hover:border-emerald-300'}`}
+                        <div
+                          role="group"
+                          aria-label={`Decision for ${bidder.name}`}
+                          className={`inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 ${isCE ? 'opacity-60' : ''}`}
                         >
-                          {included ? 'Selected' : 'Rejected'}
-                        </button>
+                          {[
+                            { value: true,  label: 'Selected', on: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300', hover: 'hover:text-emerald-700' },
+                            { value: false, label: 'Rejected', on: 'bg-red-50 text-red-700 ring-1 ring-red-300',             hover: 'hover:text-red-700'     },
+                          ].map(opt => (
+                            <button
+                              key={opt.label}
+                              type="button"
+                              aria-pressed={included === opt.value}
+                              disabled={isCE}
+                              onClick={() => setInclude(bidder.id, opt.value)}
+                              className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all disabled:cursor-not-allowed ${
+                                included === opt.value ? opt.on : `text-slate-400 ${isCE ? '' : opt.hover}`
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   )

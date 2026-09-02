@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useBackHandler, useDismissable } from '../context/NavigationContext'
 import { applyAiInstruction } from '../utils/aiTextEdit'
+import { tenderRef } from '../utils/tenderRef'
 
 // Dropdown options are now read from TenderContext (admin-configurable)
 
@@ -37,7 +38,7 @@ function generateSowContent(form, tenderId) {
 
   return {
     title: `Statement of Work — ${form.title}`,
-    reference: tenderId || 'TBD',
+    reference: form.costCode || tenderId || 'TBD',
     generatedDate: today,
     sections: [
       {
@@ -255,7 +256,7 @@ export default function ContractStrategy() {
   const closeAiEditor = useCallback(() => {
     setAiEdit(null)
     setAiPrompt('')
-  }, [])
+  }, [setAiEdit, setAiPrompt])
 
   useEffect(() => {
     if (!aiEdit) return
@@ -694,7 +695,7 @@ export default function ContractStrategy() {
                 <Target size={16} style={{ color: '#0089cf' }} />
               </div>
               <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
-                {existingTender ? `Contract Strategy — ${existingTender.id}` : 'New Contract Strategy'}
+                {existingTender ? `Contract Strategy — ${tenderRef(existingTender)}` : 'New Contract Strategy'}
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -717,7 +718,7 @@ export default function ContractStrategy() {
               <div className="col-span-2">
                 <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {t('itt.fieldTitle')}
-                  <span style={{ color: '#0089cf' }}>*</span>
+                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
                 </label>
                 <input
                   value={form.title}
@@ -771,7 +772,7 @@ export default function ContractStrategy() {
                 <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <DollarSign size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldBudget')}
-                  <span style={{ color: '#0089cf' }}>*</span>
+                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -815,7 +816,7 @@ export default function ContractStrategy() {
                 <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   <Calendar size={12} style={{ color: '#0089cf' }} />
                   {t('itt.fieldDeadline')}
-                  <span style={{ color: '#0089cf' }}>*</span>
+                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
                 </label>
                 <input
                   type="date"
@@ -857,7 +858,7 @@ export default function ContractStrategy() {
               <div className="col-span-2">
                 <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
                   {t('strategy.fieldScopeOverview')}
-                  <span style={{ color: '#0089cf' }}>*</span>
+                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
                 </label>
                 <textarea
                   rows={4}

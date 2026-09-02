@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBackHandler } from '../context/NavigationContext'
 import { useHomePath } from '../utils/permissions'
 import { awardOutcome, openRegretLetter, letterDateStr } from '../utils/contractDocs'
+import { tenderRef } from '../utils/tenderRef'
 
 export default function ContractManagement() {
   const { tenderId } = useParams()
@@ -66,7 +67,7 @@ export default function ContractManagement() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{td.id}</span>
+                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
                       <Badge variant="active">{td.stage}</Badge>
                     </div>
                     <h3 className="text-sm font-semibold text-slate-800 truncate">{td.title}</h3>
@@ -132,7 +133,7 @@ export default function ContractManagement() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="active">Contract Active</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>

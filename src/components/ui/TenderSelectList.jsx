@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Building2, Calendar, Users, FileText, RefreshCw, UserPlus } from 'lucide-react'
 import Card from './Card'
 import Badge from './Badge'
+import { tenderRef } from '../../utils/tenderRef'
 
 const statusVariant = {
   tech_eval:   'tech_eval',
@@ -64,7 +65,7 @@ export default function TenderSelectList({ tenders, status, basePath, title, des
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
-                      {tender.id}
+                      {tenderRef(tender)}
                     </span>
                     <Badge variant={statusVariant[tender.status] || 'info'}>{tender.stage}</Badge>
                     {tender.evalProgress === 'in_progress' && (

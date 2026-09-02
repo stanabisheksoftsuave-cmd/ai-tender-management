@@ -8,6 +8,7 @@ import { useDismissable } from '../../context/NavigationContext'
 import { useAccess, staticRouteAllows } from '../../utils/permissions'
 import { MODULES } from '../../utils/permissionMatrix'
 import Badge from '../ui/Badge'
+import { tenderRef } from '../../utils/tenderRef'
 
 // ── Custom SVG icons from assets/icons ────────────────────────────────────────
 const Icon = ({ src, size = 16, color }) => (
@@ -72,10 +73,10 @@ const navByRole = {
     { to: '/tenders',   icon: '/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
   ],
   pof: [
-    { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
     { to: '/pre-qualification',  icon: '/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
-    { to: '/commercial-eval',    icon: '/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
+    { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
     { to: '/upload',             icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
+    { to: '/commercial-eval',    icon: '/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
     { to: '/contract',           icon: '/icons/contract.svg',    labelKey: 'nav.contract'    },
     { to: '/contract-management',icon: '/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
     { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
@@ -139,7 +140,7 @@ const TENDERS_ITEM = { to: '/tenders', icon: '/icons/tenders.svg', labelKey: 'na
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
-  const { lang, setLang, t } = useLanguage()
+  const { lang, t } = useLanguage()
   const { theme } = useTheme()
   const { tenders } = useTenders()
   const location = useLocation()
@@ -450,24 +451,6 @@ export default function Sidebar() {
       <div className="px-3 pb-4">
         <div className="h-px mb-3" style={{ background: divider }} />
 
-        {/* Language toggle */}
-        <div className="flex items-center gap-1 mb-2 p-0.5 rounded-lg"
-          style={{ background: 'rgba(255,255,255,0.06)' }}>
-          {['en', 'ar'].map(l => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              className="flex-1 text-[10px] py-1.5 rounded-md font-medium transition-all"
-              style={lang === l
-                ? { background: accent, color: '#fff', fontFamily: l === 'ar' ? "'Cairo', sans-serif" : undefined }
-                : { color: 'rgba(255,255,255,0.40)', fontFamily: l === 'ar' ? "'Cairo', sans-serif" : undefined }
-              }
-            >
-              {l === 'en' ? 'EN' : 'عربي'}
-            </button>
-          ))}
-        </div>
-
         {/* Sign Out */}
         <button
           onClick={logout}
@@ -551,7 +534,7 @@ export default function Sidebar() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-bold tracking-wide" style={{ color: accent }}>
-                      {tender.id}
+                      {tenderRef(tender)}
                     </span>
                     <Badge variant={tender.status}>{tender.status.replace(/_/g, ' ')}</Badge>
                   </div>

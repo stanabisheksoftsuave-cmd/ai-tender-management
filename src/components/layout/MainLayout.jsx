@@ -2,6 +2,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import { useLocation } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAuth } from '../../context/AuthContext'
 
 const pageMeta = {
   '/dashboard':      { titleKey: 'page.dashboard',  subKey: 'page.dashboard.sub' },
@@ -26,13 +27,22 @@ const pageMeta = {
   '/users':          { titleKey: 'page.users',       subKey: 'page.users.sub' },
 }
 
+// The roles that review and approve ITT sections rather than author the ITT —
+// they reach /create-itt through the same route, but the page is a review desk
+// for them, so its title says so (see ITTCreation's own header).
+const ITT_REVIEWER_ROLES = ['pof', 'hse', 'icv']
+
 export default function MainLayout({ children }) {
   const { pathname } = useLocation()
   const { lang, t } = useLanguage()
+  const { user } = useAuth()
   const isRtl = lang === 'ar'
 
   const basePath = '/' + pathname.split('/')[1]
-  const meta = pageMeta[basePath] || { titleKey: 'page.dashboard', subKey: '' }
+  let meta = pageMeta[basePath] || { titleKey: 'page.dashboard', subKey: '' }
+  if (basePath === '/create-itt' && ITT_REVIEWER_ROLES.includes(user?.role?.id)) {
+    meta = { titleKey: 'page.ittReviewApprove', subKey: 'page.ittReviewApprove.sub' }
+  }
 
   return (
     <div className="app-root flex min-h-screen">

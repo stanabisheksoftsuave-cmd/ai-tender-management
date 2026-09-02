@@ -4,6 +4,7 @@ import { useTheme, themes } from '../../context/ThemeContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 
 const roleColors = {
   it_admin:    '#7C3AED',
@@ -20,8 +21,11 @@ export default function Header({ title, subtitle }) {
   const { theme, setTheme, isDark } = useTheme()
   const { lang, t } = useLanguage()
   const { user } = useAuth()
+  const { pathname } = useLocation()
   const [showTheme, setShowTheme] = useState(false)
   const isRtl = lang === 'ar'
+  // The dashboard is where Back would land anyway — no control for it there.
+  const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/')
 
   const isOlng = theme === 'olng'
 
@@ -61,7 +65,7 @@ export default function Header({ title, subtitle }) {
 
       {/* Back + page title */}
       <div className="flex items-center gap-3 min-w-0">
-        <BackButton />
+        {!isDashboard && <BackButton />}
         <div className="min-w-0">
           <h1 className="font-bold text-[15px] leading-tight tracking-tight truncate" style={{ color: title_ }}>{title}</h1>
           {subtitle && <p className="text-[11px] mt-0.5 truncate" style={{ color: sub_ }}>{subtitle}</p>}
@@ -125,10 +129,6 @@ export default function Header({ title, subtitle }) {
                     onMouseOver={e => { if (theme !== th.id) e.currentTarget.style.background = itemHover }}
                     onMouseOut={e => { if (theme !== th.id) e.currentTarget.style.background = 'transparent' }}
                   >
-                    <div className="flex gap-1 shrink-0">
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.primary }} />
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ background: th.accent  }} />
-                    </div>
                     <span className="flex-1">{th.label}</span>
                     {theme === th.id && (
                       <span className="w-4 h-4 rounded-full flex items-center justify-center"

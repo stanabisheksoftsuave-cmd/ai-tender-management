@@ -12,6 +12,7 @@ import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
 import { returnRecipient } from '../utils/evalAssignment'
 import { awardOutcome, openRegretLetter } from '../utils/contractDocs'
+import { tenderRef } from '../utils/tenderRef'
 
 // ── Inline SVG icons (matching the rest of the app) ──────────────────────────
 const Svg = ({ size = 16, sw = 1.6, style, className = '', children }) => (
@@ -158,7 +159,7 @@ export default function ScmGateReview({ gate }) {
                 <ArrowLeft size={12} /> Back
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tender.id}</span>
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
               <Badge variant="scm_gate">{SCM_GATES[gate].short}</Badge>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
