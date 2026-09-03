@@ -64,7 +64,7 @@ const DOTS = [
 export default function Login() {
   const { login, setFirstPassword } = useAuth()
   const { theme, setTheme, isDark } = useTheme()
-  const { lang, setLang, t } = useLanguage()
+  const { lang, t } = useLanguage()
   const navigate = useNavigate()
   const [username, setUsername]           = useState('')
   const [password, setPassword]           = useState('')
@@ -221,7 +221,6 @@ export default function Login() {
                 border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#CBD5E1'}`,
                 color: isDark ? 'rgba(255,255,255,0.7)' : '#475569',
               }}>
-              <span className="w-3 h-3 rounded-full shrink-0" style={{ background: themes.find(t => t.id === theme)?.primary }} />
               {themes.find(t => t.id === theme)?.label.split(' ')[0]}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                 style={{ transform: showThemes ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
@@ -246,7 +245,6 @@ export default function Login() {
                         : 'transparent',
                       color: isDark ? (theme === th.id ? '#fff' : 'rgba(255,255,255,0.6)') : (theme === th.id ? '#0F172A' : '#64748B'),
                     }}>
-                    <span className="w-3.5 h-3.5 rounded-full shrink-0 ring-1 ring-black/10" style={{ background: th.primary }} />
                     <span className="flex-1 font-medium truncate">{th.label}</span>
                     {theme === th.id && (
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -257,23 +255,6 @@ export default function Login() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Language toggle */}
-          <div className="flex items-center gap-1 rounded-lg p-0.5"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#CBD5E1'}`,
-            }}>
-            {['en', 'ar'].map(l => (
-              <button key={l} onClick={() => setLang(l)}
-                className="text-[10px] px-2.5 py-1 rounded-md transition-all font-semibold"
-                style={lang === l
-                  ? { background: theme === 'olng' ? '#0089cf' : '#2563EB', color: '#fff' }
-                  : { color: isDark ? 'rgba(255,255,255,0.4)' : '#64748B' }}>
-                {l === 'en' ? 'EN' : 'عربي'}
-              </button>
-            ))}
           </div>
         </div>
 

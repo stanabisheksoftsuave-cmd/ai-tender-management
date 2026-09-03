@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
-  FileText, Clock, AlertTriangle, ArrowRight,
+  FileText, Clock, ArrowRight,
   Activity, ClipboardCheck, BarChart3, Briefcase, UserCog,
-  Download, Send, Search,
-  Eye, MoreVertical, Upload, Users, ScrollText, Shield,
+  Download,
+  Eye, MoreVertical, Users, Shield,
   ChevronRight
 } from 'lucide-react'
 
@@ -248,25 +248,6 @@ const getActionItems = (roleId, tenders) => {
   ]
 }
 
-const getAISystemStatus = (tenders) => {
-  const byStatus = (s) => tenders.filter(t => t.status === s).length
-  const cap = (n, max) => Math.min(Math.round((n / max) * 100), 100)
-  return [
-    { label: 'ITT Generator',     status: byStatus('draft')  > 0 ? 'online' : 'standby', load: cap(byStatus('draft'),  3) },
-    { label: 'Extraction Engine', status: byStatus('upload') > 0 ? 'online' : 'standby', load: cap(byStatus('upload'), 3) },
-    { label: 'Evaluation AI',     status: (byStatus('tech_eval') + byStatus('comm_eval')) > 0 ? 'online' : 'standby', load: cap(byStatus('tech_eval') + byStatus('comm_eval'), 8) },
-    { label: 'Contract Drafter',  status: byStatus('award')  > 0 ? 'online' : 'standby', load: cap(byStatus('award'),  3) },
-  ]
-}
-
-// ── AI chips ─────────────────────────────────────────────────────────────────
-const AI_CHIPS = [
-  { icon: FileText, label: 'Most recent tender' },
-  { icon: FileText, label: 'Write cover letter' },
-  { icon: Search,   label: 'Explain document' },
-  { icon: BulbIcon, label: 'Get suggestions' },
-]
-
 // ── Workflow pipeline stages for admin overview ───────────────────────────────
 const PIPELINE_STAGES = [
   { key: 'draft',       label: 'ITT Draft',          color: '#64748B' },
@@ -276,56 +257,6 @@ const PIPELINE_STAGES = [
   { key: 'scm_gate2',   label: 'SCM Award Review',    color: '#7C3AED' },
   { key: 'award',       label: 'Award',               color: '#10B981' },
 ]
-
-// ── Quick actions per role ────────────────────────────────────────────────────
-const QUICK_ACTIONS_BY_ROLE = {
-  it_admin: [
-    { icon: Users,      label: 'User Management', color: '#2563EB', bg: '#EEF2FF', action: '/users'     },
-    { icon: ScrollText, label: 'Audit Log',        color: '#0891B2', bg: '#E0F7FA', action: '/audit-log' },
-    { icon: Shield,     label: 'RBAC & Roles',     color: '#059669', bg: '#ECFDF5', action: '/users'     },
-  ],
-  biz_admin: [
-    { icon: FileText,       label: 'All Tenders',  color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'   },
-    { icon: ClipboardCheck, label: 'Evaluations',  color: '#2563EB', bg: '#EEF2FF', action: '/tenders'   },
-    { icon: Activity,       label: 'Pipeline',     color: '#10B981', bg: '#ECFDF5', action: '/tenders'   },
-    { icon: BulbIcon,       label: 'AI Insights',  color: '#D97706', bg: '#FFFBEB', action: null         },
-  ],
-  pof: [
-    { icon: BulbIcon,  label: 'ITT Draft',             color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
-    { icon: Users,     label: 'PQQ Financial',         color: '#0891B2', bg: '#E0F7FA', action: '/pre-qualification' },
-    { icon: BarChart3, label: 'Commercial Assessment', color: '#6366F1', bg: '#EEF2FF', action: '/commercial-eval' },
-    { icon: Upload,    label: 'Upload Bids',           color: '#0891B2', bg: '#E0F7FA', action: '/upload'     },
-    { icon: Briefcase, label: 'Draft Contract',        color: '#059669', bg: '#ECFDF5', action: '/contract'   },
-    { icon: FileText,  label: 'View Tenders',          color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
-  ],
-  contract_holder: [
-    { icon: BulbIcon,       label: 'New Tender',           color: '#0891B2', bg: '#E0F7FA', action: '/contract-strategy' },
-    { icon: BulbIcon,       label: 'Create ITT',           color: '#2563EB', bg: '#EEF2FF', action: '/create-itt' },
-    { icon: ClipboardCheck, label: 'Technical Evaluation', color: '#2563EB', bg: '#EEF2FF', action: '/technical-eval' },
-    { icon: FileText,       label: 'View Tenders',         color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'    },
-  ],
-  legal_review: [
-    { icon: FileText,  label: 'Legal Review', color: '#B45309', bg: '#FFFBEB', action: '/legal-review' },
-    { icon: FileText,  label: 'View Tenders', color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'      },
-  ],
-  tech_eval: [
-    { icon: FileText,       label: 'View Tenders',     color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'        },
-    { icon: BulbIcon,       label: 'AI Score Assist',  color: '#D97706', bg: '#FFFBEB', action: null              },
-    { icon: BulbIcon,       label: 'Ask AI',            color: '#0891B2', bg: '#E0F7FA', action: null              },
-  ],
-  comm_eval: [
-    { icon: FileText,  label: 'View Tenders',     color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'         },
-    { icon: BulbIcon,  label: 'AI Score Assist',  color: '#D97706', bg: '#FFFBEB', action: null               },
-    { icon: BulbIcon,  label: 'Ask AI',            color: '#0891B2', bg: '#E0F7FA', action: null               },
-  ],
-  scm: [
-    { icon: UserCog,  label: 'Award Review',      color: '#2563EB', bg: '#EEF2FF', action: '/scm-review' },
-    { icon: FileText, label: 'View Tenders',      color: '#7C3AED', bg: '#F5F3FF', action: '/tenders'     },
-    { icon: BulbIcon, label: 'AI Insights',       color: '#D97706', bg: '#FFFBEB', action: null           },
-    { icon: BulbIcon, label: 'Ask AI',             color: '#0891B2', bg: '#E0F7FA', action: null           },
-  ],
-}
-QUICK_ACTIONS_BY_ROLE.default = QUICK_ACTIONS_BY_ROLE.biz_admin
 
 // ── Accent bg helper ──────────────────────────────────────────────────────────
 const accentBg = (c) => ({
@@ -338,9 +269,8 @@ export default function Dashboard() {
   const navigate   = useNavigate()
   const { user, users } = useAuth()
   const { tenders }= useTenders()
-  const { lang, t }= useLanguage()
+  const { lang }= useLanguage()
   const { isDark } = useTheme()
-  const [aiQuery, setAiQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(null)
 
   const roleId          = user?.role?.id
@@ -350,8 +280,6 @@ export default function Dashboard() {
   const visibleTenders  = getVisibleTenders(roleId, tenders)
   const statCards       = getStatCards(roleId, tenders)
   const actionItems     = getActionItems(roleId, tenders)
-  const aiStatus        = getAISystemStatus(tenders)
-  const quickActions    = QUICK_ACTIONS_BY_ROLE[roleId] || QUICK_ACTIONS_BY_ROLE.default
   const urgentCount     = actionItems.filter(a => a.urgent).length
 
   // Admin — pipeline counts per stage. cif_draft tenders aren't in the
@@ -372,10 +300,6 @@ export default function Dashboard() {
   const cardShadow = isDark
     ? '0 1px 3px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.15)'
     : '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)'
-
-  const ai = isDark
-    ? { bg: '#111827', border: 'rgba(255,255,255,0.08)', inputBg: 'rgba(255,255,255,0.05)', inputBorder: 'rgba(255,255,255,0.1)', inputColor: '#F1F5F9', chipBg: 'rgba(255,255,255,0.06)', chipBorder: 'rgba(255,255,255,0.08)', chipColor: '#CBD5E1' }
-    : { bg: '#FFFFFF',  border: '#E2E8F0',                inputBg: '#F8FAFC',                inputBorder: '#E2E8F0',               inputColor: '#0F172A', chipBg: '#F8FAFC',                chipBorder: '#E2E8F0',               chipColor: '#475569' }
 
   return (
     <div className="space-y-6">
@@ -459,90 +383,6 @@ export default function Dashboard() {
           )
         })}
       </div>
-
-      {/* ── Ask AI + Quick Actions (side by side) — not for the IT Admin, which
-             administers the platform rather than working tenders on it. ── */}
-      {!isItAdmin && (
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-
-        {/* Ask AI — 3 cols */}
-        <div className="lg:col-span-3 rounded-2xl p-5"
-          style={{ background: ai.bg, border: `1px solid ${ai.border}`, boxShadow: cardShadow }}>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
-              <img src="/icons/bulb.svg" alt="" width={14} height={14}
-                style={{ filter: 'brightness(0) invert(1)' }} />
-            </div>
-            <h3 className="font-bold text-sm" style={{ color: c.text }}>Ask AI Tender</h3>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: isDark ? 'rgba(37,99,235,0.2)' : '#EEF2FF', color: '#2563EB' }}>
-              POWERED BY AI
-            </span>
-          </div>
-
-          <div className="relative mb-3">
-            <img src="/icons/bulb.svg" alt=""
-              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              width={14} height={14}
-              style={{ filter: isDark ? 'brightness(0) invert(0.5)' : 'brightness(0) invert(0.6)' }} />
-            <input
-              value={aiQuery}
-              onChange={e => setAiQuery(e.target.value)}
-              placeholder="Ask me anything about tenders, documents, or bid preparation..."
-              className="w-full pl-9 pr-10 py-3 text-sm rounded-xl outline-none"
-              style={{
-                background: ai.inputBg,
-                border: `1px solid ${ai.inputBorder}`,
-                color: ai.inputColor,
-              }}
-            />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center"
-              style={{ background: aiQuery ? '#2563EB' : 'transparent' }}>
-              <Send size={12} style={{ color: aiQuery ? '#fff' : '#94A3B8' }} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {AI_CHIPS.map((chip, i) => {
-              const ChipIcon = chip.icon
-              return (
-                <button key={i}
-                  onClick={() => setAiQuery(chip.label)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  style={{ background: ai.chipBg, border: `1px solid ${ai.chipBorder}`, color: ai.chipColor }}>
-                  <ChipIcon size={11} style={{ color: '#2563EB' }} />
-                  {chip.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Quick Actions — 2 cols */}
-        <div className="lg:col-span-2">
-          <h3 className="text-sm font-bold mb-3" style={{ color: c.text }}>Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {quickActions.map((qa, i) => {
-              const Icon = qa.icon
-              return (
-                <button key={i}
-                  onClick={() => qa.action && navigate(qa.action)}
-                  className="flex flex-col items-start gap-2.5 px-4 py-3.5 rounded-xl text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-                  style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: isDark ? `${qa.color}20` : qa.bg }}>
-                    <Icon size={15} style={{ color: qa.color }} />
-                  </div>
-                  <span className="text-xs font-semibold leading-tight" style={{ color: c.text }}>{qa.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-      </div>
-      )}
 
       {/* ── Admin: Workflow Pipeline Overview ── */}
       {isAdmin && (
@@ -645,12 +485,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Main content row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── Main content ── */}
+      <div className="space-y-6">
 
         {/* Recent Tenders */}
         {roleId !== 'it_admin' && (
-        <div className="lg:col-span-2 rounded-2xl overflow-hidden"
+        <div className="rounded-2xl overflow-hidden"
           style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
 
           <div className="flex items-center justify-between px-5 py-4"
@@ -796,84 +636,8 @@ export default function Dashboard() {
         </div>
         )}
 
-        {/* Right column */}
-        <div className="space-y-4">
-
-          {/* AI System Status — hidden for IT Admin */}
-          {!isItAdmin && (
-          <div className="rounded-2xl p-5"
-            style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: isDark ? 'rgba(124,58,237,0.2)' : '#F5F3FF' }}>
-                <BulbIcon size={13} style={{ color: '#7C3AED' }} />
-              </div>
-              <h3 className="font-bold text-sm" style={{ color: c.text }}>{t('dash.systemOverview')}</h3>
-            </div>
-            <div className="space-y-3">
-              {aiStatus.map(s => (
-                <div key={s.label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full"
-                        style={{
-                          background: s.status === 'online' ? '#10B981' : '#94A3B8',
-                          boxShadow: s.status === 'online' ? '0 0 6px rgba(16,185,129,0.7)' : 'none',
-                        }} />
-                      <span className="text-xs" style={{ color: c.sub }}>{s.label}</span>
-                    </div>
-                    <span className="text-[11px] font-semibold" style={{ color: c.text }}>{s.load}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden"
-                    style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }}>
-                    <div className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${s.load}%`,
-                        background: s.status === 'online' ? 'var(--color-primary)' : '#CBD5E1',
-                      }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Action Required — hidden for IT Admin */}
-          {!isItAdmin && (
-          <div className="rounded-2xl p-5"
-            style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: isDark ? 'rgba(245,158,11,0.2)' : '#FFFBEB' }}>
-                <AlertTriangle size={13} style={{ color: '#F59E0B' }} />
-              </div>
-              <h3 className="font-bold text-sm" style={{ color: c.text }}>{t('dash.actionItems')}</h3>
-              {urgentCount > 0 && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                  style={{ background: '#EF4444' }}>{urgentCount}</span>
-              )}
-            </div>
-            <div className="space-y-2">
-              {actionItems.length === 0 ? (
-                <p className="text-xs" style={{ color: c.muted }}>No pending actions.</p>
-              ) : actionItems.map((a, i) => (
-                <div key={i}
-                  className="flex items-start gap-2.5 p-2.5 rounded-xl text-xs"
-                  style={{
-                    borderLeft: `2px solid ${a.urgent ? '#EF4444' : isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0'}`,
-                    background: a.urgent ? (isDark ? 'rgba(239,68,68,0.08)' : '#FEF2F2') : 'transparent',
-                  }}>
-                  <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                    style={{ background: a.urgent ? '#EF4444' : '#CBD5E1' }} />
-                  <span style={{ color: c.sub }}>{a.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Admin: User Overview */}
-          {isAdmin && (
+        {/* Admin: User Overview */}
+        {isAdmin && (
             <div className="rounded-2xl overflow-hidden"
               style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
               <div className="flex items-center justify-between px-4 py-3"
@@ -929,7 +693,6 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
       </div>
     </div>
   )
