@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Bot, Sparkles, CheckCircle, FileText, UploadCloud, Download, ChevronRight, ChevronDown,
@@ -7,7 +7,6 @@ import {
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
-import SearchableSelect from '../components/ui/SearchableSelect'
 import {
   PsfSection, PsfSubHeading, PsfField, PsfNarrative, PsfNote, PsfCheckboxGrid,
   PsfHistoryTable, PsfMilestoneTable, PsfTendererTable, PsfIcvTable,
@@ -25,6 +24,7 @@ import {
   PSF_TENDERER_ROW_COUNT, PSF_ICV_REQUIREMENTS, PSF_HEADER_FIELDS, PSF_NARRATIVE_FIELDS,
 } from '../data/psfTemplate'
 import { tenderRef } from '../utils/tenderRef'
+import { ASSIGNMENT_GROUPS } from '../data/assignmentGroups'
 
 /*
  * PSF Strategy — Procurement Submission Form (Strategy variant).
@@ -232,55 +232,13 @@ function normalisePsf(psf, tender, uploads) {
   }
 }
 
-// The tender is handed on at submit to the people who own the ITT sections that
-// follow: the Contract Engineer creates and exports the ITT, HSE owns Section C
-// (QHSSE) and ICV owns Section H. One group per role, each drawn from the
-// active users holding it.
-const ASSIGNMENT_GROUPS = [
-  {
-    key: 'ce',
-    roleId: 'pof',
-    title: 'Contract Engineers',
-    short: 'CE',
-    noun: 'Contract Engineers',
-    empty: 'No active Contract Engineers',
-    note: 'Picks this up for the ITT Draft and commercial stages.',
-    tenderKey: 'assignedContractEngineers',
-  },
-  {
-    key: 'hse',
-    roleId: 'hse',
-    title: 'HSE',
-    short: 'HSE',
-    noun: 'HSE Officers',
-    empty: 'No active HSE Officers',
-    note: 'Owns Section C — QHSSE Requirements on the ITT.',
-    tenderKey: 'assignedHseOfficers',
-  },
-  {
-    key: 'icv',
-    roleId: 'icv',
-    title: 'ICV',
-    short: 'ICV',
-    noun: 'ICV Leads',
-    empty: 'No active ICV Leads',
-    note: 'Owns Section H — ICV Requirements on the ITT.',
-    tenderKey: 'assignedIcvLeads',
-  },
-]
-
-
 export default function PsfStrategy() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
-  const { user, users } = useAuth()
+  const { user } = useAuth()
   const { tenders, updateTender } = useTenders()
 
   const tender = tenderId ? tenders.find(t => t.id === tenderId) : null
-
-  const usersByGroup = useMemo(() => Object.fromEntries(
-    ASSIGNMENT_GROUPS.map(g => [g.key, (users || []).filter(u => u.roleId === g.roleId && u.status === 'active')])
-  ), [users])
 
   // Every template is uploadable on the PSF page, even ones not chosen at the
   // acknowledgement gate. None of them block generation — every upload here is optional.
@@ -292,27 +250,14 @@ export default function PsfStrategy() {
   const [uploads, setUploads] = useState(tender?.psfUploads || {})
   const [psf, setPsf] = useState(() => normalisePsf(tender?.psfDocument, tender, tender?.psfUploads || {}))
   const [submitting, setSubmitting] = useState(false)
-  const [assignedIds, setAssignedIds] = useState(() => ({
-    ce: Array.isArray(tender?.assignedContractEngineers)
-      ? tender.assignedContractEngineers.map(c => c.id)
-      : tender?.assignedContractEngineer ? [tender.assignedContractEngineer.id] : [],
-    hse: (tender?.assignedHseOfficers || []).map(c => c.id),
-    icv: (tender?.assignedIcvLeads || []).map(c => c.id),
-  }))
-  const setGroupIds = (key, vals) => setAssignedIds(prev => ({ ...prev, [key]: vals }))
-  // Who a group's picked ids resolve to, as the {id, name} pairs stored on the tender.
-  const pickedIn = (key) => (usersByGroup[key] || [])
-    .filter(u => (assignedIds[key] || []).some(id => String(id) === String(u.id)))
-    .map(u => ({ id: u.id, name: u.name }))
-  // The template hands the tender to all three roles, so submit needs all three.
-  const isFullyAssigned = ASSIGNMENT_GROUPS.every(g => (assignedIds[g.key] || []).length > 0)
-  /* Who this went to, once submitted — all three roles, not just the engineers. */
+  /* Who owns this tender downstream — set once at the Contract Initiating Form,
+     read here rather than re-assigned. A legacy tender that never passed through
+     that form simply shows the dash below; nothing here gates Submit on it. */
   const assignmentSummary = ASSIGNMENT_GROUPS
-    .map(g => {
-      const names = (tender?.[g.tenderKey]
-        || (g.key === 'ce' ? [tender?.assignedContractEngineer].filter(Boolean) : []))
+    .map(({ tenderKey, singleKey, short }) => {
+      const names = (tender?.[tenderKey] || (singleKey && tender?.[singleKey] ? [tender[singleKey]] : []))
         .map(c => c.name).join(', ')
-      return names ? (g.key === 'ce' ? names : `${names} (${g.short})`) : null
+      return names ? (short === 'CE' ? names : `${names} (${short})`) : null
     })
     .filter(Boolean).join(', ') || EM_DASH
   const [templatesOpen, setTemplatesOpen] = useState(true)
@@ -412,8 +357,6 @@ export default function PsfStrategy() {
   const readOnly = !!tender?.psfCompleted
 
   const handleSubmit = () => {
-    const ces = pickedIn('ce')
-    if (!isFullyAssigned) return
     setSubmitting(true)
     setTimeout(() => {
       updateTender(tender.id, {
@@ -421,11 +364,6 @@ export default function PsfStrategy() {
         psfUploads: uploads,
         psfCompleted: true,
         psfCompletedAt: new Date().toISOString().split('T')[0],
-        assignedContractEngineers: ces,
-        assignedHseOfficers: pickedIn('hse'),
-        assignedIcvLeads: pickedIn('icv'),
-        // Keep the single field for any code still reading it (first assignee).
-        assignedContractEngineer: ces[0],
       })
       setSubmitting(false)
       // ITT Creation belongs to the Contract Engineer, so a Contract Holder is
@@ -978,63 +916,16 @@ export default function PsfStrategy() {
             />
           </PsfSection>
 
-          {/* ── Assign Team: the three owning roles, one card, side by side ── */}
+          {/* ── Assigned Team: read-only — set once at the Contract Initiating Form ── */}
           <Card className="p-5">
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
               <UserCheck size={15} className="text-[var(--color-primary)]" />
-              <h3 className="text-sm font-semibold text-slate-800">Assign Team</h3>
-              <span className="text-[11px] text-slate-400">— all three required</span>
+              <h3 className="text-sm font-semibold text-slate-800">Assigned Team</h3>
+              <span className="text-[11px] text-slate-400">— set at the Contract Initiating Form</span>
             </div>
-
-            {tender.psfCompleted ? (
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                <CheckCircle size={14} /> Assigned to {assignmentSummary}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {ASSIGNMENT_GROUPS.map(group => {
-                  const options = usersByGroup[group.key] || []
-                  const picked = assignedIds[group.key] || []
-                  return (
-                    <div key={group.key}>
-                      <label className="text-[11px] font-medium text-slate-600 mb-1 block">
-                        {group.title} <span className="font-secondary text-red-400">*</span>
-                      </label>
-                      <SearchableSelect
-                        multiple
-                        value={picked}
-                        onChange={vals => setGroupIds(group.key, vals)}
-                        options={options}
-                        getValue={u => u.id}
-                        getLabel={u => u.name}
-                        getSubLabel={u => u.username}
-                        placeholder={`Select ${group.noun}…`}
-                        searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
-                        emptyText={group.empty}
-                        ariaLabel={group.title}
-                      />
-                      {picked.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
-                            <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-2 py-0.5 rounded-full">
-                              {u.name}
-                              <button
-                                onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
-                                className="hover:text-red-500"
-                                title="Remove"
-                              >
-                                <X size={11} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <CheckCircle size={14} /> Assigned to {assignmentSummary}
+            </div>
           </Card>
 
           <Card className="p-4">
@@ -1045,8 +936,8 @@ export default function PsfStrategy() {
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {tender.psfCompleted
-                    ? `Submitted on ${tender.psfCompletedAt}. Assigned to ${(tender.assignedContractEngineers || [tender.assignedContractEngineer].filter(Boolean)).map(c => c.name).join(', ') || 'the Contract Engineer'} for ITT creation.`
-                    : 'Submitting assigns this tender to the selected Contract Engineer(s) for ITT creation.'}
+                    ? `Submitted on ${tender.psfCompletedAt}. Assigned to ${assignmentSummary} for ITT creation.`
+                    : 'Submitting hands this tender to the assigned Contract Engineer(s) for ITT creation.'}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1059,7 +950,7 @@ export default function PsfStrategy() {
                 {tender.psfCompleted ? (
                   <Button variant="secondary" onClick={() => navigate('/tenders')}>Back to Tender List</Button>
                 ) : (
-                  <Button disabled={submitting || !isFullyAssigned} onClick={handleSubmit}>
+                  <Button disabled={submitting} onClick={handleSubmit}>
                     {submitting ? 'Submitting…' : 'Submit'} <ChevronRight size={14} />
                   </Button>
                 )}

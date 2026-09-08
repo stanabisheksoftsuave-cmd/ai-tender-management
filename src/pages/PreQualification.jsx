@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Users, Bot, ShieldOff, FileText, ArrowLeft, CheckCircle,
   XCircle, Download, Award, ChevronRight, UploadCloud, Ban, Wallet, RotateCcw,
-  UserPlus, Plus, Save, Search, UserCheck, X,
+  UserPlus, Plus, Save, Search, UserCheck,
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -169,23 +169,19 @@ function generateAiStage3(bidder) {
 export default function PreQualification() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
-  const { user, users } = useAuth()
+  const { user } = useAuth()
   const home = useHomePath()
   const { tenders, updateTender } = useTenders()
   const { goBack } = useNavigation()
   const tender = tenderId ? tenders.find(t => t.id === tenderId) : null
 
-  // The Contract Holder picks which Contract Engineer(s) pick up the financial
-  // assessment — mirrors the Assign Contract Engineers step at PSF Strategy submit.
-  const contractEngineers = useMemo(
-    () => (users || []).filter(u => u.roleId === 'pof' && u.status === 'active'),
-    [users]
-  )
-  const [assignedCeIds, setAssignedCeIds] = useState(
-    Array.isArray(tender?.assignedContractEngineers)
-      ? tender.assignedContractEngineers.map(c => c.id)
-      : tender?.assignedContractEngineer ? [tender.assignedContractEngineer.id] : []
-  )
+  // The Contract Engineer(s) who pick up the financial assessment are set once
+  // at the Contract Initiating Form (ContractStrategy.jsx) — read here, not
+  // re-assigned. A legacy tender that never passed through that form just
+  // shows no names below; it still isn't blocked from submitting.
+  const assignedCes = Array.isArray(tender?.assignedContractEngineers)
+    ? tender.assignedContractEngineers
+    : tender?.assignedContractEngineer ? [tender.assignedContractEngineer] : []
 
   // Stage 1 local state
   const [sowFileName, setSowFileName] = useState('')
@@ -601,7 +597,7 @@ export default function PreQualification() {
   }
 
   const allStage3Decided = activeBidders.length > 0 && activeBidders.every(b => b.responseUploaded && stage3Overall(b))
-  const stage3ReadyToSubmit = allStage3Decided && (!financialAssessmentNeeded || assignedCeIds.length > 0)
+  const stage3ReadyToSubmit = allStage3Decided
 
   const finalizeStage3 = () => {
     // Every bidder who responded continues to financial assessment — including
@@ -611,20 +607,15 @@ export default function PreQualification() {
       updateTender(tender.id, { status: 'prequal_rejected', prequalBidders })
       return
     }
-    // Hand the document to the assigned Contract Engineer(s). financialAssessmentRequired is
-    // persisted because the decision has to outlive this page — the CE and the
-    // dashboards both need to know the assessment was asked for.
-    const ces = contractEngineers
-      .filter(u => assignedCeIds.some(id => String(id) === String(u.id)))
-      .map(u => ({ id: u.id, name: u.name }))
+    // The document goes to whichever Contract Engineer(s) the Contract Initiating
+    // Form assigned. financialAssessmentRequired is persisted because the decision
+    // has to outlive this page — the CE and the dashboards both need to know the
+    // assessment was asked for.
     updateTender(tender.id, {
       status: 'prequal_stage4',
       stage: 'Pre-Qualification — Financial Assessment',
       financialAssessmentRequired: true,
       financialAssessmentAssignedAt: new Date().toISOString().split('T')[0],
-      assignedContractEngineers: ces,
-      // Keep the single field for any code still reading it (first assignee).
-      assignedContractEngineer: ces[0],
     })
   }
 
@@ -961,39 +952,23 @@ export default function PreQualification() {
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <UserCheck size={15} className="text-[var(--color-primary)]" />
-                <h3 className="text-sm font-semibold text-slate-800">Assign Contract Engineers</h3>
-                <span className="text-[11px] text-slate-400">— at least one required</span>
+                <h3 className="text-sm font-semibold text-slate-800">Assigned Contract Engineers</h3>
+                <span className="text-[11px] text-slate-400">— set at the Contract Initiating Form</span>
               </div>
-              <div className="max-w-sm">
-                <SearchableSelect
-                  multiple
-                  value={assignedCeIds}
-                  onChange={vals => setAssignedCeIds(vals)}
-                  options={contractEngineers}
-                  getValue={u => u.id}
-                  getLabel={u => u.name}
-                  getSubLabel={u => u.username}
-                  placeholder="Select Contract Engineers…"
-                  searchPlaceholder="Search contract engineers…"
-                  emptyText="No active Contract Engineers"
-                  ariaLabel="Assign Contract Engineers"
-                />
-                {assignedCeIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {contractEngineers.filter(u => assignedCeIds.some(id => String(id) === String(u.id))).map(u => (
-                      <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-2 py-0.5 rounded-full">
-                        {u.name}
-                        <button onClick={() => setAssignedCeIds(prev => prev.filter(id => String(id) !== String(u.id)))} className="hover:text-red-500" title="Remove">
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="text-[11px] text-slate-400 mt-1.5">
-                  Once submitted, every assigned Contract Engineer picks up this tender for the financial assessment.
-                </p>
-              </div>
+              {assignedCes.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {assignedCes.map(u => (
+                    <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/8 px-2 py-0.5 rounded-full">
+                      {u.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No Contract Engineer was assigned at the Contract Initiating Form.</p>
+              )}
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Submitting hands this tender to the assigned Contract Engineer(s) for the financial assessment.
+              </p>
             </Card>
           )}
 
@@ -1178,9 +1153,7 @@ export default function PreQualification() {
                 <p className={`text-xs text-slate-500 ${!stage3ReadyToSubmit ? 'opacity-70' : ''}`}>
                   {!allStage3Decided
                     ? 'Upload responses and complete QHSE, Technical and Administrative marking for every bidder before proceeding.'
-                    : !stage3ReadyToSubmit
-                      ? 'Assign at least one Contract Engineer before proceeding to financial assessment.'
-                      : `${activeBidders.filter(b => stage3Overall(b) === 'pass').length} of ${activeBidders.length} bidders passed Stage 3.`}
+                    : `${activeBidders.filter(b => stage3Overall(b) === 'pass').length} of ${activeBidders.length} bidders passed Stage 3.`}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

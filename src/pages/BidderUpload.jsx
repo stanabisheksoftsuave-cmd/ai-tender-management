@@ -65,10 +65,6 @@ export default function BidderUpload() {
   const [bidderForm, setBidderForm] = useState({ company: '', contact: '', phone: '' })
   const [bidderErrors, setBidderErrors] = useState({})
 
-  // Evaluator assignment modal
-  const [showAssignModal, setShowAssignModal] = useState(false)
-  const [assignments, setAssignments] = useState({ techEval: '', commEval: '', mode: 'linear' })
-  const [assignModalErrors, setAssignModalErrors] = useState({})
 
   // Correction request portal (for POF re-upload flow)
   const [correctionTender,    setCorrectionTender]    = useState(null)
@@ -175,7 +171,6 @@ export default function BidderUpload() {
   // must stay at top level to be a valid hook call.
   useDismissable(reassignTender, () => setReassignTender(null))
   useDismissable(showTracker, () => setShowTracker(false))
-  useDismissable(showAssignModal, () => setShowAssignModal(false))
   useDismissable(showAddBidder, () => setShowAddBidder(false))
 
   // Shared Back unwinds in-page state first. With a :tenderId param the detail
@@ -350,18 +345,12 @@ export default function BidderUpload() {
     setCorrectionSubmitted(prev => ({ ...prev, [`${tender.id}-${bidderId}`]: true }))
   }
 
+  // No separate assignment step at ingestion: technical evaluation is owned by
+  // the Contract Holder role (left unassigned — canEvaluate already falls back
+  // to "any Contract Holder" for an unassigned tech side); commercial goes to
+  // whichever Contract Engineer was assigned at the Contract Initiating Form
+  // or Create ITT, carried straight through from the tender record.
   const proceedToEvaluation = () => {
-    setAssignments({ techEval: '', commEval: '', mode: 'linear' })
-    setAssignModalErrors({})
-    setShowAssignModal(true)
-  }
-
-  const confirmProceedToEvaluation = () => {
-    const errs = {}
-    if (!assignments.techEval) errs.techEval = 'Required'
-    if (!assignments.commEval) errs.commEval = 'Required'
-    if (Object.keys(errs).length) { setAssignModalErrors(errs); return }
-
     const bidderList = activeBidders.map(b => ({
       id: b.id,
       name: b.company,
@@ -369,15 +358,15 @@ export default function BidderUpload() {
       contact: b.contact,
       phone: b.phone || '',
     }))
-    const techUser = users.find(u => u.id === Number(assignments.techEval))
-    const commUser = users.find(u => u.id === Number(assignments.commEval))
-    // Evaluation flow is decided at ingestion (evalMode), not in this modal.
+    const ce = Array.isArray(selectedTender.assignedContractEngineers) && selectedTender.assignedContractEngineers.length > 0
+      ? selectedTender.assignedContractEngineers[0]
+      : selectedTender.assignedContractEngineer || null
     const isParallel = evalMode === 'parallel'
     updateTender(selectedTender.id, {
       bidderList,
       bidders: bidderList.length,
-      assignedTechEval: techUser ? { id: techUser.id, name: techUser.name } : null,
-      assignedCommEval: commUser ? { id: commUser.id, name: commUser.name } : null,
+      assignedTechEval: null,
+      assignedCommEval: ce,
       evaluationMode: isParallel ? 'parallel' : 'linear',
       ...(isParallel
         ? { status: 'parallel_eval', stage: 'Parallel Evaluation', evalProgress: 'not_started', techSide: 'evaluating', commSide: 'evaluating' }
@@ -386,7 +375,6 @@ export default function BidderUpload() {
     // Linear keeps the existing status chain (upload → tech_eval → …).
     // Parallel is placed directly into 'parallel_eval' above.
     if (!isParallel) advanceTender(selectedTender.id)
-    setShowAssignModal(false)
     navigate('/tenders')
   }
 
@@ -987,6 +975,13 @@ export default function BidderUpload() {
     )
   }
 
+  // Where Proceed to Evaluation will route this tender — the Contract Engineer
+  // assigned at the Contract Initiating Form / Create ITT, or "any Contract
+  // Engineer" if this tender never went through either (falls back by role).
+  const routedCe = Array.isArray(selectedTender?.assignedContractEngineers) && selectedTender.assignedContractEngineers.length > 0
+    ? selectedTender.assignedContractEngineers[0]
+    : selectedTender?.assignedContractEngineer || null
+
   // ── Main ingestion screen ──
   return (
     <div className="space-y-5">
@@ -1041,6 +1036,12 @@ export default function BidderUpload() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+          <Users size={12} className="text-slate-400 shrink-0" />
+          Proceeding routes this to <strong className="text-slate-700 font-semibold">Technical → Contract Holder</strong>
+          <span className="text-slate-300">·</span>
+          <strong className="text-slate-700 font-semibold">Commercial → {routedCe?.name || 'any Contract Engineer'}</strong>
         </div>
       </Card>
 
@@ -1281,93 +1282,6 @@ export default function BidderUpload() {
         </div>
       )}
 
-      {/* ── Evaluator Assignment Modal ── */}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 fade-in">
-          <Card className="w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <Users size={14} className="text-[var(--color-primary)]" /> Assign Evaluators
-              </h3>
-              <button onClick={() => setShowAssignModal(false)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 text-slate-400">
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="px-5 py-2 bg-blue-50 border-b border-blue-100">
-              <p className="text-[11px] text-blue-700">
-                Assign evaluators before moving <span className="font-semibold">{selectedTender?.id}</span> to evaluation.
-                Each evaluator will only see tenders assigned to them.
-              </p>
-            </div>
-
-            <div className="px-5 py-4 space-y-4">
-              {/* Evaluation flow — chosen at ingestion, shown read-only here */}
-              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-xs font-medium text-slate-600">Evaluation Flow</span>
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary)]">
-                  {evalMode === 'parallel' ? <ArrowRightLeft size={13} /> : <GitBranch size={13} />}
-                  {evalMode === 'parallel' ? 'Parallel' : 'Linear'}
-                </span>
-              </div>
-
-              {/* Technical Evaluator — Contract Holder */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Technical Evaluator <span className="text-slate-400 font-medium">(Contract Holder)</span> <span className="font-secondary text-red-400">*</span>
-                </label>
-                <SearchableSelect
-                  value={assignments.techEval}
-                  onChange={v => { setAssignments(a => ({ ...a, techEval: v === '' ? '' : String(v) })); setAssignModalErrors(er => ({ ...er, techEval: '' })) }}
-                  options={techEvaluators}
-                  getValue={u => u.id}
-                  getLabel={u => u.name}
-                  getSubLabel={u => u.email || u.username || ''}
-                  placeholder="— Select Contract Holder —"
-                  searchPlaceholder="Search contract holders…"
-                  emptyText="No matching contract holders"
-                  ariaLabel="Technical Evaluator"
-                  error={!!assignModalErrors.techEval}
-                  clearable
-                />
-                {assignModalErrors.techEval && <p className="text-[10px] text-red-500 mt-0.5">{assignModalErrors.techEval}</p>}
-              </div>
-
-              {/* Commercial Evaluator — Contract Engineer */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                  Commercial Evaluator <span className="text-slate-400 font-medium">(Contract Engineer)</span> <span className="font-secondary text-red-400">*</span>
-                </label>
-                <SearchableSelect
-                  value={assignments.commEval}
-                  onChange={v => { setAssignments(a => ({ ...a, commEval: v === '' ? '' : String(v) })); setAssignModalErrors(er => ({ ...er, commEval: '' })) }}
-                  options={commEvaluators}
-                  getValue={u => u.id}
-                  getLabel={u => u.name}
-                  getSubLabel={u => u.email || u.username || ''}
-                  placeholder="— Select Contract Engineer —"
-                  searchPlaceholder="Search contract engineers…"
-                  emptyText="No matching contract engineers"
-                  ariaLabel="Commercial Evaluator"
-                  error={!!assignModalErrors.commEval}
-                  clearable
-                />
-                {assignModalErrors.commEval && <p className="text-[10px] text-red-500 mt-0.5">{assignModalErrors.commEval}</p>}
-              </div>
-
-            </div>
-
-            <div className="flex gap-2 px-5 pb-5">
-              <Button variant="secondary" className="flex-1 justify-center" onClick={() => setShowAssignModal(false)}>
-                Cancel
-              </Button>
-              <Button className="flex-1 justify-center" onClick={confirmProceedToEvaluation}>
-                <CheckCircle size={13} /> Confirm &amp; Proceed
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* ── AI Extraction Tracker Modal ── */}
       {showTracker && (
@@ -1392,8 +1306,10 @@ export default function BidderUpload() {
               <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
-                style={{ background: 'var(--color-primary)' }}
-                  style={{ width: uploadedBidders.length ? `${(uploadedBidders.filter(b => b.status === 'completed').length / uploadedBidders.length) * 100}%` : '0%' }}
+                  style={{
+                    background: 'var(--color-primary)',
+                    width: uploadedBidders.length ? `${(uploadedBidders.filter(b => b.status === 'completed').length / uploadedBidders.length) * 100}%` : '0%',
+                  }}
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1.5">

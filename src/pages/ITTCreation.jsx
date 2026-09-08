@@ -4,13 +4,14 @@ import {
   Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
   FileText, FileSpreadsheet, AlertCircle, Download, ClipboardCheck,
   UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
-  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil
+  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil, UserCheck
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
@@ -27,6 +28,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import { tenderRef } from '../utils/tenderRef'
 import { TEMPLATE_DEFS } from './StrategyTemplatesDashboard'
 import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
+import { ASSIGNMENT_GROUPS } from '../data/assignmentGroups'
 
 // Who fills which ITT section. Contract Holder owns the SOW & methodology; HSE
 // owns QHSSE; ICV owns the ICV requirements; the Contract Engineer owns the
@@ -48,6 +50,9 @@ function defaultSectionIndexFor(flow, roleId, approved = {}) {
 
 const OWNER_LABEL = { pof: 'Contract Engineer', contract_holder: 'Contract Holder', hse: 'Contract HSE', icv: 'ICV' }
 const OWNER_COLOR = { pof: '#1B4F8A', contract_holder: '#0891B2', hse: '#0EA5E9', icv: '#DB2777' }
+// Where each section-owner role's Contract Initiating Form assignment lives on
+// the tender — Contract Holder has none (they're the tender's own creator).
+const ASSIGNEE_FIELD = { pof: 'assignedContractEngineers', hse: 'assignedHseOfficers', icv: 'assignedIcvLeads' }
 
 // Sections whose owner may attach a finalised document alongside filling the
 // template fields — Section B1 (General Conditions) and Section H (ICV).
@@ -106,7 +111,7 @@ export default function ITTCreation() {
   // department stays on the same vocabulary end to end.
   const CONFIGURED_DEPARTMENTS = dropdownConfig.departments || []
   const { t } = useLanguage()
-  const { user } = useAuth()
+  const { user, users } = useAuth()
   const approverName = user?.name || 'Contract Engineer'
   const approverRole = user?.role?.label || 'Contract Engineer'
   const steps = [t('itt.step1'), t('itt.step2'), t('itt.step3'), t('itt.step4')]
@@ -176,6 +181,33 @@ export default function ITTCreation() {
   // PSF: either a brand-new draft (no backing tender yet) or a tender explicitly
   // flagged psfSkipped. Only these need the strategy templates uploaded here.
   const isDirectItt = !existingTender || existingTender.psfSkipped === true
+
+  // A tender that came through PSF already has its CE/HSE/ICV from the
+  // Contract Initiating Form — shown read-only. A direct ITT skipped that
+  // form entirely, so the Contract Holder assigns the team here instead.
+  const usersByGroup = useMemo(() => Object.fromEntries(
+    ASSIGNMENT_GROUPS.map(g => [g.key, (users || []).filter(u => u.roleId === g.roleId && u.status === 'active')])
+  ), [users])
+  const [assignedIds, setAssignedIds] = useState(() => ({
+    ce: Array.isArray(existingTender?.assignedContractEngineers)
+      ? existingTender.assignedContractEngineers.map(c => c.id)
+      : existingTender?.assignedContractEngineer ? [existingTender.assignedContractEngineer.id] : [],
+    hse: (existingTender?.assignedHseOfficers || []).map(c => c.id),
+    icv: (existingTender?.assignedIcvLeads || []).map(c => c.id),
+  }))
+  const setGroupIds = (key, vals) => setAssignedIds(prev => ({ ...prev, [key]: vals }))
+  const pickedIn = (key) => (usersByGroup[key] || [])
+    .filter(u => (assignedIds[key] || []).some(id => String(id) === String(u.id)))
+    .map(u => ({ id: u.id, name: u.name }))
+  const isFullyAssigned = ASSIGNMENT_GROUPS.every(g => (assignedIds[g.key] || []).length > 0)
+  /* Read-only display for a PSF-sourced tender — who the CIF assigned. */
+  const assignmentSummary = ASSIGNMENT_GROUPS
+    .map(({ tenderKey, singleKey, short }) => {
+      const names = (existingTender?.[tenderKey] || (singleKey && existingTender?.[singleKey] ? [existingTender[singleKey]] : []))
+        .map(c => c.name).join(', ')
+      return names ? (short === 'CE' ? names : `${names} (${short})`) : null
+    })
+    .filter(Boolean).join(', ') || '—'
 
   const initialForm = existingTender
     ? { title: existingTender.title || '', department: existingTender.department || '', budget: existingTender.budget || '', deadline: existingTender.deadline || '', duration: existingTender.duration || '', description: existingTender.description || '', costCode: existingTender.costCode || '', currency: existingTender.currency || 'USD' }
@@ -261,6 +293,13 @@ export default function ITTCreation() {
       currency:    existingTender.currency || 'USD',
     })
     setDraftTenderId(existingTender.id)
+    setAssignedIds({
+      ce: Array.isArray(existingTender.assignedContractEngineers)
+        ? existingTender.assignedContractEngineers.map(c => c.id)
+        : existingTender.assignedContractEngineer ? [existingTender.assignedContractEngineer.id] : [],
+      hse: (existingTender.assignedHseOfficers || []).map(c => c.id),
+      icv: (existingTender.assignedIcvLeads || []).map(c => c.id),
+    })
     setSectionAnswers(existingTender.sectionAnswers || {})
     setSectionProse(existingTender.sectionProse || {})
     setSectionApproved(existingTender.sectionApproved || {})
@@ -293,7 +332,7 @@ export default function ITTCreation() {
   }
 
   const requiredFields = ['title', 'department', 'budget', 'deadline', 'description']
-  const isFormValid = requiredFields.every(f => form[f].trim() !== '')
+  const isFormValid = requiredFields.every(f => form[f].trim() !== '') && (!isDirectItt || isFullyAssigned)
   const fieldError = (key) => showErrors && form[key].trim() === ''
 
   const setField = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
@@ -339,10 +378,20 @@ export default function ITTCreation() {
               // the details step would blank out answers already filled in.
               sectionAnswers: tenders.find(t => t.id === draftTenderId)?.sectionAnswers || {},
               b1Category: tenders.find(t => t.id === draftTenderId)?.b1Category ?? null,
+              // Only a direct ITT (no CIF/PSF) assigns the team here — a
+              // PSF-sourced tender already carries it and this branch must not
+              // clobber that with a stale/empty picker the UI never showed.
+              ...(isDirectItt ? {
+                assignedContractEngineers: pickedIn('ce'),
+                assignedHseOfficers: pickedIn('hse'),
+                assignedIcvLeads: pickedIn('icv'),
+                assignedContractEngineer: pickedIn('ce')[0] || null,
+              } : {}),
             })
           } else {
             const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(t.id.split('-')[2]) || 0), 0)
             const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
+            const ces = pickedIn('ce')
             addTender({
               id: newId,
               title: form.title,
@@ -363,6 +412,12 @@ export default function ITTCreation() {
               b1Category: null,
               // Strategy templates the Contract Holder uploaded in lieu of PSF.
               strategyTemplateUploads: templateUploads,
+              // A brand-new tender only reaches this branch via the direct-ITT
+              // path, so the team assigned here is the only one it will ever get.
+              assignedContractEngineers: ces,
+              assignedHseOfficers: pickedIn('hse'),
+              assignedIcvLeads: pickedIn('icv'),
+              assignedContractEngineer: ces[0] || null,
               // Started here deliberately without pre-qualification, so it never
               // passes through PSF Strategy. Without this it would fail the PSF
               // gate below and become unreachable by every role.
@@ -403,6 +458,16 @@ export default function ITTCreation() {
   const effectiveFlow = useMemo(() => resolveFlow(b1Category), [b1Category])
   // Section-board helpers.
   const ownerOf = sectionId => SECTION_OWNER[sectionId] || 'pof'
+  // The person the Contract Initiating Form assigned to a section's owning
+  // role — CE/HSE/ICV are picked once there (ContractStrategy.jsx) rather than
+  // reassigned here, so "owned by" reads as a name instead of just the role.
+  // Falls back to the generic role label for Contract Holder (no CIF field)
+  // and for a legacy tender that predates the CIF assignment step.
+  const ownerDisplay = ownerRoleId => {
+    const field = ASSIGNEE_FIELD[ownerRoleId]
+    const people = field ? (tenders.find(t => t.id === draftTenderId)?.[field] || []) : []
+    return people.length ? people.map(p => p.name).join(', ') : (OWNER_LABEL[ownerRoleId] || ownerRoleId)
+  }
   const canEditSection = sectionId => ownerOf(sectionId) === roleId
   // A section is "complete" once its owner has reviewed and approved it.
   const isSectionComplete = section => !!sectionApproved[section.id]
@@ -1036,6 +1101,72 @@ export default function ITTCreation() {
             </div>
           </Card>
 
+          {/* ── Assign Team: a PSF-sourced tender already has this from the Contract
+               Initiating Form (read-only here); a direct ITT never passed through
+               that form, so the Contract Holder sets it here instead. ── */}
+          <Card branded className="p-5">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <UserCheck size={15} style={{ color: '#0089cf' }} />
+              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>{isDirectItt ? 'Assign Team' : 'Assigned Team'}</h3>
+              <span className="text-[11px] text-slate-400">
+                {isDirectItt ? '— all three required' : '— set at the Contract Initiating Form'}
+              </span>
+            </div>
+
+            {isDirectItt ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {ASSIGNMENT_GROUPS.map(group => {
+                  const options = usersByGroup[group.key] || []
+                  const picked = assignedIds[group.key] || []
+                  return (
+                    <div key={group.key}>
+                      <label className="text-[11px] font-medium text-slate-600 mb-1 block">
+                        {group.title} <span className="font-secondary text-red-400">*</span>
+                      </label>
+                      <SearchableSelect
+                        multiple
+                        value={picked}
+                        onChange={vals => setGroupIds(group.key, vals)}
+                        options={options}
+                        getValue={u => u.id}
+                        getLabel={u => u.name}
+                        getSubLabel={u => u.username}
+                        placeholder={`Select ${group.noun}…`}
+                        searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
+                        emptyText={group.empty}
+                        ariaLabel={group.title}
+                      />
+                      {picked.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
+                            <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)' }}>
+                              {u.name}
+                              <button
+                                onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
+                                className="hover:text-red-500"
+                                title="Remove"
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <CheckCircle size={14} /> Assigned to {assignmentSummary}
+              </div>
+            )}
+            {isDirectItt && showErrors && !isFullyAssigned && (
+              <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1"><AlertCircle size={10} />Select at least one Contract Engineer, HSE and ICV</p>
+            )}
+          </Card>
+
           {/* Strategy templates upload — shown on the direct path (Contract Holder
               creating an ITT without PSF). PSF-prefilled tenders skip this. */}
           {isDirectItt && (
@@ -1297,7 +1428,7 @@ export default function ITTCreation() {
                     <optgroup label={`👁  OTHER ROLES' SECTIONS — view only (${viewOnlyOptions.length})`}>
                       {viewOnlyOptions.map(({ item, idx }) => (
                         <option key={item.id} value={idx}>
-                          {item.title}  —  {OWNER_LABEL[ownerOf(item.id)]}
+                          {item.title}  —  {ownerDisplay(ownerOf(item.id))}
                         </option>
                       ))}
                     </optgroup>
@@ -1335,7 +1466,7 @@ export default function ITTCreation() {
                     <p className="text-[11px]" style={{ color: '#94a3b8' }}>
                       {canEditCurrent
                         ? 'You own this section — fill the fields, refine the wording, then approve it.'
-                        : `Owned by ${OWNER_LABEL[ownerOf(current.id)]} — you can read it, but nothing here can be changed.`}
+                        : `Owned by ${ownerDisplay(ownerOf(current.id))} — you can read it, but nothing here can be changed.`}
                     </p>
                   </div>
                 </div>
@@ -1409,10 +1540,10 @@ export default function ITTCreation() {
                           <p className="text-[11px] text-slate-500 mt-0.5">{B1_CATEGORY_MAP[b1Category]?.sub}</p>
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-400 mt-3">The {OWNER_LABEL[ownerOf('sectionB1')]} has not selected a General Conditions tier yet.</p>
+                        <p className="text-xs text-slate-400 mt-3">{ownerDisplay(ownerOf('sectionB1'))} has not selected a General Conditions tier yet.</p>
                       )}
                       <p className="mt-4 text-[11px] font-medium flex items-center gap-1.5" style={{ color: '#64748b' }}>
-                        <Eye size={12} /> Read-only — owned by {OWNER_LABEL[ownerOf('sectionB1')]}
+                        <Eye size={12} /> Read-only — owned by {ownerDisplay(ownerOf('sectionB1'))}
                       </p>
                     </Card>
                   )
@@ -1431,7 +1562,7 @@ export default function ITTCreation() {
                        gates it on every clause class being approved first. */
                     nextApproves
                     readOnly={!canEditCurrent}
-                    readOnlyNote={`Read-only — owned by ${OWNER_LABEL[ownerOf(current.id)]}`}
+                    readOnlyNote={`Read-only — owned by ${ownerDisplay(ownerOf(current.id))}`}
                   />
                 ) : current ? (
                   canEditCurrent ? (
@@ -1479,7 +1610,7 @@ export default function ITTCreation() {
                       isFirst={currentIndex === 0}
                       isLast={false}
                       readOnly
-                      readOnlyNote={`Read-only — owned by ${OWNER_LABEL[ownerOf(current.id)]}`}
+                      readOnlyNote={`Read-only — owned by ${ownerDisplay(ownerOf(current.id))}`}
                     />
                   )
                 ) : null}

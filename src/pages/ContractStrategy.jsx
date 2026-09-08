@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Target, Building2, ShieldOff, ArrowLeft, ArrowRight, FileText, AlertCircle,
-  DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert,
+  DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert, UserCheck,
   UploadCloud, X, Paperclip, Sparkles, RefreshCw,
   Download, Edit3, ChevronRight, Wand2, Undo2, Plus, Bot, Check
 } from 'lucide-react'
 import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import { useTenders } from '../context/TenderContext'
 import { useAuth } from '../context/AuthContext'
@@ -17,6 +18,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { useBackHandler, useDismissable } from '../context/NavigationContext'
 import { applyAiInstruction } from '../utils/aiTextEdit'
 import { tenderRef } from '../utils/tenderRef'
+import { ASSIGNMENT_GROUPS } from '../data/assignmentGroups'
 
 // Dropdown options are now read from TenderContext (admin-configurable)
 
@@ -185,7 +187,7 @@ function editTextToSection(section, text) {
 export default function ContractStrategy() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, users } = useAuth()
   const { t } = useLanguage()
   const { tenders, addTender, updateTender, dropdownConfig } = useTenders()
 
@@ -229,6 +231,24 @@ export default function ContractStrategy() {
   const [hsseFile, setHsseFile] = useState(existingTender?.hsseRiskRegister || null)
   const [showErrors, setShowErrors] = useState(false)
   const hsseInputRef = useRef(null)
+
+  const usersByGroup = useMemo(() => Object.fromEntries(
+    ASSIGNMENT_GROUPS.map(g => [g.key, (users || []).filter(u => u.roleId === g.roleId && u.status === 'active')])
+  ), [users])
+  const [assignedIds, setAssignedIds] = useState(() => ({
+    ce: Array.isArray(existingTender?.assignedContractEngineers)
+      ? existingTender.assignedContractEngineers.map(c => c.id)
+      : existingTender?.assignedContractEngineer ? [existingTender.assignedContractEngineer.id] : [],
+    hse: (existingTender?.assignedHseOfficers || []).map(c => c.id),
+    icv: (existingTender?.assignedIcvLeads || []).map(c => c.id),
+  }))
+  const setGroupIds = (key, vals) => setAssignedIds(prev => ({ ...prev, [key]: vals }))
+  // Who a group's picked ids resolve to, as the {id, name} pairs stored on the tender.
+  const pickedIn = (key) => (usersByGroup[key] || [])
+    .filter(u => (assignedIds[key] || []).some(id => String(id) === String(u.id)))
+    .map(u => ({ id: u.id, name: u.name }))
+  // The tender is handed to all three roles downstream, so Generate SOW needs all three.
+  const isFullyAssigned = ASSIGNMENT_GROUPS.every(g => (assignedIds[g.key] || []).length > 0)
 
   // Step system: 0 = Form, 1 = AI Generation, 2 = SOW Review
   const [step, setStep] = useState(0)
@@ -395,8 +415,14 @@ export default function ContractStrategy() {
     setField('budget', code + ' ' + num.toLocaleString('en-US'))
   }
 
+  // A tender that already moved past the Contract Initiating Form (opened here
+  // again via the sidebar's cross-nav picker) may predate the Assign Team step,
+  // or already have real people assigned who happen to be inactive/deleted now —
+  // either way, re-opening this form must not become a dead end. Only a tender
+  // still at the CIF stage (new, or a resumable cif_draft) requires it.
+  const requiresAssignment = !existingTender || existingTender.status === 'cif_draft'
   const requiredFields = ['title', 'budget', 'deadline', 'description']
-  const isFormValid = requiredFields.every(f => form[f].trim() !== '')
+  const isFormValid = requiredFields.every(f => form[f].trim() !== '') && (!requiresAssignment || isFullyAssigned)
   const fieldError = (key) => showErrors && form[key].trim() === ''
 
   // Duration helpers
@@ -421,9 +447,15 @@ export default function ContractStrategy() {
   const handleGenerate = () => {
     if (!isFormValid) { setShowErrors(true); return }
 
+    const ces = pickedIn('ce')
     const payload = {
       ...form,
       hsseRiskRegister: hsseFile || null,
+      assignedContractEngineers: ces,
+      assignedHseOfficers: pickedIn('hse'),
+      assignedIcvLeads: pickedIn('icv'),
+      // Keep the single field for any code still reading it (first assignee).
+      assignedContractEngineer: ces[0] || null,
     }
 
     let id = savedTenderId
@@ -873,6 +905,63 @@ export default function ContractStrategy() {
               </div>
 
             </div>
+          </Card>
+
+          {/* ── Assign Team: the three owning roles, set once here so PSF, PQQ
+               and ITT Creation just read who owns each side. ── */}
+          <Card branded className="p-5 olng-slide-up" style={{ animationDelay: '90ms' }}>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <UserCheck size={15} style={{ color: '#0089cf' }} />
+              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>Assign Team</h3>
+              <span className="text-[11px] text-slate-400">{requiresAssignment ? '— all three required' : '— set previously'}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {ASSIGNMENT_GROUPS.map(group => {
+                const options = usersByGroup[group.key] || []
+                const picked = assignedIds[group.key] || []
+                return (
+                  <div key={group.key}>
+                    <label className="text-[11px] font-medium text-slate-600 mb-1 block">
+                      {group.title} <span className="font-secondary text-red-400">*</span>
+                    </label>
+                    <SearchableSelect
+                      multiple
+                      value={picked}
+                      onChange={vals => setGroupIds(group.key, vals)}
+                      options={options}
+                      getValue={u => u.id}
+                      getLabel={u => u.name}
+                      getSubLabel={u => u.username}
+                      placeholder={`Select ${group.noun}…`}
+                      searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
+                      emptyText={group.empty}
+                      ariaLabel={group.title}
+                    />
+                    {picked.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
+                          <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)' }}>
+                            {u.name}
+                            <button
+                              onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
+                              className="hover:text-red-500"
+                              title="Remove"
+                            >
+                              <X size={11} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
+                  </div>
+                )
+              })}
+            </div>
+            {showErrors && requiresAssignment && !isFullyAssigned && (
+              <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1"><AlertCircle size={10} />Select at least one Contract Engineer, HSE and ICV</p>
+            )}
           </Card>
 
           {/* Submit / Generate SOW */}
