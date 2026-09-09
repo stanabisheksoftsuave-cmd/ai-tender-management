@@ -82,16 +82,30 @@ const DEFAULT_DROPDOWN_CONFIG = {
   ],
   tenderTypes: ['Goods', 'Services', 'Works', 'Consultancy'],
   departments: [
-    'IT',
-    'Supply Chain',
-    'Operations',
-    'Engineering',
-    'Finance',
-    'Human Resources',
-    'HSSE',
-    'Legal',
-    'Maintenance',
-    'Projects',
+    'New Business Development (NBD)',
+    'Chief Executive Office (CEO)',
+    'Engineering & Technology (EN)',
+    'OLNG Development Foundation (ODF)',
+    'Internal Audit (IA)',
+    'Finance (NGF)',
+    'Human Resources (HR)',
+    'Operations & Production (OP)',
+    'Marketing & Shipping (NGM)',
+    'Quality Health Safety & Environment (HS)',
+    'Corporate Security (HSC)',
+    'Digital and Information Technology (DI)',
+    'Strategic Planning Management (SPM)',
+    'Facility Management (FM)',
+    'Contracting, Procurement & Logistics (CPL)',
+    'Major Project (MP)',
+    'Chief Operating Officer (COO)',
+    'Legal (NGL)',
+    'Lean and Continuous Improvement (LCI)',
+    'Maintenance and Turnarounds (TM)',
+    'In Country Value (ICV)',
+    'Decarbonisation & New Energies (NZ)',
+    'Asset Improvement (AI)',
+    'Others',
   ],
   contractRisks: ['Low', 'Medium', 'High', 'Critical'],
   currencies: [
@@ -155,8 +169,16 @@ export function TenderProvider({ children }) {
   }, [tenders])
 
   // ── Admin-configurable dropdown options (persisted to localStorage) ──
+  // Bumped to 2 when the department list was replaced with the official
+  // organisation-wide department names — stale localStorage copies of the
+  // old short list (IT, Supply Chain, ...) need to be replaced, not merged.
   const [dropdownConfig, setDropdownConfig] = useState(() => {
     try {
+      if (localStorage.getItem('atm_dropdown_config_v') !== '2') {
+        localStorage.setItem('atm_dropdown_config_v', '2')
+        localStorage.removeItem('atm_dropdown_config')
+        return DEFAULT_DROPDOWN_CONFIG
+      }
       const saved = localStorage.getItem('atm_dropdown_config')
       if (!saved) return DEFAULT_DROPDOWN_CONFIG
       const parsed = JSON.parse(saved)
