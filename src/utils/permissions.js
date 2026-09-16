@@ -64,6 +64,7 @@ export const ROUTE_ROLES = {
   '/upload':              [ROLE.CONTRACT_ENGINEER],  // module: ingestion
   '/technical-eval':      [ROLE.CONTRACT_HOLDER],    // module: tech_eval
   '/commercial-eval':     [ROLE.CONTRACT_ENGINEER],  // module: comm_eval
+  '/commercial-eval-profile': [ROLE.CONTRACT_ENGINEER],
   // Supply Chain's three approval gates.                 module: scm_review
   '/scm-tech-review':     [ROLE.SCM],
   '/scm-review':          [ROLE.SCM],
