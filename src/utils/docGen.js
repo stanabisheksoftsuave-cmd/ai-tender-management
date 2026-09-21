@@ -3,7 +3,7 @@
 // evaluation rationale / fail-reasoning documents and the bidder rejection
 // letters — no backend, no dependencies.
 
-const esc = (s) =>
+export const esc = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -182,6 +182,27 @@ export function clarificationRequestDoc({ ref, tenderId, tenderTitle, bidderName
       <div class="foot">System-generated clarification request. Reference: ${esc(ref || '')} · Tender: ${esc(tenderId || '')}.</div>
     </div>`
   return { title: `Clarification ${ref} — ${bidderName}`, content }
+}
+
+// Generic H.5 deliverable shell — Executive Summary, Commercial Evaluation
+// Report, Deviation/Risk/Sensitivity/Clarification registers, Endorsement
+// Paper, Tender Board Pack all share this one document skeleton, generated
+// from already-computed evaluation data rather than authored by hand.
+// `sections` is an array of { heading, bodyHtml } — bodyHtml is trusted,
+// pre-built markup (the caller escapes any bidder-supplied text it embeds).
+export function deliverableDoc({ title, kicker, tenderId, tenderTitle, meta = [], sections = [] }) {
+  const content = `
+    <div class="head">
+      <div class="brand">${esc(kicker || 'Oman LNG · Commercial Evaluation')}</div>
+      <h1>${esc(title)}</h1>
+      <div class="sub">${esc(tenderId || '')}${tenderTitle ? ' · ' + esc(tenderTitle) : ''}</div>
+    </div>
+    <div class="body">
+      ${meta.length ? `<div class="meta">${meta.map(m => `<div><b>${esc(m.label)}:</b> ${esc(m.value)}</div>`).join('')}</div>` : ''}
+      ${sections.map(s => `<h2>${esc(s.heading)}</h2>${s.bodyHtml}`).join('')}
+      <div class="foot">Generated from stored evaluation data. Advisory document — the recorded recommendation and gate decisions are authoritative.</div>
+    </div>`
+  return { title, content }
 }
 
 export function rejectionLetterDoc({ tenderId, tenderTitle, bidderName, department, awardedTo, dateStr }) {

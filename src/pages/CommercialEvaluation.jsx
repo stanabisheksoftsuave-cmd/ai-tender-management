@@ -66,6 +66,8 @@ import { useHomePath } from '../utils/permissions'
 import { canEvaluate, isUnassignedSide } from '../utils/evalAssignment'
 import { openHtmlDoc, clarificationRequestDoc } from '../utils/docGen'
 import { tenderRef } from '../utils/tenderRef'
+import AwardPackagePanel from '../components/commercial/AwardPackagePanel'
+import { finalDarEntry } from '../utils/awardPackage'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
 const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -104,18 +106,40 @@ export default function CommercialEvaluation() {
 
   const tender = tenders.find(t => t.id === tenderId)
 
+  // Once the Contract Engineer locks the Tender Evaluation Profile at issuance,
+  // it becomes the single source of truth for Sections A–G (framework §5) — a
+  // tender with no profile, or one still in draft, keeps the built-in defaults
+  // below exactly as before.
+  const evalProfile = tender?.commercialEvalProfileLocked ? tender.commercialEvalProfile : null
+
   // The nine steps run in order. `runs` holds each step's AI progress exactly
   // like the old two-step flow did, just keyed by step id.
   const [step, setStep]       = useState('extraction')
   const [runs, setRuns]       = useState({})   // { [stepId]: { running, step, done } }
-  const [skipped, setSkipped] = useState({})   // optional steps the evaluator skipped
+  // Optional steps the evaluator skipped — a locked profile that disables
+  // Section E (PAF) or Section G (Negotiation) pre-skips those steps here.
+  const [skipped, setSkipped] = useState(() => {
+    const init = {}
+    if (evalProfile && evalProfile.sectionE?.enabled === false)  init.preference   = true
+    if (evalProfile && evalProfile.sectionG?.enabled === false)  init.negotiation  = true
+    return init
+  })
   const [openField, setOpenField]     = useState(null)   // step 1 evidence row
   const [docChecks, setDocChecks]     = useState({})     // step 2A { [bidderId]: { [docId]: 'pass'|'fail'|'na' } }
   const [review, setReview]           = useState({})     // step 2B { [bidderId]: { [itemId]: { status, note } } }
   const [riskAck, setRiskAck]         = useState({})     // step 3
   const [benchTab, setBenchTab]       = useState('compare')  // step 4
   const [indexPct, setIndexPct]       = useState(0)      // step 5 user-defined index
-  const [paf, setPaf]                 = useState(commercialPafDefaults) // step 6
+  // step 6 — the locked profile's Section E is authoritative once issued;
+  // otherwise this stays the editable, per-tender default it always was.
+  const [paf, setPaf]                 = useState(() => evalProfile?.sectionE ? {
+    lccWeightingPct:    evalProfile.sectionE.lccWeightingPct,
+    icvWeightingPct:    evalProfile.sectionE.icvWeightingPct,
+    capPct:             evalProfile.sectionE.capPct,
+    omaniPreferencePct: evalProfile.sectionF?.preferencePct ?? commercialPafDefaults.omaniPreferencePct,
+    applyPreference:    evalProfile.sectionF?.enabled ?? commercialPafDefaults.applyPreference,
+    basis:              evalProfile.sectionE.basis,
+  } : commercialPafDefaults)
   const [negoPicked, setNegoPicked]   = useState({})     // step 7
   const [clarifications, setClarifications] = useState([])   // step 8
   const [recId, setRecId]             = useState(null)   // step 9
@@ -443,6 +467,18 @@ export default function CommercialEvaluation() {
   const pickedSavings = eligibleRows.reduce((s, r) =>
     s + opportunitiesOf(r.id).filter(o => negoPicked[`${r.id}:${o.id}`]).reduce((t, o) => t + o.savings, 0), 0)
 
+  // ── Award package inputs sourced from the generic flow's own registers —
+  // the scenario flow prices differently and has no equivalent yet, so these
+  // stay empty/null there rather than guessing at a mapping. ──
+  const awardDeviations = scenario ? [] : deviationRegister.map(d => ({ bidderName: d.row.name, item: d.item.name, note: d.note }))
+  const awardExceptions = scenario ? [] : exceptionsLog.map(d => ({ bidderName: d.row.name, item: d.item.name, note: d.note }))
+  const awardRisks = scenario ? [] : allRisks.map(k => ({ bidderName: k.row.name, risk: k.risk, impact: k.impact, rating: k.rating, detail: k.detail, mitigation: k.mitigation }))
+  const awardNegotiationSavings = (!scenario && isDone('negotiation') && !isSkipped('negotiation')) ? Math.round(pickedSavings) : null
+  const awardSensitivity = (!scenario && isDone('sensitivity')) ? (() => {
+    const s = stability()
+    return { label: commercialStability[s.key].label, heldPct: Math.round(s.heldPct), flips: s.flips.length }
+  })() : null
+
   // ── STEP 8 — clarification register ──
   // Drafted from every open finding produced by the preceding steps.
   const buildClarifications = () => {
@@ -523,6 +559,41 @@ export default function CommercialEvaluation() {
   const aiRecId = scenario ? scenarioAwardId : (ranked[0]?.id ?? null)
   const effectiveRecId = recId ?? aiRecId
   const recBidder = rows.find(b => b.id === effectiveRecId) || (scenario ? rows[0] : null) || null
+
+  // ── H.4 completion gates, shared by the award package panel below ──
+  // A scenario tender runs its own real pricing steps, so its gates are
+  // "every one of its own steps settled" rather than the generic framework's
+  // named Compliance/Risk/Benchmarking/Sensitivity list; the two families
+  // share the same ids (compliance, risk), the priced steps differ per family.
+  const awardGates = scenario
+    ? steps.filter(s => s.id !== 'tbAward').map(s => ({ key: s.id, label: s.name, ok: isDone(s.id) }))
+        .concat([{ key: 'clarifications', label: 'Clarifications closed', ok: openClarifications.length === 0 }])
+    : [
+        { key: 'compliance',  label: 'Commercial Compliance',              ok: isDone('compliance') },
+        { key: 'risk',        label: 'Commercial Risk',                    ok: isDone('risk') },
+        { key: 'benchmark',   label: 'Price Normalization & Benchmarking', ok: isDone('benchmark') },
+        { key: 'sensitivity', label: 'Sensitivity Analysis',               ok: isDone('sensitivity') },
+        { key: 'clarifications', label: 'Clarifications closed',           ok: openClarifications.length === 0 },
+        ...(evalProfile?.sectionE?.enabled !== false
+          ? [{ key: 'preference', label: 'LC / ICV / PAF / Omani Preference', ok: isDone('preference') && !isSkipped('preference') }]
+          : []),
+        ...(evalProfile?.sectionG?.enabled !== false
+          ? [{ key: 'negotiation', label: 'Negotiation Strategy', ok: isDone('negotiation') && !isSkipped('negotiation') }]
+          : []),
+      ]
+
+  // ── Award package data — ranking/exclusions/money-formatter normalized to
+  // one shape regardless of which pricing flow produced them. ──
+  const awardFmtMoney = scenario ? sFmt.money2 : fmtMoney
+  const awardExcluded = excludedRows.map(b => ({ id: b.id, name: b.name }))
+  const awardRankingSnapshot = scenario
+    ? (summary?.ranked
+        ? summary.totals.ranked.map(r => {
+            const b = scenario.bidders.find(x => x.code === r.code)
+            return { id: b?.id, name: b?.name ?? r.code, evaluated: Math.round(r.total) }
+          })
+        : scenario.rounds.map(r => ({ id: r.id, name: r.label, evaluated: Math.round(summary.totals.rounds[r.id].total) })))
+    : ranked.map(r => ({ id: r.id, name: r.name, evaluated: Math.round(evaluatedPriceOf(r.id)) }))
 
   // ── The generic step runner — one AI pass per step, same as the old flow ──
   useEffect(() => {
@@ -709,6 +780,12 @@ export default function CommercialEvaluation() {
         negotiationSavings: isSkipped('negotiation') ? null : Math.round(pickedSavings),
       },
       commercialRecommendation: recommendation,
+      // The DAR history always ends with the Final entry that was actually
+      // submitted — a re-run never leaves it implicitly at "Draft".
+      commercialDarHistory: [...(tender.commercialDarHistory || []), finalDarEntry({
+        history: tender.commercialDarHistory || [], ranking: awardRankingSnapshot,
+        excluded: awardExcluded, recommendedBidderId: recBidder?.id ?? null, fmtMoney: awardFmtMoney,
+      })],
     })
     if (isParallel) submitParallelEval(tenderId, 'comm')
     else advanceTender(tenderId)
@@ -770,6 +847,10 @@ export default function CommercialEvaluation() {
               <Badge variant="evaluation">Commercial Evaluation</Badge>
               <EvaluationTypeBadge meta={typeMeta} />
               {isParallel && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Parallel</span>}
+              <button onClick={() => navigate(`/commercial-eval-profile/${tenderId}`)}
+                className="text-[10px] font-semibold text-slate-400 hover:text-[var(--color-primary)] underline decoration-dotted underline-offset-2 transition-colors">
+                {evalProfile ? 'Evaluation Profile (locked)' : 'Evaluation Profile'}
+              </button>
             </div>
             <h3 className="font-semibold text-slate-800">{tender.title}</h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -845,7 +926,7 @@ export default function CommercialEvaluation() {
             <UploadCloud size={16} className="text-[var(--color-primary)]" />
             <h3 className="text-sm font-semibold text-slate-800">Upload Commercial Documents</h3>
           </div>
-          <p className="text-xs text-slate-500 mb-4">Technical evaluation is complete. Upload the bidders' commercial submissions so the data extraction step can run.</p>
+          <p className="text-xs text-slate-500 mb-4">Technical evaluation is complete and SCM Gate 1 has approved release of commercial evaluation. Upload the bidders' commercial submissions so the data extraction step can run.</p>
           <div className="rounded-xl border-2 border-dashed border-slate-200 hover:border-[var(--color-primary)]/50 transition-colors flex flex-col items-center justify-center gap-2.5 py-10">
             <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center"><UploadCloud size={22} className="text-slate-400" /></div>
             <p className="text-xs text-slate-500">Drop commercial documents or</p>
@@ -1430,6 +1511,14 @@ export default function CommercialEvaluation() {
                         </div>
                       </Card>
 
+                      <AwardPackagePanel tender={tender} tenderId={tenderId} updateTender={updateTender}
+                        tenderTitle={tender.title}
+                        gates={awardGates} ranking={awardRankingSnapshot} excluded={awardExcluded}
+                        recommendedBidder={recBidder} fmtMoney={awardFmtMoney}
+                        deviations={awardDeviations} exceptions={awardExceptions} risks={awardRisks}
+                        clarifications={clarifications} negotiationSavings={awardNegotiationSavings}
+                        sensitivity={awardSensitivity} note={note} />
+
                       <Card className="p-4">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                           <div>
@@ -1873,7 +1962,11 @@ export default function CommercialEvaluation() {
                   {/* Configuration */}
                   <Card className="p-4">
                     <h3 className="text-sm font-semibold text-slate-800 mb-0.5">PAF Configuration</h3>
-                    <p className="text-xs text-slate-400 mb-3">Configurable per tender — this is the single source of truth for evaluation adjustments.</p>
+                    <p className="text-xs text-slate-400 mb-3">
+                      {evalProfile
+                        ? 'Set in the Tender Evaluation Profile (Section E) — locked at issuance, read-only here.'
+                        : 'Configurable per tender — this is the single source of truth for evaluation adjustments.'}
+                    </p>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                       {[
                         { key: 'lccWeightingPct',    label: 'LCC Weighting %',   max: 20 },
@@ -1883,22 +1976,22 @@ export default function CommercialEvaluation() {
                       ].map(f => (
                         <div key={f.key}>
                           <label className="text-[11px] font-semibold text-slate-500">{f.label}</label>
-                          <input type="number" min={0} max={f.max} value={paf[f.key]}
+                          <input type="number" min={0} max={f.max} value={paf[f.key]} disabled={!!evalProfile}
                             onChange={e => setPaf(prev => ({ ...prev, [f.key]: Math.max(0, Math.min(f.max, Number(e.target.value) || 0)) }))}
-                            className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30" />
+                            className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-400" />
                         </div>
                       ))}
                       <div>
                         <label className="text-[11px] font-semibold text-slate-500">PAF Basis</label>
-                        <select value={paf.basis} onChange={e => setPaf(prev => ({ ...prev, basis: e.target.value }))}
-                          className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
+                        <select value={paf.basis} disabled={!!evalProfile} onChange={e => setPaf(prev => ({ ...prev, basis: e.target.value }))}
+                          className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-400">
                           <option value="normalized">Normalized price (price normalization)</option>
                           <option value="submitted">Submitted bid price</option>
                         </select>
                       </div>
                     </div>
                     <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                      <input type="checkbox" checked={paf.applyPreference}
+                      <input type="checkbox" checked={paf.applyPreference} disabled={!!evalProfile}
                         onChange={e => setPaf(prev => ({ ...prev, applyPreference: e.target.checked }))}
                         className="accent-[var(--color-primary)]" />
                       <span className="text-xs text-slate-600">Apply Omani Company / SME / Omani JV preference</span>
@@ -2315,6 +2408,14 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
                           })}
                         </div>
                       </Card>
+
+                      <AwardPackagePanel tender={tender} tenderId={tenderId} updateTender={updateTender}
+                        tenderTitle={tender.title}
+                        gates={awardGates} ranking={awardRankingSnapshot} excluded={awardExcluded}
+                        recommendedBidder={recBidder} fmtMoney={awardFmtMoney}
+                        deviations={awardDeviations} exceptions={awardExceptions} risks={awardRisks}
+                        clarifications={clarifications} negotiationSavings={awardNegotiationSavings}
+                        sensitivity={awardSensitivity} note={note} />
 
                       {/* Submit */}
                       <Card className="p-4">

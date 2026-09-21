@@ -15,6 +15,7 @@ const pageMeta = {
   '/upload':         { titleKey: 'page.ingestion',   subKey: 'page.ingestion.sub' },
   '/technical-eval': { titleKey: 'page.techEval',    subKey: 'page.techEval.sub' },
   '/commercial-eval':{ titleKey: 'page.commEval',    subKey: 'page.commEval.sub' },
+  '/commercial-eval-profile': { titleKey: 'page.commEvalProfile', subKey: 'page.commEvalProfile.sub' },
   '/scm-tech-review':     { titleKey: 'page.scmTechReview',     subKey: 'page.scmTechReview.sub' },
   '/scm-review':          { titleKey: 'page.scmAwardReview',    subKey: 'page.scmAwardReview.sub' },
   '/scm-contract-review': { titleKey: 'page.scmContractReview', subKey: 'page.scmContractReview.sub' },

@@ -82,6 +82,7 @@ const navByRole = {
     { to: '/pre-qualification',  icon: '/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
     { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
     { to: '/upload',             icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
+    { to: '/commercial-eval-profile', icon: '/icons/bulb.svg',   labelKey: 'nav.commEvalProfile' },
     { to: '/commercial-eval',    icon: '/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
     { to: '/contract',           icon: '/icons/contract.svg',    labelKey: 'nav.contract'    },
     { to: '/contract-management',icon: '/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },

@@ -32,6 +32,7 @@ import ITTCreation from './pages/ITTCreation'
 import BidderUpload from './pages/BidderUpload'
 import TechnicalEvaluation from './pages/TechnicalEvaluation'
 import CommercialEvaluation from './pages/CommercialEvaluation'
+import TenderEvaluationProfile from './pages/TenderEvaluationProfile'
 import AwardRecommendation from './pages/AwardRecommendation'
 import ScmGateReview from './pages/ScmGateReview'
 import ContractTemplate from './pages/ContractTemplate'
@@ -97,6 +98,8 @@ function ProtectedRoutes() {
           <Route path="/technical-eval/:tenderId" element={<TechnicalEvaluation />} />
           <Route path="/commercial-eval" element={<CommercialEvaluation />} />
           <Route path="/commercial-eval/:tenderId" element={<CommercialEvaluation />} />
+          <Route path="/commercial-eval-profile" element={<TenderEvaluationProfile />} />
+          <Route path="/commercial-eval-profile/:tenderId" element={<TenderEvaluationProfile />} />
           {/* SCM gate 1 — technical evaluation review */}
           <Route path="/scm-tech-review" element={<ScmGateReview gate="scm_gate1" />} />
           <Route path="/scm-tech-review/:tenderId" element={<ScmGateReview gate="scm_gate1" />} />
