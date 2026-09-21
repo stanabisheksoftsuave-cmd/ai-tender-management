@@ -4,10 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
-import SearchableSelect from '../components/ui/SearchableSelect'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
-import { useAuth } from '../context/AuthContext'
 import { useBackHandler, useDismissable } from '../context/NavigationContext'
 import { tenderRef } from '../utils/tenderRef'
 
@@ -39,13 +37,7 @@ export default function BidderUpload() {
   const navigate = useNavigate()
   const { tenders, advanceTender, updateTender, uploadParallelReport } = useTenders()
   const { lang, t, } = useLanguage()
-  const { users } = useAuth()
   const uploadTenders = tenders.filter(t => t.status === 'upload')
-
-  // Technical evaluation is owned by the Contract Holder; commercial by the
-  // Contract Engineer. Evaluator pools are drawn from those roles.
-  const techEvaluators = users.filter(u => u.roleId === 'contract_holder' && u.status === 'active')
-  const commEvaluators = users.filter(u => u.roleId === 'pof' && u.status === 'active')
 
   const paramTender = tenderId ? tenders.find(t => t.id === tenderId) : null
   const [selectedTender, setSelectedTender] = useState(paramTender || null)
@@ -74,11 +66,6 @@ export default function BidderUpload() {
   const [correctionExtracted,    setCorrectionExtracted]    = useState({}) // { bidderId: bool }
   const [correctionExtractPct,   setCorrectionExtractPct]   = useState({}) // { bidderId: 0-100 }
   const [correctionGeneral,      setCorrectionGeneral]      = useState({}) // { bidderId: [{name,size}] }
-
-  // Reassign evaluators modal (for tenders already in evaluation)
-  const [reassignTender,  setReassignTender]  = useState(null)
-  const [reassignForm,    setReassignForm]    = useState({ techEval: '', commEval: '' })
-  const [reassignErrors,  setReassignErrors]  = useState({})
 
   const biddersRef = useRef(bidders)
   useEffect(() => { biddersRef.current = bidders }, [bidders])
@@ -167,9 +154,6 @@ export default function BidderUpload() {
 
   // Modals sit above the page — Back closes the topmost one before any in-page
   // or route unwinding. Each mirrors its own X / Cancel reset.
-  // reassignTender renders inside the list branch below an early return, so this
-  // must stay at top level to be a valid hook call.
-  useDismissable(reassignTender, () => setReassignTender(null))
   useDismissable(showTracker, () => setShowTracker(false))
   useDismissable(showAddBidder, () => setShowAddBidder(false))
 
@@ -299,34 +283,6 @@ export default function BidderUpload() {
   const correctionTenders = tenders.filter(
     t => t.correctionRequests?.some(r => !r.resolved)
   )
-
-  // Tenders currently in evaluation (tech or commercial) — POF can reassign evaluators
-  const evaluationTenders = tenders.filter(
-    t => t.status === 'tech_eval' || t.status === 'comm_eval'
-  )
-
-  const openReassignModal = (tender) => {
-    setReassignTender(tender)
-    setReassignForm({
-      techEval: tender.assignedTechEval ? String(tender.assignedTechEval.id) : '',
-      commEval: tender.assignedCommEval ? String(tender.assignedCommEval.id) : '',
-    })
-    setReassignErrors({})
-  }
-
-  const confirmReassign = () => {
-    const errs = {}
-    if (!reassignForm.techEval) errs.techEval = 'Required'
-    if (!reassignForm.commEval) errs.commEval = 'Required'
-    if (Object.keys(errs).length) { setReassignErrors(errs); return }
-    const techUser = techEvaluators.find(u => String(u.id) === reassignForm.techEval)
-    const commUser = commEvaluators.find(u => String(u.id) === reassignForm.commEval)
-    updateTender(reassignTender.id, {
-      assignedTechEval: techUser ? { id: techUser.id, name: techUser.name } : reassignTender.assignedTechEval,
-      assignedCommEval: commUser ? { id: commUser.id, name: commUser.name } : reassignTender.assignedCommEval,
-    })
-    setReassignTender(null)
-  }
 
   const handleCorrectionFileSelect = (bidderId, docId, file) => {
     if (!file) return
@@ -646,74 +602,6 @@ export default function BidderUpload() {
     return (
       <div className="space-y-5">
 
-      {/* ── Reassign Evaluator Modal ── */}
-      {reassignTender && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Reassign Evaluators</h3>
-                <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{reassignTender.title}</p>
-              </div>
-              <button onClick={() => setReassignTender(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Technical Evaluator</label>
-                <SearchableSelect
-                  value={reassignForm.techEval}
-                  onChange={v => setReassignForm(f => ({ ...f, techEval: v === '' ? '' : String(v) }))}
-                  options={techEvaluators}
-                  getValue={u => u.id}
-                  getLabel={u => u.name}
-                  getSubLabel={u => u.email || u.username || ''}
-                  placeholder="— Select Technical Evaluator —"
-                  searchPlaceholder="Search evaluators…"
-                  emptyText="No matching evaluators"
-                  ariaLabel="Technical Evaluator"
-                  clearable
-                />
-                {reassignErrors.techEval && <p className="text-[11px] text-red-500 mt-1">{reassignErrors.techEval}</p>}
-                {reassignTender.assignedTechEval && (
-                  <p className="text-[11px] text-slate-400 mt-1">Current: {reassignTender.assignedTechEval.name}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Commercial Evaluator</label>
-                <SearchableSelect
-                  value={reassignForm.commEval}
-                  onChange={v => setReassignForm(f => ({ ...f, commEval: v === '' ? '' : String(v) }))}
-                  options={commEvaluators}
-                  getValue={u => u.id}
-                  getLabel={u => u.name}
-                  getSubLabel={u => u.email || u.username || ''}
-                  placeholder="— Select Commercial Evaluator —"
-                  searchPlaceholder="Search evaluators…"
-                  emptyText="No matching evaluators"
-                  ariaLabel="Commercial Evaluator"
-                  clearable
-                />
-                {reassignErrors.commEval && <p className="text-[11px] text-red-500 mt-1">{reassignErrors.commEval}</p>}
-                {reassignTender.assignedCommEval && (
-                  <p className="text-[11px] text-slate-400 mt-1">Current: {reassignTender.assignedCommEval.name}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
-              <button onClick={() => setReassignTender(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors">
-                Cancel
-              </button>
-              <button onClick={confirmReassign}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-all">
-                <Save size={12} /> Confirm Reassignment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
         {/* ── Evaluation Report Uploads (Tech & Comm) ── */}
         {pendingReports.length > 0 && (
           <div className="space-y-3">
@@ -862,55 +750,6 @@ export default function BidderUpload() {
             </Card>
           ))}
         </div>
-
-        {/* ── Active Evaluations — Reassign Evaluator ── */}
-        {evaluationTenders.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Users size={14} className="text-slate-500" />
-              <h3 className="text-sm font-semibold text-slate-700">Active Evaluations</h3>
-              <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{evaluationTenders.length}</span>
-            </div>
-            <div className="space-y-3">
-              {evaluationTenders.map(tender => (
-                <Card key={tender.id} className="p-4 border-slate-200">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-                        <span className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">{tender.stage}</span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
-                      <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        {tender.assignedTechEval && (
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <span className="w-4 h-4 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold flex items-center justify-center">
-                              {tender.assignedTechEval.name[0]}
-                            </span>
-                            Tech: {tender.assignedTechEval.name}
-                          </span>
-                        )}
-                        {tender.assignedCommEval && (
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <span className="w-4 h-4 rounded bg-blue-100 text-blue-700 text-[9px] font-bold flex items-center justify-center">
-                              {tender.assignedCommEval.name[0]}
-                            </span>
-                            Comm: {tender.assignedCommEval.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => openReassignModal(tender)}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors shrink-0">
-                      <UserPlus size={12} /> Reassign
-                    </button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── Correction Requests from Technical Evaluator ── */}
         {correctionTenders.length > 0 && (
