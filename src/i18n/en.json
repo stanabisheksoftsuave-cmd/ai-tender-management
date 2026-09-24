@@ -235,7 +235,7 @@
   "audit.tender":        "Tender",
   "audit.ip":            "IP Address",
   "audit.status":        "Status",
-  "audit.search":        "Search user, action, tender ID...",
+  "audit.search":        "Search user",
   "audit.colourTheme":   "Colour Theme",
 
   "itt.step1":           "Project Details",

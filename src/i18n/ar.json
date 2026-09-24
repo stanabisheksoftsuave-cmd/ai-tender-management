@@ -235,7 +235,7 @@
   "audit.tender":        "المناقصة",
   "audit.ip":            "عنوان IP",
   "audit.status":        "الحالة",
-  "audit.search":        "بحث عن مستخدم أو إجراء أو رقم مناقصة...",
+  "audit.search":        "بحث عن مستخدم",
   "audit.colourTheme":   "نمط اللون",
 
   "itt.step1":           "تفاصيل المشروع",
