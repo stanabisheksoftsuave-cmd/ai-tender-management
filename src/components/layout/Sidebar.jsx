@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { Lock, LogOut } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -232,6 +232,10 @@ export default function Sidebar() {
     setPickerItem(null)
     if (key) navigate(pathFor(key, id))
   }
+
+  // Sign Out asks for confirmation first, same as the reference app.
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  useDismissable(showSignOutConfirm, () => setShowSignOutConfirm(false))
 
   const isOlng   = theme === 'olng'
 
@@ -501,7 +505,7 @@ export default function Sidebar() {
 
         {/* Sign Out */}
         <button
-          onClick={logout}
+          onClick={() => setShowSignOutConfirm(true)}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
           style={{ color: logoutColor }}
           onMouseOver={e => { e.currentTarget.style.background = logoutHoverBg; e.currentTarget.style.color = logoutHoverColor }}
@@ -513,6 +517,39 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+
+    {/* ── Sign Out confirmation — rendered outside <aside> so its z-index isn't
+        scoped inside the sidebar's own stacking context (it would otherwise
+        paint behind the top Header bar, which sits at a higher z-index as a
+        sibling stacking context). ── */}
+    {showSignOutConfirm && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        onClick={() => setShowSignOutConfirm(false)}>
+        <div onClick={e => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 flex flex-col items-center text-center gap-4">
+          <span className="flex w-14 h-14 shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>
+            <LogOut size={24} />
+          </span>
+          <div className="space-y-1">
+            <p className="text-lg font-bold text-slate-800">Sign out</p>
+            <p className="text-sm text-slate-500">Are you sure you want to sign out?</p>
+          </div>
+          <div className="mt-1 flex items-center gap-3">
+            <button
+              onClick={() => setShowSignOutConfirm(false)}
+              className="px-6 py-2 rounded-full text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={logout}
+              className="px-6 py-2 rounded-full text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* ── Tender picker: choose which CIF tender the strategy sub-item opens ── */}
     {pickerItem && (

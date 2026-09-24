@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import StageTimeline from '../components/ui/StageTimeline'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -357,20 +358,17 @@ export default function TenderList() {
         </div>
       </div>
 
-      {/* Summary bar */}
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-              ${activeFilter === tab.key
-                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-          >
-            {tab.label} <span className="ml-1 opacity-60">({nonDraftTenders.filter(tab.fn).length})</span>
-          </button>
-        ))}
+      {/* Stage filter */}
+      <div className="w-full max-w-xs">
+        <SearchableSelect
+          value={activeFilter}
+          onChange={key => setActiveFilter(key)}
+          options={tabs}
+          getValue={tab => tab.key}
+          getLabel={tab => `${tab.label} (${nonDraftTenders.filter(tab.fn).length})`}
+          searchable={false}
+          ariaLabel={lang === 'ar' ? 'تصفية حسب المرحلة' : 'Filter by stage'}
+        />
       </div>
 
       {/* Table */}

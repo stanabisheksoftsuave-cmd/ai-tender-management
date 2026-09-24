@@ -284,6 +284,14 @@ export default function BidderUpload() {
     t => t.correctionRequests?.some(r => !r.resolved)
   )
 
+  // One combined list for the picker screen — a correction-request tender
+  // reads as just another row (flagged, not routed to its own separate
+  // section) alongside everything else awaiting ingestion.
+  const ingestionList = [
+    ...uploadTenders.map(tender => ({ tender, isCorrection: false })),
+    ...correctionTenders.map(tender => ({ tender, isCorrection: true })),
+  ]
+
   const handleCorrectionFileSelect = (bidderId, docId, file) => {
     if (!file) return
     const key = `${bidderId}-${docId}`
@@ -339,45 +347,75 @@ export default function BidderUpload() {
     const requests = (correctionTender.correctionRequests || []).filter(r => !r.resolved)
     return (
       <div className="space-y-5">
-        <button
-          onClick={closeCorrectionPortal}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft size={14} /> Back
-        </button>
-
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{correctionTender.id}</span>
-              <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Bell size={10} /> Correction Requests from Technical Evaluator
-              </span>
-            </div>
-            <h3 className="font-semibold text-slate-800">{correctionTender.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {correctionTender.department} · Upload missing documents flagged by the Technical Evaluator
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-2xl font-bold text-amber-600">{requests.length}</p>
-            <p className="text-xs text-slate-400">Pending bidder{requests.length !== 1 ? 's' : ''}</p>
-          </div>
+        <div className="flex items-center gap-3">
+          <button onClick={closeCorrectionPortal} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+            <ArrowLeft size={14} /> {t('common.backToList')}
+          </button>
+          <span className="text-slate-200">|</span>
+          <span className="text-xs text-slate-400">{tenderRef(correctionTender)}</span>
         </div>
 
-        {/* Bidder correction cards */}
+        {/* Header — same chrome as the normal ingestion screen (INGESTION badge,
+            tender ref/title, registered-bidder count), so a re-upload request
+            reads as the same screen, not a separate page. */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(correctionTender)}</span>
+                <Badge variant="upload">Ingestion</Badge>
+              </div>
+              <h3 className="font-semibold text-slate-800">{correctionTender.title}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Upload missing documents flagged by the Technical Evaluator</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-amber-600">{requests.length}</p>
+              <p className="text-xs text-slate-400">Pending bidder{requests.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Evaluation Flow — read-only here: the tender already committed to a
+            mode at ingestion, this screen only re-opens document upload. */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <GitBranch size={14} className="text-[var(--color-primary)] shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Evaluation Flow</p>
+                <p className="text-[11px] text-slate-400">
+                  {correctionTender.evaluationMode === 'parallel'
+                    ? 'Parallel — Technical and Commercial evaluated together.'
+                    : 'Linear — Technical first, then Commercial after technical evaluation.'}
+                </p>
+              </div>
+            </div>
+            <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg shrink-0">
+              <Lock size={11} /> Locked — a document has already been uploaded for this tender
+            </span>
+          </div>
+        </Card>
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-700">Registered Bidders ({requests.length})</h3>
+        </div>
+
+        {/* Bidder cards — same shape as the normal ingestion bidder card
+            (status icon, name, status pill, document rows with a delete icon,
+            a labelled upload slot), with the clarification folded in as a
+            banner instead of routing to a separate screen. */}
         <div className="space-y-4">
           {requests.map(req => {
             const isSubmitted   = !!correctionSubmitted[`${correctionTender.id}-${req.bidderId}`]
             const isExtracting  = !!correctionExtracting[req.bidderId]
             const isExtracted   = !!correctionExtracted[req.bidderId]
             const extractPct    = correctionExtractPct[req.bidderId] || 0
-            const specificUploaded = req.missingDocs.filter(
-              d => correctionUploads[`${req.bidderId}-${d.id}`]
-            ).length
+            const uploadedDocs  = req.missingDocs.filter(d => correctionUploads[`${req.bidderId}-${d.id}`])
+            const pendingDocs   = req.missingDocs.filter(d => !correctionUploads[`${req.bidderId}-${d.id}`])
             const generalFiles  = correctionGeneral[req.bidderId] || []
-            const uploadedCount = specificUploaded + generalFiles.length
+            const uploadedCount = uploadedDocs.length + generalFiles.length
+            const ready         = pendingDocs.length === 0
+            const statusLabel   = isSubmitted ? 'Submitted' : isExtracted ? 'Extracted' : ready ? 'Ready' : 'Pending'
 
             const handleGeneralFiles = (incoming) => {
               const files = Array.from(incoming)
@@ -394,202 +432,138 @@ export default function BidderUpload() {
               }))
             }
 
+            const runExtraction = () => {
+              setCorrectionExtractPct(prev => ({ ...prev, [req.bidderId]: 0 }))
+              setCorrectionExtracting(prev => ({ ...prev, [req.bidderId]: true }))
+            }
+
             return (
-              <div key={req.bidderId} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                {/* Bidder header */}
-                <div className="px-5 py-4 border-b border-slate-100 bg-amber-50 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
-                      <Bell size={16} className="text-amber-500" />
+              <Card key={req.bidderId} className="p-4">
+                <div className="flex items-start gap-3">
+                  <span className={`flex w-9 h-9 shrink-0 items-center justify-center rounded-lg ${isSubmitted || isExtracted ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                    <FileText size={16} className={isSubmitted || isExtracted ? 'text-emerald-500' : 'text-amber-500'} />
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-slate-800">{req.bidderName}</span>
+                      <Badge variant={isSubmitted || isExtracted ? 'success' : 'warning'}>{statusLabel}</Badge>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-800 text-sm">{req.bidderName}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        <span className="font-semibold text-slate-700">{req.evaluatorName || 'Technical Evaluator'}</span> sent a re-upload request · {req.notifiedAt}
+
+                    {/* Clarification banner */}
+                    <div className="mt-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+                      <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                        <AlertTriangle size={12} className="shrink-0" />
+                        {req.missingDocs.length} clarification{req.missingDocs.length !== 1 ? 's' : ''} from {req.evaluatorName || 'the Technical Evaluator'}
                       </p>
+                      <ul className="mt-1 ml-5 list-disc text-[11px] text-amber-700 space-y-0.5">
+                        <li>{req.bidderName} — missing or deficient documents · {req.notifiedAt}</li>
+                      </ul>
                     </div>
-                  </div>
-                  {isSubmitted && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 bg-white border border-emerald-200 px-3 py-1.5 rounded-full">
-                      <CheckCircle size={11} /> Submitted
-                    </span>
-                  )}
-                </div>
 
-                {/* Missing docs list */}
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
-                    Missing Documents — {req.missingDocs.length} item{req.missingDocs.length !== 1 ? 's' : ''}
-                  </p>
-                  <div className="space-y-2">
-                    {req.missingDocs.map(doc => {
-                      const key = `${req.bidderId}-${doc.id}`
-                      const fileName = correctionUploads[key]
-                      const inputId = `corr-${req.bidderId}-${doc.id}`
-                      return (
-                        <div key={doc.id}
-                          className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all
-                            ${fileName ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
-                              ${doc.kind === 'mandatory' ? 'bg-red-100' : 'bg-amber-100'}`}>
-                              <FileText size={13} className={doc.kind === 'mandatory' ? 'text-red-500' : 'text-amber-500'} />
+                    {/* Already-uploaded documents — same delete-icon row as ingestion */}
+                    {(uploadedDocs.length > 0 || generalFiles.length > 0) && (
+                      <div className="mt-2 space-y-1.5">
+                        {uploadedDocs.map(doc => {
+                          const key = `${req.bidderId}-${doc.id}`
+                          return (
+                            <div key={doc.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                              <span className="flex items-center gap-2 min-w-0 text-xs font-medium text-slate-700">
+                                <FileText size={13} className="text-[var(--color-primary)] shrink-0" />
+                                <span className="truncate">{correctionUploads[key]}</span>
+                              </span>
+                              {!isSubmitted && (
+                                <button type="button"
+                                  onClick={() => setCorrectionUploads(prev => { const next = { ...prev }; delete next[key]; return next })}
+                                  aria-label={`Remove ${doc.name}`}
+                                  className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 shrink-0">
+                                  <X size={13} />
+                                </button>
+                              )}
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-700 truncate">{doc.name}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] font-mono text-slate-400">{doc.docRef}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold
-                                  ${doc.kind === 'mandatory' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                                  {doc.kind === 'mandatory' ? 'Mandatory' : 'Optional'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="shrink-0">
-                            {fileName ? (
-                              <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
-                                <CheckCircle size={12} />
-                                <span className="max-w-[120px] truncate">{fileName}</span>
-                              </div>
-                            ) : (
-                              <label htmlFor={inputId}
-                                className={`flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border cursor-pointer transition-colors
-                                  ${isSubmitted
-                                    ? 'opacity-40 pointer-events-none bg-slate-100 border-slate-200 text-slate-400'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]'}`}>
-                                <Upload size={11} /> Upload
-                              </label>
-                            )}
-                            <input id={inputId} type="file" className="hidden" disabled={isSubmitted}
-                              onChange={e => handleCorrectionFileSelect(req.bidderId, doc.id, e.target.files?.[0])} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* General document upload zone — always available */}
-                  <div className={`mt-3 border-2 border-dashed rounded-xl transition-all
-                    ${isSubmitted ? 'opacity-40 pointer-events-none border-slate-200' : 'border-slate-300 hover:border-[var(--color-primary)]/60'}`}>
-                    <label className="flex flex-col items-center gap-2 py-5 cursor-pointer">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                        <Upload size={16} className="text-[var(--color-primary)]" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs font-medium text-slate-600">Upload documents for this bidder</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">PDF, ZIP, RAR, DOCX — any format accepted</p>
-                      </div>
-                      <input type="file" multiple className="hidden" disabled={isSubmitted}
-                        onChange={e => { handleGeneralFiles(e.target.files); e.target.value = '' }} />
-                    </label>
-                    {generalFiles.length > 0 && (
-                      <div className="px-4 pb-4 space-y-1.5">
+                          )
+                        })}
                         {generalFiles.map((f, i) => (
-                          <div key={i} className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <CheckCircle size={12} className="text-emerald-500 shrink-0" />
-                              <span className="text-[11px] font-medium text-slate-700 truncate">{f.name}</span>
+                          <div key={i} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <span className="flex items-center gap-2 min-w-0 text-xs font-medium text-slate-700">
+                              <FileText size={13} className="text-[var(--color-primary)] shrink-0" />
+                              <span className="truncate">{f.name}</span>
                               <span className="text-[10px] text-slate-400 shrink-0">{f.size}</span>
-                            </div>
+                            </span>
                             {!isSubmitted && (
-                              <button onClick={() => setCorrectionGeneral(prev => ({
-                                ...prev,
-                                [req.bidderId]: prev[req.bidderId].filter((_, idx) => idx !== i),
-                              }))} className="text-slate-300 hover:text-red-400 shrink-0">
-                                <X size={12} />
+                              <button type="button"
+                                onClick={() => setCorrectionGeneral(prev => ({ ...prev, [req.bidderId]: prev[req.bidderId].filter((_, idx) => idx !== i) }))}
+                                aria-label={`Remove ${f.name}`}
+                                className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 shrink-0">
+                                <X size={13} />
                               </button>
                             )}
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Submit row — 3-phase: upload → extract → submit */}
-                <div className="px-5 pb-5 space-y-3">
-
-                  {/* Phase indicator pills */}
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                    <span className={`px-2.5 py-1 rounded-full ${uploadedCount > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>1 Upload</span>
-                    <span className="text-slate-300">›</span>
-                    <span className={`px-2.5 py-1 rounded-full ${isExtracting ? 'bg-blue-100 text-blue-700' : isExtracted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>2 AI Extraction</span>
-                    <span className="text-slate-300">›</span>
-                    <span className={`px-2.5 py-1 rounded-full ${isSubmitted ? 'bg-emerald-100 text-emerald-700' : isExtracted ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>3 Submit</span>
-                  </div>
-
-                  {/* Extraction progress bar */}
-                  {isExtracting && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <Activity size={12} className="text-blue-600 animate-pulse" />
-                          <span className="text-xs font-semibold text-blue-700">AI Extraction Running...</span>
+                    {/* Upload slot — one per document still flagged missing */}
+                    {!isSubmitted && pendingDocs.map(doc => {
+                      const inputId = `corr-${req.bidderId}-${doc.id}`
+                      return (
+                        <div key={doc.id} className="mt-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 flex items-center justify-between gap-2 bg-slate-50/60">
+                          <span className="flex items-center gap-1.5 min-w-0 text-xs font-medium text-slate-600">
+                            <FileText size={13} className="text-slate-400 shrink-0" />
+                            <span className="truncate">{doc.name}</span>
+                            {doc.kind === 'mandatory' && <span className="text-red-400 shrink-0">*</span>}
+                          </span>
+                          <label htmlFor={inputId} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)] hover:underline cursor-pointer shrink-0">
+                            <Upload size={11} /> Upload {doc.name.split(' ')[0].toLowerCase()}
+                          </label>
+                          <input id={inputId} type="file" className="hidden"
+                            onChange={e => handleCorrectionFileSelect(req.bidderId, doc.id, e.target.files?.[0])} />
                         </div>
-                        <span className="text-xs font-bold text-blue-600">{extractPct}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-blue-100 overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${extractPct}%`, background: 'var(--color-primary)' }} />
-                      </div>
-                    </div>
-                  )}
+                      )
+                    })}
 
-                  {/* Extraction complete */}
-                  {isExtracted && !isSubmitted && (
-                    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
-                      <CheckCircle size={12} /> AI extraction complete — documents indexed &amp; ready
-                    </div>
-                  )}
-
-                  {/* Action row */}
-                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                    <span className="text-xs text-slate-500">
-                      {isSubmitted   ? 'Documents submitted to Technical Evaluator for review.'
-                       : isExtracted ? 'Extraction complete — submit when ready'
-                       : isExtracting ? 'Extracting uploaded documents…'
-                       : `${uploadedCount} of ${req.missingDocs.length} file${req.missingDocs.length !== 1 ? 's' : ''} ready`}
-                    </span>
-
-                    {/* Phase 2: Run AI Extraction */}
-                    {!isSubmitted && !isExtracted && !isExtracting && (
-                      <button
-                        disabled={uploadedCount === 0}
-                        onClick={() => {
-                          setCorrectionExtractPct(prev => ({ ...prev, [req.bidderId]: 0 }))
-                          setCorrectionExtracting(prev => ({ ...prev, [req.bidderId]: true }))
-                        }}
-                        className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all
-                          ${uploadedCount > 0
-                            ? 'text-white hover:opacity-90'
-                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                        style={uploadedCount > 0 ? { background: 'var(--color-primary)' } : {}}>
-                        <Bot size={12} /> Run AI Extraction
-                      </button>
+                    {!isSubmitted && (
+                      <label className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)] hover:underline cursor-pointer w-fit">
+                        <Upload size={11} /> Upload additional documents
+                        <input type="file" multiple className="hidden"
+                          onChange={e => { handleGeneralFiles(e.target.files); e.target.value = '' }} />
+                      </label>
                     )}
 
-                    {/* Phase 3: Submit (only after extraction) */}
-                    {!isSubmitted && (isExtracted || isExtracting) && (
-                      <button
-                        disabled={!isExtracted}
-                        onClick={() => handleSubmitCorrection(correctionTender, req.bidderId)}
-                        className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all
-                          ${isExtracted
-                            ? 'bg-[var(--color-primary)] hover:opacity-90 text-white'
-                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                        <Send size={12} /> Submit to Technical Evaluator
-                      </button>
-                    )}
-
-                    {/* Submitted */}
-                    {isSubmitted && (
-                      <span className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-100 text-emerald-600 px-4 py-2 rounded-lg">
-                        <CheckCircle size={12} /> Submitted
-                      </span>
+                    {isExtracting && (
+                      <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
+                        <Activity size={11} className="text-[var(--color-primary)] animate-pulse" />
+                        AI extraction running… {extractPct}%
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
+
+                {/* Ready bar — mirrors the normal ingestion screen's "ready for
+                    evaluation" footer */}
+                {isSubmitted ? (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl px-4 py-3 bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-700">
+                    <CheckCircle size={13} className="shrink-0" />
+                    Sent to Technical Evaluation — {req.bidderName}'s corrected documents were submitted to {req.evaluatorName || 'the Technical Evaluator'} for review.
+                  </div>
+                ) : (
+                  <div className={`mt-3 flex items-center justify-between rounded-xl px-4 py-3 ${isExtracted ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}`}>
+                    <span className={`flex items-center gap-2 text-xs font-medium ${isExtracted ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {isExtracted ? <CheckCircle size={13} /> : <Clock size={13} />}
+                      {isExtracted ? 'All documents extracted. Ready to resubmit.' : `${uploadedCount} of ${req.missingDocs.length} document${req.missingDocs.length !== 1 ? 's' : ''} ready`}
+                    </span>
+                    {isExtracted ? (
+                      <Button size="sm" onClick={() => handleSubmitCorrection(correctionTender, req.bidderId)}>
+                        Submit to Technical Evaluator <Send size={13} />
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" disabled={uploadedCount === 0 || isExtracting} onClick={runExtraction}>
+                        <Bot size={13} /> Run AI Extraction
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </Card>
             )
           })}
         </div>
@@ -714,84 +688,75 @@ export default function BidderUpload() {
             <h2 className="text-sm font-semibold text-slate-700">{t('ing.selectTitle')}</h2>
             <p className="text-xs text-slate-400 mt-0.5">{t('ing.selectSub')}</p>
           </div>
-          <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{uploadTenders.length} {t('ing.ready')}</span>
+          <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{ingestionList.length} {t('ing.ready')}</span>
         </div>
-        {uploadTenders.length === 0 && (
+        {ingestionList.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
             <Lock size={32} />
             <p className="text-sm font-medium">{t('ing.noTenders')}</p>
             <p className="text-xs">{t('ing.noTendersSub')}</p>
           </div>
         )}
+        {/* One unified list — a tender the Technical Evaluator sent back for
+            re-upload sits alongside every other tender awaiting ingestion,
+            just flagged with its own badge, rather than routing to a separate
+            screen before you can even see it. */}
         <div className="space-y-3">
-          {uploadTenders.map(tender => (
-            <Card key={tender.id} className="p-4 cursor-pointer hover:shadow-md hover:border-[var(--color-primary)]/30 transition-all group" onClick={() => setSelectedTender(tender)}>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor[tender.status] || 'bg-slate-100 text-slate-600'}`}>{stageLabel[tender.status] || tender.stage}</span>
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="flex items-center gap-1 text-xs text-slate-400"><Building2 size={11} /> {tender.department}</span>
-                    <span className="flex items-center gap-1 text-xs text-slate-400"><Calendar size={11} /> Deadline {tender.deadline}</span>
-                    <span className="flex items-center gap-1 text-xs text-slate-400"><Users size={11} /> {tender.bidders} bidder{tender.bidders !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-slate-800">{tender.budget}</p>
-                    <p className="text-[10px] text-slate-400">Budget</p>
-                  </div>
-                  <ChevronRight size={16} className="text-slate-300 group-hover:text-[var(--color-primary)] transition-colors" />
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        {/* ── Correction Requests from Technical Evaluator ── */}
-        {correctionTenders.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Bell size={14} className="text-amber-500" />
-              <h3 className="text-sm font-semibold text-slate-700">Correction Requests — Technical Evaluator</h3>
-              <span className="text-xs font-bold text-white bg-amber-500 px-2 py-0.5 rounded-full">
-                {correctionTenders.reduce((n, t) => n + (t.correctionRequests?.filter(r => !r.resolved).length || 0), 0)} pending
-              </span>
-            </div>
-            <div className="space-y-3">
-              {correctionTenders.map(tender => {
-                const pending = tender.correctionRequests.filter(r => !r.resolved)
-                return (
-                  <Card key={tender.id}
-                    className="p-4 cursor-pointer hover:shadow-md hover:border-amber-300 transition-all group border-amber-200 bg-amber-50/40"
-                    onClick={() => { setCorrectionTender(tender); setCorrectionUploads({}); setCorrectionSubmitted({}); setCorrectionExtracting({}); setCorrectionExtracted({}); setCorrectionExtractPct({}); setCorrectionGeneral({}) }}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
-                            {tender.stage}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="flex items-center gap-1 text-xs text-slate-400"><Building2 size={11} /> {tender.department}</span>
-                          <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                            <AlertTriangle size={11} /> {pending.length} bidder{pending.length !== 1 ? 's' : ''} need re-upload
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="text-amber-300 group-hover:text-amber-500 transition-colors shrink-0" />
+          {ingestionList.map(({ tender, isCorrection }) => {
+            const pending = isCorrection ? tender.correctionRequests.filter(r => !r.resolved) : []
+            return (
+              <Card key={tender.id}
+                className={`p-4 cursor-pointer hover:shadow-md transition-all group ${isCorrection ? 'border-amber-200 bg-amber-50/40 hover:border-amber-300' : 'hover:border-[var(--color-primary)]/30'}`}
+                onClick={() => {
+                  if (isCorrection) {
+                    setCorrectionTender(tender)
+                    setCorrectionUploads({}); setCorrectionSubmitted({}); setCorrectionExtracting({})
+                    setCorrectionExtracted({}); setCorrectionExtractPct({}); setCorrectionGeneral({})
+                  } else {
+                    setSelectedTender(tender)
+                  }
+                }}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
+                      {isCorrection ? (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                          <Bell size={10} /> Needs re-upload
+                        </span>
+                      ) : (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor[tender.status] || 'bg-slate-100 text-slate-600'}`}>{stageLabel[tender.status] || tender.stage}</span>
+                      )}
                     </div>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        )}
+                    <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
+                    <div className="flex items-center gap-4 mt-2">
+                      <span className="flex items-center gap-1 text-xs text-slate-400"><Building2 size={11} /> {tender.department}</span>
+                      {isCorrection ? (
+                        <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                          <AlertTriangle size={11} /> {pending.length} bidder{pending.length !== 1 ? 's' : ''} need re-upload
+                        </span>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1 text-xs text-slate-400"><Calendar size={11} /> Deadline {tender.deadline}</span>
+                          <span className="flex items-center gap-1 text-xs text-slate-400"><Users size={11} /> {tender.bidders} bidder{tender.bidders !== 1 ? 's' : ''}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {!isCorrection && (
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-slate-800">{tender.budget}</p>
+                        <p className="text-[10px] text-slate-400">Budget</p>
+                      </div>
+                    )}
+                    <ChevronRight size={16} className={`transition-colors ${isCorrection ? 'text-amber-300 group-hover:text-amber-500' : 'text-slate-300 group-hover:text-[var(--color-primary)]'}`} />
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
       </div>
     )
   }

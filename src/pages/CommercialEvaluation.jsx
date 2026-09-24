@@ -37,10 +37,12 @@ const Quote         = p => <Svg {...p}><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-
 const Download      = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Svg>
 const Upload        = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
 const Paperclip     = p => <Svg {...p}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></Svg>
+const Trash2        = p => <Svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import {
   bidders, commercialEstimate, commercialBidFactors, commercialComplianceDocs,
   commercialComplianceGroups, COMMERCIAL_MARKET_INCREASE,
@@ -116,6 +118,11 @@ export default function CommercialEvaluation() {
   // like the old two-step flow did, just keyed by step id.
   const [step, setStep]       = useState('extraction')
   const [runs, setRuns]       = useState({})   // { [stepId]: { running, step, done } }
+  // Linear-flow upload gate — one staged file per bidder, keyed by bidder id,
+  // held until "Extract" is clicked. Kept in local state (not the tender) same
+  // as every other File/Blob field; deleting one just drops that bidder's
+  // entry so the same slot can be re-uploaded.
+  const [commercialFiles, setCommercialFiles] = useState({})
   // Optional steps the evaluator skipped — a locked profile that disables
   // Section E (PAF) or Section G (Negotiation) pre-skips those steps here.
   const [skipped, setSkipped] = useState(() => {
@@ -919,22 +926,59 @@ export default function CommercialEvaluation() {
         </Card>
       )}
 
-      {/* ══════════ Upload gate (linear evaluations) ══════════ */}
+      {/* ══════════ Upload gate (linear evaluations) — one upload slot per bidder ══════════ */}
       {!commercialDocsReady ? (
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-1">
             <UploadCloud size={16} className="text-[var(--color-primary)]" />
             <h3 className="text-sm font-semibold text-slate-800">Upload Commercial Documents</h3>
           </div>
-          <p className="text-xs text-slate-500 mb-4">Technical evaluation is complete and SCM Gate 1 has approved release of commercial evaluation. Upload the bidders' commercial submissions so the data extraction step can run.</p>
-          <div className="rounded-xl border-2 border-dashed border-slate-200 hover:border-[var(--color-primary)]/50 transition-colors flex flex-col items-center justify-center gap-2.5 py-10">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center"><UploadCloud size={22} className="text-slate-400" /></div>
-            <p className="text-xs text-slate-500">Drop commercial documents or</p>
-            <label className="cursor-pointer">
-              <span className="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity">Browse Files</span>
-              <input type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) { updateTender(tenderId, { commercialDocsUploaded: true }); e.target.value = '' } }} />
-            </label>
-            <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX · ZIP</p>
+          <p className="text-xs text-slate-500 mb-4">Technical evaluation is complete and SCM Gate 1 has approved release of commercial evaluation. Upload each bidder's commercial submission, then run data extraction.</p>
+
+          <div className="space-y-2">
+            {rows.map(r => {
+              const file = commercialFiles[r.id]
+              return (
+                <div key={r.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-xs font-semibold text-slate-700 shrink-0">{r.name}</span>
+                    {file && (
+                      <span className="flex items-center gap-1 text-[11px] text-slate-400 truncate">
+                        <FileText size={12} className="text-slate-400 shrink-0" />
+                        {file.name} · {(file.size / 1024).toFixed(0)} KB
+                      </span>
+                    )}
+                  </div>
+                  {file ? (
+                    <button
+                      onClick={() => setCommercialFiles(prev => { const next = { ...prev }; delete next[r.id]; return next })}
+                      className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                      title="Delete — you can re-upload this bidder's file"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  ) : (
+                    <label className="cursor-pointer shrink-0">
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 text-slate-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors">
+                        <UploadCloud size={12} /> Upload
+                      </span>
+                      <input type="file" className="hidden" onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) setCommercialFiles(prev => ({ ...prev, [r.id]: { name: f.name, size: f.size } }))
+                        e.target.value = ''
+                      }} />
+                    </label>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button size="sm" disabled={rows.some(r => !commercialFiles[r.id])}
+              onClick={() => updateTender(tenderId, { commercialDocsUploaded: true })}>
+              <Sparkles size={13} /> Extract
+            </Button>
           </div>
         </Card>
       ) : submitted && recBidder ? (
@@ -1983,11 +2027,15 @@ export default function CommercialEvaluation() {
                       ))}
                       <div>
                         <label className="text-[11px] font-semibold text-slate-500">PAF Basis</label>
-                        <select value={paf.basis} disabled={!!evalProfile} onChange={e => setPaf(prev => ({ ...prev, basis: e.target.value }))}
-                          className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-400">
-                          <option value="normalized">Normalized price (price normalization)</option>
-                          <option value="submitted">Submitted bid price</option>
-                        </select>
+                        <SearchableSelect
+                          value={paf.basis} disabled={!!evalProfile}
+                          onChange={v => setPaf(prev => ({ ...prev, basis: v }))}
+                          options={[{ id: 'normalized', label: 'Normalized price (price normalization)' }, { id: 'submitted', label: 'Submitted bid price' }]}
+                          getValue={o => o.id} getLabel={o => o.label}
+                          searchable={false}
+                          ariaLabel="PAF basis"
+                          className="mt-1"
+                        />
                       </div>
                     </div>
                     <label className="flex items-center gap-2 mt-3 cursor-pointer">

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Card from '../ui/Card'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
+import SearchableSelect from '../ui/SearchableSelect'
 import { openHtmlDoc, deliverableDoc, esc } from '../../utils/docGen'
 import { computeChangeImpact } from '../../utils/awardPackage'
 
@@ -181,10 +182,15 @@ export default function AwardPackagePanel({
             <h3 className="text-sm font-semibold text-slate-800">Draft Award Recommendations</h3>
           </div>
           <div className="flex items-center gap-2">
-            <select value={trigger} onChange={e => setTrigger(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30">
-              {TRIGGERS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
+            <div style={{ width: 160 }}>
+              <SearchableSelect
+                value={trigger} onChange={v => setTrigger(v)}
+                options={TRIGGERS}
+                getValue={t => t.id} getLabel={t => t.label}
+                searchable={false}
+                ariaLabel="Draft trigger"
+              />
+            </div>
             <Button size="sm" variant="secondary" onClick={generateDraft}><Plus size={12} /> Generate Draft</Button>
           </div>
         </div>

@@ -39,6 +39,7 @@ export default function SearchableSelect({
   emptyText = 'No matches found',
   clearable = false,
   multiple = false,   // value becomes an array; clicking toggles and keeps the panel open
+  searchable = true,  // false hides the search box — short, fixed lists (roles, statuses, stage filters)
   disabled = false,
   error = false,
   className = '',
@@ -143,7 +144,11 @@ export default function SearchableSelect({
     }
   }, [open, place])
 
-  useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+  useEffect(() => {
+    if (!open) return
+    if (searchable) inputRef.current?.focus()
+    else listRef.current?.focus()
+  }, [open, searchable])
 
   useEffect(() => {
     if (!open || !listRef.current) return
@@ -220,24 +225,27 @@ export default function SearchableSelect({
           className={`fixed z-[100] rounded-xl overflow-hidden flex flex-col ${themed ? '' : 'bg-white border border-slate-200'}`}
           style={{ ...panelStyle, left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
         >
-          <div className={`flex items-center gap-2 px-2.5 py-2 shrink-0 ${themed ? '' : 'border-b border-slate-100 bg-slate-50/60'}`}
-            style={themed ? { borderBottom: `1px solid ${t.border || '#E2E8F0'}` } : undefined}>
-            <Search size={13} className="shrink-0 opacity-50" style={themed ? { color: t.sub } : { color: '#94A3B8' }} />
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={e => { setQuery(e.target.value); setActive(0) }}
-              onKeyDown={onKeyDown}
-              placeholder={searchPlaceholder}
-              aria-label={searchPlaceholder}
-              aria-controls={listId}
-              className={`w-full text-xs bg-transparent focus:outline-none ${themed ? '' : 'text-slate-700 placeholder:text-slate-400'}`}
-              style={themed ? { color: t.text } : undefined}
-            />
-          </div>
+          {searchable && (
+            <div className={`flex items-center gap-2 px-2.5 py-2 shrink-0 ${themed ? '' : 'border-b border-slate-100 bg-slate-50/60'}`}
+              style={themed ? { borderBottom: `1px solid ${t.border || '#E2E8F0'}` } : undefined}>
+              <Search size={13} className="shrink-0 opacity-50" style={themed ? { color: t.sub } : { color: '#94A3B8' }} />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={e => { setQuery(e.target.value); setActive(0) }}
+                onKeyDown={onKeyDown}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                aria-controls={listId}
+                className={`w-full text-xs bg-transparent focus:outline-none ${themed ? '' : 'text-slate-700 placeholder:text-slate-400'}`}
+                style={themed ? { color: t.text } : undefined}
+              />
+            </div>
+          )}
 
           <ul ref={listRef} id={listId} role="listbox" aria-label={ariaLabel || placeholder}
-            className="flex-1 min-h-0 overflow-y-auto py-1">
+            tabIndex={-1} onKeyDown={!searchable ? onKeyDown : undefined}
+            className="flex-1 min-h-0 overflow-y-auto py-1 focus:outline-none">
             {clearable && !query.trim() && (
               <li>
                 <button type="button" role="option" aria-selected={!hasSelection}

@@ -70,7 +70,7 @@
   "page.auditLog":           "Audit Log",
   "page.auditLog.sub":       "Complete audit trail of all system actions",
   "page.users":              "User Management",
-  "page.users.sub":          "Onboard users and configure role-based access permissions",
+  "page.users.sub":          "Manage system users, roles and access permissions",
 
   "login.appName":            "AI Tender Management",
   "login.appSub":             "Sultanate of Oman · Government Procurement",

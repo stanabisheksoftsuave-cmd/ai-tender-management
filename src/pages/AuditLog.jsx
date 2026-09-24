@@ -1,71 +1,112 @@
-import { useState } from 'react'
-import { Search, Download, Filter, ChevronDown } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Search, Download, RotateCcw } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import SearchableSelect from '../components/ui/SearchableSelect'
+import DatePicker from '../components/ui/DatePicker'
 import { auditLogs } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
-const roleColors = {
-  'Contract Engineer': 'bg-blue-100 text-blue-700',
-  'Technical Evaluator': 'bg-green-100 text-green-700',
-  'Commercial Evaluator': 'bg-amber-100 text-amber-700',
-  'Legal Reviewer': 'bg-purple-100 text-purple-700',
-  'Management Reviewer': 'bg-teal-100 text-teal-700',
-  'Contractor Engineer': 'bg-amber-100 text-amber-800',
-  'System': 'bg-violet-100 text-violet-700',
-  'IT Admin': 'bg-red-100 text-red-700',
-}
-
 const ROLE_FILTERS = ['all', 'it admin', 'system', 'procurement', 'evaluator', 'reviewer']
+const ROLE_FILTER_OPTIONS = ROLE_FILTERS.map(f => ({ id: f, label: f === 'all' ? 'All roles' : f.replace(/\b\w/g, c => c.toUpperCase()) }))
 
 export default function AuditLog() {
   const { itAdminLogs } = useAuth()
   const { lang, t } = useLanguage()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const allLogs = [...itAdminLogs, ...auditLogs]
+
+  // Actions are free-text ("Created ITT", "Uploaded Bidder Proposals", …) — the
+  // filter groups them by their leading verb, derived from whatever is
+  // actually in the log rather than a fixed taxonomy that might not match it.
+  const actionOptions = useMemo(() => {
+    const verbs = [...new Set(allLogs.map(l => l.action.split(' ')[0]))].sort()
+    return [{ id: 'all', label: 'All actions' }, ...verbs.map(v => ({ id: v, label: v }))]
+  }, [allLogs])
 
   const filtered = allLogs.filter(log => {
     const matchSearch = log.user.toLowerCase().includes(search.toLowerCase()) ||
       log.action.toLowerCase().includes(search.toLowerCase()) ||
       String(log.tender).toLowerCase().includes(search.toLowerCase())
-    const matchFilter = filter === 'all' || log.role.toLowerCase().includes(filter)
-    return matchSearch && matchFilter
+    const matchRole = filter === 'all' || log.role.toLowerCase().includes(filter)
+    const matchAction = actionFilter === 'all' || log.action.startsWith(actionFilter)
+    const logDate = String(log.timestamp).split(' ')[0]
+    const matchFrom = !fromDate || logDate >= fromDate
+    const matchTo = !toDate || logDate <= toDate
+    return matchSearch && matchRole && matchAction && matchFrom && matchTo
   })
+
+  const canReset = !!(search || filter !== 'all' || actionFilter !== 'all' || fromDate || toDate)
+  const resetFilters = () => {
+    setSearch(''); setFilter('all'); setActionFilter('all'); setFromDate(''); setToDate('')
+  }
 
   return (
     <div className="space-y-5">
       {/* Controls */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={t('audit.search')}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-          />
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">{t('audit.search')}</label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Actor, target or tender"
+                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">Action</label>
+            <SearchableSelect
+              value={actionFilter}
+              onChange={v => setActionFilter(v)}
+              options={actionOptions}
+              getValue={o => o.id}
+              getLabel={o => o.label}
+              searchable={false}
+              ariaLabel="Filter by action"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">{t('audit.role')}</label>
+            <SearchableSelect
+              value={filter}
+              onChange={v => setFilter(v)}
+              options={ROLE_FILTER_OPTIONS}
+              getValue={o => o.id}
+              getLabel={o => o.label}
+              searchable={false}
+              ariaLabel={t('audit.role')}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">From</label>
+            <DatePicker value={fromDate} onChange={setFromDate} placeholder="Pick a date" maxKey={toDate || undefined} ariaLabel="From date" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">To</label>
+            <DatePicker value={toDate} onChange={setToDate} placeholder="Pick a date" minKey={fromDate || undefined} ariaLabel="To date" />
+          </div>
         </div>
-        <div className="relative">
-          <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-            aria-label={t('audit.role')}
-            className="appearance-none pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-200 bg-white capitalize focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-          >
-            {ROLE_FILTERS.map(f => (
-              <option key={f} value={f} className="capitalize">{f === 'all' ? 'All roles' : f}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={resetFilters} disabled={!canReset}>
+            <RotateCcw size={13} /> Reset filters
+          </Button>
+          <Button variant="secondary" size="sm">
+            <Download size={13} /> {t('common.exportCsv')}
+          </Button>
         </div>
-        <Button variant="secondary" size="sm" className="ml-auto">
-          <Download size={13} /> {t('common.exportCsv')}
-        </Button>
       </div>
 
       {/* Table */}
@@ -91,7 +132,7 @@ export default function AuditLog() {
                     <span className="font-medium text-slate-700">{log.user}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColors[log.role] || 'bg-slate-100 text-slate-600'}`}>
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200">
                       {log.role}
                     </span>
                   </td>

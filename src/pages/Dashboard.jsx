@@ -4,7 +4,7 @@ import {
   Activity, ClipboardCheck, BarChart3, Briefcase, UserCog,
   Download,
   Eye, MoreVertical, Users, Shield,
-  ChevronRight
+  ChevronRight, Inbox, CheckCircle, ClipboardList
 } from 'lucide-react'
 
 // Bulb SVG — uses currentColor so any style.color is inherited
@@ -147,13 +147,21 @@ const getStatCards = (roleId, tenders) => {
     { label: 'AI Extractions',  value: '8',                                  icon: BulbIcon,  accentColor: '#7C3AED', trend: '96% ACC.',     chipVariant: 'acc',    sub: 'Documents processed' },
   ]
 
-  if (roleId === 'contract_holder') return [
-    { label: 'Bidder Matching',    value: String(byStatus('prequal_stage1').length), icon: Users,          accentColor: '#0891B2', trend: 'Stage 1', chipVariant: '',       sub: 'Matching ERP bidders to SOW' },
-    { label: 'Questionnaire',      value: String(byStatus('prequal_stage2').length), icon: FileText,       accentColor: '#F59E0B', trend: 'Stage 2', chipVariant: 'urgent', sub: 'Generating & distributing PQQ' },
-    { label: 'Response Review',    value: String(byStatus('prequal_stage3').length), icon: ClipboardCheck, accentColor: '#EF4444', trend: 'Stage 3', chipVariant: '',       sub: 'QHSE / Technical / Admin checks' },
-    { label: 'With Contract Engineer', value: String(byStatus('prequal_stage4').length), icon: Clock,      accentColor: '#0891B2', trend: 'Stage 4', chipVariant: '',       sub: 'Awaiting financial assessment' },
-    { label: 'Final Review',       value: String(byStatus('prequal_final_review').length), icon: ClipboardCheck, accentColor: '#10B981', trend: 'Stage 5', chipVariant: 'urgent', sub: 'Assessment returned — ready to submit' },
-  ]
+  if (roleId === 'contract_holder') {
+    // Every stage the Contract Holder themselves has to move forward — the
+    // five PQQ sub-stages collapse into one actionable count here, since
+    // "With Contract Engineer" (stage 4) is the one stage sitting with someone
+    // else, not awaiting this role.
+    const awaitingYou = byStatus('prequal_stage1').length + byStatus('prequal_stage2').length
+      + byStatus('prequal_stage3').length + byStatus('prequal_final_review').length
+    const completed = tenders.filter(t => ['active', 'contract_closure', 'closed'].includes(t.status)).length
+    return [
+      { label: 'Active Tenders', value: String(pipelineTenders.length), icon: FileText,      accentColor: '#2563EB' },
+      { label: 'Awaiting You',   value: String(awaitingYou),            icon: Inbox,          accentColor: '#F59E0B', sub: 'Stages you can advance' },
+      { label: 'In Evaluation',  value: String(byStatus('tech_eval').length + byStatus('comm_eval').length), icon: ClipboardList, accentColor: '#64748B', sub: 'Technical or commercial' },
+      { label: 'Completed',      value: String(completed),              icon: CheckCircle,    accentColor: '#10B981' },
+    ]
+  }
 
   if (roleId === 'it_admin') {
     const active   = INITIAL_USERS.filter(u => u.status === 'active').length
@@ -331,7 +339,23 @@ export default function Dashboard() {
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((s, i) => {
+        {roleId === 'contract_holder' ? statCards.map((s, i) => (
+          <div key={i} className="rounded-2xl p-5"
+            style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] leading-tight pr-2"
+                style={{ color: c.muted }}>
+                {s.label}
+              </p>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: isDark ? `${s.accentColor}20` : accentBg(s.accentColor) }}>
+                <s.icon size={15} style={{ color: s.accentColor }} />
+              </div>
+            </div>
+            <p className="text-3xl font-extrabold leading-none mb-1.5" style={{ color: c.text }}>{s.value}</p>
+            {s.sub && <p className="text-xs" style={{ color: c.muted }}>{s.sub}</p>}
+          </div>
+        )) : statCards.map((s, i) => {
           const isAccCard  = s.chipVariant === 'acc'
           const isUrgent   = s.chipVariant === 'urgent'
           const isSoon     = s.chipVariant === 'soon'
@@ -466,7 +490,7 @@ export default function Dashboard() {
                       </td>
                       <td className="px-5 py-3.5 text-xs" style={{ color: c.sub }}>{u.username}</td>
                       <td className="px-5 py-3.5">
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: `${roleInfo?.color || '#64748B'}18`, color: roleInfo?.color || '#64748B' }}>
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200">
                           {roleInfo?.label || u.roleId}
                         </span>
                       </td>

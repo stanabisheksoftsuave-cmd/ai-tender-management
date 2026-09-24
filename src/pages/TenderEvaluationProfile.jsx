@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import TenderSelectList from '../components/ui/TenderSelectList'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { useAuth } from '../context/AuthContext'
 import { useTenders } from '../context/TenderContext'
 import { useNavigation } from '../context/NavigationContext'
@@ -88,17 +89,22 @@ export default function TenderEvaluationProfile() {
   }
 
   if (!tenderId) {
+    // Linear tenders only reach this list once Technical Evaluation is done and
+    // SCM Gate 1 has released commercial (scm_gate1 / comm_eval). Parallel
+    // tenders run technical and commercial (profile → commercial) side by side,
+    // so `parallel_eval` is eligible from the start of that concurrent phase —
+    // not gated on the technical side finishing.
     const eligible = tenders.filter(t => [
-      'draft', 'upload', 'tech_eval', 'scm_gate1', 'comm_eval', 'parallel_eval',
+      'scm_gate1', 'comm_eval', 'parallel_eval',
     ].includes(t.status))
     return (
       <TenderSelectList
         tenders={eligible}
-        status={['draft', 'upload', 'tech_eval', 'scm_gate1', 'comm_eval', 'parallel_eval']}
+        status={['scm_gate1', 'comm_eval', 'parallel_eval']}
         basePath="/commercial-eval-profile"
         title="Tender Evaluation Profile"
         description="Configure Sections A–G once per tender. Locking issues the profile — every commercial evaluation agent reads from it from that point on."
-        emptyText="No tenders available to configure"
+        emptyText="No tenders available to configure — technical evaluation must be complete first"
       />
     )
   }
@@ -194,11 +200,14 @@ export default function TenderEvaluationProfile() {
                   <td className="px-4 py-2 text-[11px] text-slate-400">{row.group}</td>
                   <td className="px-3 py-2 text-xs text-slate-700">{row.name}</td>
                   <td className="px-3 py-2">
-                    <select value={row.treatment} disabled={dis}
-                      onChange={e => setSectionBRow(row.id, { treatment: e.target.value })}
-                      className={inputCls + ' mt-0'}>
-                      {SUBMISSION_TREATMENTS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    <SearchableSelect
+                      value={row.treatment} disabled={dis}
+                      onChange={v => setSectionBRow(row.id, { treatment: v })}
+                      options={SUBMISSION_TREATMENTS}
+                      getValue={t => t} getLabel={t => t}
+                      searchable={false}
+                      ariaLabel={`Treatment for ${row.name}`}
+                    />
                   </td>
                 </tr>
               ))}
@@ -269,11 +278,15 @@ export default function TenderEvaluationProfile() {
           </div>
           <div>
             <label className="text-[11px] font-semibold text-slate-500">PAF Basis</label>
-            <select value={profile.sectionE.basis} disabled={dis || !profile.sectionE.enabled} className={inputCls}
-              onChange={e => set('sectionE', { basis: e.target.value })}>
-              <option value="normalized">Normalized price</option>
-              <option value="submitted">Submitted bid price</option>
-            </select>
+            <SearchableSelect
+              value={profile.sectionE.basis} disabled={dis || !profile.sectionE.enabled}
+              onChange={v => set('sectionE', { basis: v })}
+              options={[{ id: 'normalized', label: 'Normalized price' }, { id: 'submitted', label: 'Submitted bid price' }]}
+              getValue={o => o.id} getLabel={o => o.label}
+              searchable={false}
+              ariaLabel="PAF basis"
+              className="mt-1"
+            />
           </div>
         </div>
       </SectionCard>
@@ -285,11 +298,15 @@ export default function TenderEvaluationProfile() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="text-[11px] font-semibold text-slate-500">Preference Type</label>
-            <select value={profile.sectionF.preferenceType} disabled={dis || !profile.sectionF.enabled} className={inputCls}
-              onChange={e => set('sectionF', { preferenceType: e.target.value })}>
-              {omaniEligibleTypes.map(t => <option key={t} value={t}>{t}</option>)}
-              <option value="Social Enterprise">Social Enterprise</option>
-            </select>
+            <SearchableSelect
+              value={profile.sectionF.preferenceType} disabled={dis || !profile.sectionF.enabled}
+              onChange={v => set('sectionF', { preferenceType: v })}
+              options={[...omaniEligibleTypes, 'Social Enterprise']}
+              getValue={t => t} getLabel={t => t}
+              searchable={false}
+              ariaLabel="Omani preference type"
+              className="mt-1"
+            />
           </div>
           <div>
             <label className="text-[11px] font-semibold text-slate-500">Preference %</label>
@@ -298,10 +315,15 @@ export default function TenderEvaluationProfile() {
           </div>
           <div>
             <label className="text-[11px] font-semibold text-slate-500">Application Method</label>
-            <select value={profile.sectionF.applicationMethod} disabled={dis || !profile.sectionF.enabled} className={inputCls}
-              onChange={e => set('sectionF', { applicationMethod: e.target.value })}>
-              {PREFERENCE_APPLICATION_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
+            <SearchableSelect
+              value={profile.sectionF.applicationMethod} disabled={dis || !profile.sectionF.enabled}
+              onChange={v => set('sectionF', { applicationMethod: v })}
+              options={PREFERENCE_APPLICATION_METHODS}
+              getValue={m => m.id} getLabel={m => m.label}
+              searchable={false}
+              ariaLabel="Preference application method"
+              className="mt-1"
+            />
           </div>
         </div>
       </SectionCard>

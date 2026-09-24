@@ -80,8 +80,6 @@ const ModSvg = {
 }
 
 // ── Data ─────────────────────────────────────────────────────────────────────
-const ROLE_COLORS = ['#0089cf','#1b4c6f','#059669','#D97706','#7C3AED','#DC2626','#0891B2','#92400E','#BE185D','#1D4ED8']
-
 // Role ids that were removed — technical/commercial evaluation is now owned by
 // the Contract Holder / Contract Engineer. Filtered out of any persisted role list.
 const REMOVED_ROLE_IDS = new Set(['tech_eval', 'comm_eval'])
@@ -111,15 +109,13 @@ const TABS = [
 ]
 
 const emptyUser     = { name: '', email: '', role: 'pof', status: 'active' }
-const emptyRoleForm = { label: '', color: '#0089cf', description: '' }
+const emptyRoleForm = { label: '', color: '#64748B', description: '' }
 
 // ── Small sub-components ─────────────────────────────────────────────────────
 function RolePill({ role }) {
   if (!role) return null
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap"
-      style={{ background: role.color + '18', color: role.color, border: `1px solid ${role.color}30` }}>
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: role.color }} />
+    <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200">
       {role.label}
     </span>
   )
@@ -174,6 +170,7 @@ export default function UserManagement() {
   const [tab,           setTab]           = useState(defaultTab)
   const [search,        setSearch]        = useState('')
   const [filterRole,    setFilterRole]    = useState('all')
+  const [filterStatus,  setFilterStatus]  = useState('all')
   const [menuOpen,      setMenuOpen]      = useState(null)
 
   const [showUserModal, setShowUserModal] = useState(false)
@@ -269,6 +266,7 @@ export default function UserManagement() {
     const em = (u.email || u.username || '').toLowerCase()
     return (u.name.toLowerCase().includes(search.toLowerCase()) || em.includes(search.toLowerCase()))
       && (filterRole === 'all' || u.roleId === filterRole)
+      && (filterStatus === 'all' || u.status === filterStatus)
   })
 
   const getRoleObj = id => roles.find(r => r.id === id)
@@ -393,17 +391,13 @@ export default function UserManagement() {
   return (
     <div className="space-y-5">
 
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: text }}>User Management</h1>
-          <p className="text-xs mt-0.5" style={{ color: sub }}>Manage system users, roles and access permissions</p>
-        </div>
+      {/* ── Page header — title and description both live in the top bar (Header.jsx); this row is just the actions ── */}
+      <div className="flex items-center justify-end flex-wrap gap-3">
         <div className="flex items-center gap-2">
           {/* Creating is a CRUD action — an ACTION-level role sees the tabs but no
               way to change what is on them. */}
-          {activeTab === 'users'  && canAdminEdit && <Button onClick={openAdd}                      size="sm"><IcoPlus size={13} /> Onboard User</Button>}
-          {activeTab === 'access' && canAdminEdit && <Button onClick={() => setShowRoleModal(true)} size="sm"><IcoPlus size={13} /> Create Role</Button>}
+          {activeTab === 'users'  && canAdminEdit && <Button onClick={openAdd}                      size="sm" style={{ borderRadius: 8 }}><IcoPlus size={13} /> Onboard User</Button>}
+          {activeTab === 'access' && canAdminEdit && <Button onClick={() => setShowRoleModal(true)} size="sm" style={{ borderRadius: 8 }}><IcoPlus size={13} /> Create Role</Button>}
           {activeTab !== 'dropdowns' && !canAdminEdit && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
               style={{ background: surfBg, color: sub, border: `1px solid ${border}` }}>
@@ -423,23 +417,26 @@ export default function UserManagement() {
               <s.Icon size={18} style={{ color: 'var(--color-primary)' }} />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: sub }}>{s.label}</p>
-              <p className="text-2xl font-extrabold leading-none" style={{ color: text }}>{s.value}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: sub }}>{s.label}</p>
+              <p className="text-2xl font-bold leading-none" style={{ color: text }}>{s.value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
-        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--color-border)' }}>
+      <div className="flex items-center gap-2" style={{ borderBottom: `1px solid ${border}` }}>
         {visibleTabs.map(t => (
           <button key={t.id} onClick={() => selectTab(t.id)}
-            className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
+            className="relative px-5 py-2.5 rounded-lg text-sm font-semibold transition-all"
             style={activeTab === t.id
-              ? { background: 'var(--color-primary)', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
+              ? { background: 'transparent', color: 'var(--color-primary)' }
               : { background: 'transparent', color: sub }}>
             {t.label}
+            {activeTab === t.id && (
+              <span className="absolute left-1 right-1 -bottom-[3px] h-[3px] rounded-full"
+                style={{ background: 'var(--color-primary)' }} />
+            )}
           </button>
         ))}
       </div>
@@ -449,18 +446,44 @@ export default function UserManagement() {
         <div className="space-y-4">
 
           {/* Filters */}
-          <div className="flex gap-3 flex-wrap">
-            <div className="relative">
-              <IcoSearch size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: sub, pointerEvents: 'none' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search name or email..."
-                style={{ ...inp(), paddingLeft: 32, width: 240 }} />
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="w-full max-w-xs">
+              <label className="text-xs font-medium block mb-1.5" style={{ color: text }}>Search</label>
+              <div className="relative">
+                <IcoSearch size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: sub, pointerEvents: 'none' }} />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Name or email…"
+                  style={{ ...inp(), paddingLeft: 32 }} />
+              </div>
             </div>
-            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-              style={{ ...inp(), width: 'auto' }}>
-              <option value="all">All Roles</option>
-              {roles.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
+            <div className="flex flex-wrap items-end gap-3">
+              <div style={{ width: 176 }}>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: text }}>Role</label>
+                <SearchableSelect
+                  value={filterRole}
+                  onChange={v => setFilterRole(v)}
+                  options={[{ id: 'all', label: 'All roles' }, ...roles]}
+                  getValue={r => r.id}
+                  getLabel={r => r.label}
+                  searchable={false}
+                  theme={selectTheme}
+                  ariaLabel="Filter by role"
+                />
+              </div>
+              <div style={{ width: 152 }}>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: text }}>Status</label>
+                <SearchableSelect
+                  value={filterStatus}
+                  onChange={v => setFilterStatus(v)}
+                  options={[{ id: 'all', label: 'All statuses' }, { id: 'active', label: 'Active' }, { id: 'inactive', label: 'Inactive' }]}
+                  getValue={s => s.id}
+                  getLabel={s => s.label}
+                  searchable={false}
+                  theme={selectTheme}
+                  ariaLabel="Filter by status"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Table */}
@@ -468,14 +491,13 @@ export default function UserManagement() {
             style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow, overflow: 'visible' }}>
             <table className="w-full" style={{ tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '34%' }} /><col style={{ width: '22%' }} />
-                <col style={{ width: '13%' }} /><col style={{ width: '19%' }} />
-                <col style={{ width: '12%' }} />
+                <col style={{ width: '40%' }} /><col style={{ width: '24%' }} />
+                <col style={{ width: '18%' }} /><col style={{ width: '18%' }} />
               </colgroup>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${border}`, background: surfBg }}>
-                  {['User', 'Role', 'Status', 'Last Login', 'Actions'].map((h, i) => (
-                    <th key={i} className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-widest"
+                  {['User', 'Role', 'Status', 'Actions'].map((h, i) => (
+                    <th key={i} className={`${h === 'Actions' ? 'text-right' : 'text-left'} px-5 py-3 text-[10px] font-semibold uppercase tracking-widest`}
                       style={{ color: sub }}>{h}</th>
                   ))}
                 </tr>
@@ -499,7 +521,7 @@ export default function UserManagement() {
                             {u.avatar}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate" style={{ color: text }}>{u.name}</p>
+                            <p className="text-sm font-medium truncate" style={{ color: text }}>{u.name}</p>
                             <p className="text-[11px] truncate flex items-center gap-1" style={{ color: sub }}>
                               <IcoMail size={10} />{u.email || u.username}
                             </p>
@@ -512,7 +534,7 @@ export default function UserManagement() {
 
                       {/* Status */}
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md"
                           style={u.status === 'active'
                             ? { background: '#05966918', color: '#059669', border: '1px solid #05966930' }
                             : { background: '#94A3B818', color: '#94A3B8', border: '1px solid #94A3B830' }}>
@@ -523,27 +545,26 @@ export default function UserManagement() {
                         </span>
                       </td>
 
-                      {/* Last login */}
-                      <td className="px-5 py-3.5 text-xs font-mono" style={{ color: sub }}>{u.lastLogin || '—'}</td>
-
                       {/* Actions */}
-                      <td className="px-4 py-3.5 relative">
+                      <td className="px-5 py-3.5 relative">
                         {/* Every entry in this menu writes, so an ACTION-level
                             viewer gets no menu at all rather than an empty one. */}
-                        {canAdminEdit ? (
-                          <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                            style={{ background: surfBg, color: sub }}>
-                            <IcoMore size={14} />
-                          </button>
-                        ) : (
-                          <span className="text-xs" style={{ color: sub }}>—</span>
-                        )}
+                        <div className="flex justify-end">
+                          {canAdminEdit ? (
+                            <button onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
+                              className="w-8 h-8 flex items-center justify-center transition-colors hover:opacity-70"
+                              style={{ background: 'transparent', color: sub }}>
+                              <IcoMore size={16} />
+                            </button>
+                          ) : (
+                            <span className="text-xs" style={{ color: sub }}>—</span>
+                          )}
+                        </div>
 
                         {canAdminEdit && menuOpen === u.id && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />
-                            <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-52 rounded-xl py-1.5 z-50`}
+                            <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-52 rounded-lg py-1.5 z-50`}
                               style={{ background: surface, border: `1px solid ${border}`, boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}>
 
                               <MenuItem Icon={IcoEdit} label="Edit User" onClick={() => openEdit(u)} hoverBg={surfBg} color={text} />
@@ -1016,19 +1037,6 @@ export default function UserManagement() {
                 placeholder="e.g. Legal Reviewer" style={{ ...inp(), marginTop: 6 }} />
             </div>
             <div>
-              <MLabel text="Role Colour" color={sub} />
-              <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                {ROLE_COLORS.map(col => (
-                  <button key={col} type="button" onClick={() => setRoleForm(f => ({ ...f, color: col }))}
-                    className="w-7 h-7 rounded-lg shrink-0 transition-transform hover:scale-110"
-                    style={{ background: col, outline: roleForm.color === col ? `3px solid ${col}` : 'none', outlineOffset: 2 }} />
-                ))}
-                <input type="color" value={roleForm.color}
-                  onChange={e => setRoleForm(f => ({ ...f, color: e.target.value }))}
-                  className="w-8 h-7 rounded cursor-pointer border-0 p-0 ml-1" title="Custom colour" />
-              </div>
-            </div>
-            <div>
               <MLabel text="Description (optional)" color={sub} />
               <input value={roleForm.description} onChange={e => setRoleForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="Brief description of responsibilities..." style={{ ...inp(), marginTop: 6 }} />
@@ -1087,10 +1095,17 @@ export default function UserManagement() {
 
             <div>
               <MLabel text="Assign Role" color={sub} required />
-              <select value={userForm.role} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
-                style={{ ...inp(), marginTop: 6 }}>
-                {roles.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
+              <SearchableSelect
+                value={userForm.role}
+                onChange={v => setUserForm(f => ({ ...f, role: v }))}
+                options={roles}
+                getValue={r => r.id}
+                getLabel={r => r.label}
+                searchable={false}
+                theme={selectTheme}
+                ariaLabel="Assign role"
+                className="mt-1.5"
+              />
               {userForm.role && matrix[userForm.role] && (
                 <div className="mt-2 rounded-xl px-3 py-2.5" style={{ background: surfBg, border: `1px solid ${border}` }}>
                   <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: sub }}>Modules for this role</p>
@@ -1208,7 +1223,7 @@ function MenuItem({ Icon, label, onClick, hoverBg, color, iconColor, badge }) {
       <Icon size={13} style={{ color: iconColor || color, opacity: 0.7 }} />
       {label}
       {badge != null && (
-        <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+        <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-white"
           style={{ background: 'var(--color-primary)' }}>{badge}</span>
       )}
     </button>

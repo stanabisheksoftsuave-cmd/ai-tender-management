@@ -3,6 +3,7 @@ import Header from './Header'
 import { useLocation } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 
 const pageMeta = {
   '/dashboard':      { titleKey: 'page.dashboard',  subKey: 'page.dashboard.sub' },
@@ -33,10 +34,21 @@ const pageMeta = {
 // for them, so its title says so (see ITTCreation's own header).
 const ITT_REVIEWER_ROLES = ['pof', 'hse', 'icv']
 
+// These pages' cards already carry their own light-opacity shadow
+// (`var(--color-shadow)` on <Card>) — on the OLNG theme's pale-blue page
+// background that shadow barely reads against the tint. Swapping the canvas
+// to a neutral off-white here is what actually makes it visible, rather than
+// adding a second, heavier shadow on top.
+const LIGHT_CANVAS_ROUTES = new Set([
+  '/tenders', '/create-itt', '/contract-strategy',
+  '/technical-eval', '/commercial-eval', '/upload', '/commercial-eval-profile',
+])
+
 export default function MainLayout({ children }) {
   const { pathname } = useLocation()
   const { lang, t } = useLanguage()
   const { user } = useAuth()
+  const { isDark } = useTheme()
   const isRtl = lang === 'ar'
 
   const basePath = '/' + pathname.split('/')[1]
@@ -44,12 +56,16 @@ export default function MainLayout({ children }) {
   if (basePath === '/create-itt' && ITT_REVIEWER_ROLES.includes(user?.role?.id)) {
     meta = { titleKey: 'page.ittReviewApprove', subKey: 'page.ittReviewApprove.sub' }
   }
+  // Dark theme already has its own (dark) canvas via var(--color-background) —
+  // this override is only for the OLNG light theme's pale-blue tint.
+  const lightCanvas = !isDark && LIGHT_CANVAS_ROUTES.has(basePath)
 
   return (
     <div className="app-root flex min-h-screen">
       <Header title={t(meta.titleKey)} subtitle={meta.subKey ? t(meta.subKey) : ''} />
       <Sidebar />
-      <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}>
+      <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}
+        style={lightCanvas ? { background: '#F8FAFC' } : undefined}>
         <main className="flex-1 p-6 overflow-auto fade-in">
           {children}
         </main>
