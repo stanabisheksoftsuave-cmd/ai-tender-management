@@ -996,7 +996,7 @@ export default function PreQualification() {
                   />
                 </div>
                 <label className={`flex items-center gap-1.5 text-xs font-semibold text-white px-4 py-2.5 rounded-lg transition-all ${processingId != null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
+                  style={{ background: 'var(--color-primary)' }}>
                   <UploadCloud size={13} /> Upload Response
                   <input type="file" className="hidden" disabled={processingId != null}
                     onChange={e => { if (selectedUploadId != null) handleResponseFileChosen(selectedUploadId, e.target.files?.[0]) }} />

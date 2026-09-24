@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Lock, LogOut } from 'lucide-react'
+import { Lock, LogOut, Plus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -310,7 +310,7 @@ export default function Sidebar() {
         ) : (
           <span className="w-1 h-1 rounded-full shrink-0" style={{
             background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
-            boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
+            
           }} />
         )}
         {sub.label}
@@ -373,10 +373,10 @@ export default function Sidebar() {
 
       {/* ── User chip ── */}
       <div className="px-4 py-4">
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md"
           style={{ background: chipBg, border: chipBorder }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0"
-            style={{ background: `linear-gradient(135deg, ${accent}, rgba(255,255,255,0.2))` }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
+            style={{ background: accent }}>
             {user?.name?.[0] || 'U'}
           </div>
           <div className="min-w-0">
@@ -408,7 +408,7 @@ export default function Sidebar() {
                 {/* Parent: Contract Strategy */}
                 <button
                   onClick={handleStrategyToggle}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-xs font-medium transition-colors"
                   style={{
                     background: isParentActive ? activeNavBg : 'transparent',
                     borderLeft: isParentActive ? activeNavBorder : '2px solid transparent',
@@ -465,7 +465,7 @@ export default function Sidebar() {
             <NavLink key={item.to} to={item.to} className="block">
               {({ isActive }) => (
                 <div
-                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  className="flex items-center justify-between px-3 py-2.5 rounded-md text-xs font-medium transition-colors"
                   style={{
                     background:  isActive ? activeNavBg : 'transparent',
                     borderLeft:  isActive ? activeNavBorder : '2px solid transparent',
@@ -475,7 +475,7 @@ export default function Sidebar() {
                   onMouseOut={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
                 >
                   <span className="flex items-center gap-2.5">
-                    <img
+                    {/* <img
                       src={item.icon}
                       alt=""
                       width={15}
@@ -485,13 +485,15 @@ export default function Sidebar() {
                           ? 'brightness(0) invert(1)'
                           : 'brightness(0) invert(0.55)',
                       }}
-                    />
+                    /> */}
+                     {item.to === '/create-itt' && (
+                    <Plus size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
+                  )}
                     {t(item.labelKey)}
                   </span>
-                  {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: accent, boxShadow: `0 0 6px ${accent}` }} />
-                  )}
+                  {/* {item.to === '/create-itt' && (
+                    <Plus size={13} style={{ opacity: isActive ? 1 : 0.6 }} />
+                  )} */}
                 </div>
               )}
             </NavLink>

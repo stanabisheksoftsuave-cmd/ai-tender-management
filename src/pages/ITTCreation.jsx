@@ -4,7 +4,7 @@ import {
   Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
   FileText, FileSpreadsheet, AlertCircle, Download, ClipboardCheck,
   UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
-  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil, UserCheck
+  Plus, Hash, ShieldAlert, Info, Eye, Pencil, UserCheck, Check
 } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
@@ -95,13 +95,6 @@ const ITT_READY_STATUSES = new Set([
   'prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4',
   'prequal_final_review',
 ])
-
-const draftStatusMap = [
-  { label: 'ITT Draft', sub: 'Filling in project details', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { label: 'ITT Draft', sub: 'Preparing document templates...', cls: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { label: 'ITT Draft', sub: 'Filling in section templates', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { label: 'Ready to Export', sub: 'Export for external review', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-]
 
 export default function ITTCreation() {
   const { tenderId } = useParams()
@@ -680,10 +673,6 @@ export default function ITTCreation() {
     URL.revokeObjectURL(url)
   }
 
-  const currentDraftStatus = ittApproved
-    ? { label: 'ITT Exported', sub: 'Exported — awaiting bid upload', cls: 'bg-green-100 text-green-700 border-green-200' }
-    : draftStatusMap[step] || draftStatusMap[0]
-
   // Shared card for a tender row in the Create ITT picker.
   const renderDraftCard = (dt) => (
     <Card
@@ -694,13 +683,10 @@ export default function ITTCreation() {
     >
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-            <Briefcase size={16} style={{ color: '#0089cf' }} />
-          </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {/* Cost code and draft state only — no provenance or assignee chips. */}
-              <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{tenderRef(dt)}</span>
+              <span className="text-xs font-mono text-slate-500">{tenderRef(dt)}</span>
               <Badge variant="draft">{dt.stage || 'Draft — Pending Export'}</Badge>
             </div>
             <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1e293b' }}>{dt.title || 'Untitled tender'}</p>
@@ -761,11 +747,10 @@ export default function ITTCreation() {
     return (
       <div className="space-y-5">
         <div className="olng-slide-up">
-          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1e293b' }}>
-            <Inbox size={20} style={{ color: '#0089cf' }} />
+          <h2 className="text-lg font-semibold" style={{ color: '#1e293b' }}>
             {isIttReviewer ? 'ITT Review & Approve' : 'Create ITT'}
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 mt-0.5">
             {isIttReviewer
               ? <>Select a tender to review and approve your <strong>ITT</strong> sections.</>
               : <>Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.</>}
@@ -774,10 +759,7 @@ export default function ITTCreation() {
 
         {draftTenders.length === 0 && (
           <Card branded className="p-6 text-center olng-slide-up">
-            <div className="w-11 h-11 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
-              <ShieldAlert size={18} style={{ color: '#0089cf' }} />
-            </div>
-            <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>{isIttReviewer ? 'No ITTs waiting on your review' : 'No tenders ready for ITT creation'}</p>
+            <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{isIttReviewer ? 'No ITTs waiting on your review' : 'No tenders ready for ITT creation'}</p>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-md mx-auto">
               A tender must complete the <strong>PSF Strategy</strong> (Procurement Submission Form) step before its ITT can be created.
               Finish Strategy Templates and submit the PSF for a tender, then it will appear here.
@@ -789,9 +771,8 @@ export default function ITTCreation() {
         {afterPsfTenders.length > 0 && (
           <div className="olng-slide-up" style={{ animationDelay: '60ms' }}>
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle size={14} style={{ color: '#059669' }} />
               <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>From PSF Strategy</h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>{afterPsfTenders.length}</span>
+              <span className="text-xs text-slate-400">{afterPsfTenders.length}</span>
             </div>
             <p className="text-[11px] text-slate-400 mb-2.5">Completed pre-qualification and PSF — details are pre-populated.</p>
             <div className="space-y-3">{afterPsfTenders.map(renderDraftCard)}</div>
@@ -802,9 +783,8 @@ export default function ITTCreation() {
         {directIttTenders.length > 0 && (
           <div className="olng-slide-up" style={{ animationDelay: '90ms' }}>
             <div className="flex items-center gap-2 mb-1">
-              <Plus size={14} style={{ color: '#0089cf' }} />
               <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>Direct ITT (No PSF)</h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,137,207,0.12)', color: '#0089cf' }}>{directIttTenders.length}</span>
+              <span className="text-xs text-slate-400">{directIttTenders.length}</span>
             </div>
             <p className="text-[11px] text-slate-400 mb-2.5">Started directly without pre-qualification / PSF, with templates uploaded here.</p>
             <div className="space-y-3">{directIttTenders.map(renderDraftCard)}</div>
@@ -815,7 +795,7 @@ export default function ITTCreation() {
           <Button
             variant="secondary"
             onClick={() => setSkipDraftPicker(true)}
-            className="w-full justify-center py-3"
+            className="border border-slate-300 bg-white"
           >
             <Plus size={14} /> Start New ITT (No Pre-Qualification)
           </Button>
@@ -826,44 +806,40 @@ export default function ITTCreation() {
 
   return (
     <div className="space-y-5">
-      {/* ── Branded Status Banner ── */}
-      <div className="flex items-center justify-between olng-slide-up">
-        <div className="olng-status-banner">
-          <span className="status-dot" />
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: '#1e293b' }}>{currentDraftStatus.label}</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-xs text-slate-500">{currentDraftStatus.sub}</span>
-          </div>
-        </div>
-        <span className="text-xs font-mono px-3 py-1 rounded-lg font-medium" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.15)' }}>
-          {draftTenderId || 'New Draft'}
-        </span>
-      </div>
-
-      {/* ── Premium Step Indicator ── */}
-      <div className="flex items-center gap-0 olng-slide-up" style={{ animationDelay: '60ms' }}>
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <div className={`olng-step-circle ${
-                i < step ? 'olng-step-circle--done' :
-                i === step ? 'olng-step-circle--active' :
-                'olng-step-circle--pending'
-              }`}>
-                {i < step ? <CheckCircle size={15} /> : i + 1}
-              </div>
-              <span className={`text-sm whitespace-nowrap ${
-                i === step ? 'font-semibold' : i < step ? 'font-medium' : ''
-              }`} style={{
-                color: i === step ? '#1e293b' : i < step ? '#0089cf' : '#94a3b8'
-              }}>{s}</span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className={`olng-step-connector mx-3 ${i < step ? 'olng-step-connector--done' : ''}`} />
-            )}
-          </div>
-        ))}
+      {/* ── Step indicator ── */}
+      <div className="flex items-center gap-4 px-5 py-3.5 rounded-lg bg-white border border-slate-200">
+        <ol className="flex items-center flex-1 min-w-0">
+          {steps.map((s, i) => {
+            const done = i < step, current = i === step
+            return (
+              <li key={i} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
+                <span className="flex items-center gap-2.5 shrink-0">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
+                    style={done || current
+                      ? { background: '#0089cf', color: '#fff' }
+                      : { background: '#eef0f3', color: '#64748b' }}
+                  >
+                    {done ? <Check size={13} /> : i + 1}
+                  </span>
+                  <span className="text-sm whitespace-nowrap" style={{
+                    color: current ? '#1e293b' : '#64748b',
+                    fontWeight: current ? 500 : 400,
+                  }}>{s}</span>
+                </span>
+                {i < steps.length - 1 && (
+                  <span className="flex-1 flex justify-center px-3">
+                    <span className="block w-10 h-px" style={{ background: done ? '#0089cf' : '#cbd5e1' }} />
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ol>
+        {ittApproved && <Badge variant="success">Exported</Badge>}
+        {draftTenderId && (
+          <span className="text-xs font-mono text-slate-400 shrink-0">{draftTenderId}</span>
+        )}
       </div>
 
       {/* Section-owner / exporter roles wait until the Contract Holder has generated the ITT */}
@@ -898,10 +874,7 @@ export default function ITTCreation() {
           )}
 
           <Card branded className="p-6">
-            <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                <FileText size={16} style={{ color: '#0089cf' }} />
-              </div>
+            <h3 className="text-sm font-semibold mb-5 pb-3 border-b border-slate-100" style={{ color: '#1e293b' }}>
               Project Information
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -962,7 +935,6 @@ export default function ITTCreation() {
                 return (
                   <div>
                     <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                      <Clock size={12} style={{ color: '#0089cf' }} />
                       {t('itt.fieldDuration')}
                     </label>
                     <div className="flex gap-2">
@@ -988,7 +960,6 @@ export default function ITTCreation() {
               {/* Cost Code */}
               <div>
                 <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Hash size={12} style={{ color: '#0089cf' }} />
                   {t('strategy.fieldCostCode')}
                 </label>
                 <input
@@ -1106,7 +1077,6 @@ export default function ITTCreation() {
                that form, so the Contract Holder sets it here instead. ── */}
           <Card branded className="p-5">
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <UserCheck size={15} style={{ color: '#0089cf' }} />
               <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>{isDirectItt ? 'Assign Team' : 'Assigned Team'}</h3>
               <span className="text-[11px] text-slate-400">
                 {isDirectItt ? '— all three required' : '— set at the Contract Initiating Form'}
@@ -1177,11 +1147,8 @@ export default function ITTCreation() {
                 className="w-full flex items-center justify-between gap-3 px-5 py-4"
               >
                 <span className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                    <FileText size={16} style={{ color: '#0089cf' }} />
-                  </span>
                   <span className="text-left min-w-0">
-                    <span className="block font-semibold" style={{ color: '#1e293b', fontSize: '15px' }}>Strategy Templates</span>
+                    <span className="block text-sm font-semibold" style={{ color: '#1e293b' }}>Strategy Templates</span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">Upload the completed strategy templates for this ITT</span>
                   </span>
                 </span>
@@ -1230,7 +1197,7 @@ export default function ITTCreation() {
           {existingTender?.bidderList && existingTender?.bidderList.length > 0 && (
             <Card branded accent className="p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#e8f3fb' }}>
                   <User size={16} style={{ color: '#0089cf' }} />
                 </div>
                 Qualified Bidders — From Pre-Qualification
@@ -1261,7 +1228,7 @@ export default function ITTCreation() {
           {(generatedTemplates.length > 0 || hasPreQual) && (
             <Card branded accent className="p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#e8f3fb' }}>
                   <FileSpreadsheet size={16} style={{ color: '#0089cf' }} />
                 </div>
                 Generated Templates
@@ -1326,7 +1293,7 @@ export default function ITTCreation() {
           {existingTender?.handoffDocuments && Object.keys(existingTender.handoffDocuments).length > 0 && (
             <Card branded accent className="p-6">
               <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#e8f3fb' }}>
                   <Paperclip size={16} style={{ color: '#0089cf' }} />
                 </div>
                 Internal Reference Documents
@@ -1360,27 +1327,22 @@ export default function ITTCreation() {
             </Card>
           )}
 
-          <Button
-            variant="brand"
-            onClick={handleGenerate}
-            className="w-full justify-center py-3.5 text-[15px]"
-            disabled={showErrors && !isFormValid}
-          >
-            <Sparkles size={16} />
-            Generate with AI
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              variant="brand"
+              onClick={handleGenerate}
+              disabled={showErrors && !isFormValid}
+            >
+              Generate ITT
+            </Button>
+          </div>
 
           {showErrors && !isFormValid && (
-            <p className="text-[11px] text-red-500 text-center flex items-center justify-center gap-1">
+            <p className="text-[11px] text-red-500 text-right flex items-center justify-end gap-1">
               <AlertCircle size={11} /> Please fill in all required fields marked with *
             </p>
           )}
 
-          {!showErrors && (
-            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              AI will generate the ITT from your project details. Choose a template after generation.
-            </p>
-          )}
         </div>
       )}
 
@@ -1448,11 +1410,17 @@ export default function ITTCreation() {
                   the dropdown the open section came from. */}
               {current && (
                 <div
-                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 flex-wrap"
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 flex-wrap bg-white"
                   style={canEditCurrent
-                    ? { background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))', border: '1px solid rgba(0,137,207,0.25)' }
-                    : { background: 'rgba(100,116,139,0.06)', border: '1px solid rgba(100,116,139,0.2)' }}
-                >
+    ? {
+        background: '#fff',
+        border: '1px solid rgba(0,137,207,0.25)',
+      }
+    : {
+        background: '#fff',
+        border: '1px solid rgba(100,116,139,0.2)',
+      }}
+>
                   <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                     style={canEditCurrent
                       ? { background: 'rgba(0,137,207,0.14)', color: '#0089cf' }
@@ -1496,7 +1464,7 @@ export default function ITTCreation() {
                   <Card branded className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#e8f3fb' }}>
                           <UploadCloud size={15} style={{ color: '#0089cf' }} />
                         </span>
                         <div className="min-w-0">

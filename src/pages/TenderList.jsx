@@ -394,7 +394,7 @@ export default function TenderList() {
                     onClick={() => setExpanded(expanded === td.id ? null : td.id)}
                   >
                     <td className="px-4 py-3">
-                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
+                      <span className="text-xs font-semibold whitespace-nowrap" style={{ color: '#0088CC' }}>{tenderRef(td)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-slate-800">{td.title}</p>
@@ -405,8 +405,14 @@ export default function TenderList() {
                         {statusLabels[td.status] || td.stage}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-700">{td.budget}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500">{td.deadline}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-slate-700 whitespace-nowrap tabular-nums">{td.budget}</td>
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap tabular-nums" style={{
+                      fontFamily: 'Candara, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '13px',
+                      lineHeight: '100%',
+                      letterSpacing: '-0.42px'
+                    }}>{td.deadline}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{td.bidders || '—'}</td>
                     <td className="px-4 py-3">
                       <ChevronRight size={14} className={`text-slate-400 transition-transform ${expanded === td.id ? 'rotate-90' : ''}`} />
