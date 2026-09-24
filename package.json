@@ -16,8 +16,8 @@
     "jszip": "^3.10.1",
     "localtunnel": "^2.0.2",
     "lucide-react": "^1.18.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-excel-renderer": "^1.1.0",
     "react-router-dom": "^7.17.0",
     "xlsx": "^0.14.5"
