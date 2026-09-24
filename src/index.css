@@ -75,17 +75,17 @@
   --color-primary-light: #afd9f4;
   --color-accent:        #1b4c6f;
   --color-surface:       #ffffff;
-  --color-surface-2:     #ecf4fc;
-  --color-background:    #ecf4fc;
+  --color-surface-2:     #f5f6f8;
+  --color-background:    #f5f6f8;
   --color-sidebar:       #1b4c6f;
   --color-sidebar-text:  rgba(255,255,255,0.6);
   --color-sidebar-active:#0089cf;
   --color-badge-ai:      #0089cf;
   --color-border:        #cce6f8;
   --gradient: linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%);
-  --color-shadow: 0 1px 4px rgba(27,76,111,0.08), 0 4px 16px rgba(27,76,111,0.12);
+  --color-shadow: 0 1px 2px rgba(15,23,42,0.06);
 }
-[data-theme='olng'] body { color: #1e293b; background-color: #ecf4fc; }
+[data-theme='olng'] body { color: #1e293b; background-color: #f5f6f8; }
 
 /* ── OLNG: force primary blue for Tailwind utility classes ── */
 [data-theme='olng'] .text-blue-600  { color: #0089cf !important; }
@@ -316,7 +316,7 @@ body {
 
 /* ── Card hover ── */
 .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; }
-.card-hover:hover { box-shadow: 0 12px 32px -4px rgba(0,0,0,0.3); transform: translateY(-2px); }
+.card-hover:hover { box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
 
 /* ── Focus ring ── */
 input:focus, select:focus, textarea:focus { outline: none; }
@@ -328,7 +328,7 @@ input:focus, select:focus, textarea:focus { outline: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   OLNG BRAND – ITT CREATION PREMIUM ENHANCEMENTS
+   OLNG BRAND – ITT CREATION COMPONENT STYLES
    Scoped to [data-theme='olng'] so other themes remain unaffected.
 ═══════════════════════════════════════════════════════════════════════ */
 
@@ -368,13 +368,13 @@ input:focus, select:focus, textarea:focus { outline: none; }
 }
 
 /* ── Utility classes ── */
-.olng-slide-up   { animation: olng-slide-up 0.4s cubic-bezier(0.16,1,0.3,1) both; }
-.olng-scale-in   { animation: olng-scale-in 0.35s cubic-bezier(0.16,1,0.3,1) both; }
-.olng-pulse-glow { animation: olng-pulse-glow 2.2s ease-in-out infinite; }
-.olng-float      { animation: olng-float 3s ease-in-out infinite; }
+.olng-slide-up   { animation: fade-in 0.15s ease both; }
+.olng-scale-in   { animation: fade-in 0.15s ease both; }
+.olng-pulse-glow { }
+.olng-float      { }
 
 /* Stagger children with --i index */
-.olng-stagger { animation-delay: calc(var(--i, 0) * 80ms); }
+.olng-stagger { }
 
 /* ── AI-editable SOW text: highlight selection to signal it can be edited ── */
 .olng-sow-editable { cursor: text; }
@@ -389,23 +389,12 @@ input:focus, select:focus, textarea:focus { outline: none; }
   position: relative;
   overflow: hidden;
 }
-.olng-card-branded::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #1b4c6f 0%, #0089cf 60%, #afd9f4 100%);
-  border-radius: 16px 16px 0 0;
-  z-index: 1;
-}
 
 /* ── Glassmorphism Card ── */
 [data-theme='olng'] .olng-glass {
-  background: rgba(255,255,255,0.72);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  border: 1px solid rgba(0,137,207,0.12);
-  box-shadow: 0 2px 8px rgba(27,76,111,0.06), 0 8px 32px rgba(27,76,111,0.08);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--color-shadow);
 }
 
 /* ── Premium Progress Bar ── */
@@ -418,19 +407,10 @@ input:focus, select:focus, textarea:focus { outline: none; }
 .olng-progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #1b4c6f 0%, #0089cf 100%);
-  transition: width 0.6s cubic-bezier(0.16,1,0.3,1);
+  background: #0089cf;
+  transition: width 0.3s ease;
   position: relative;
   overflow: hidden;
-}
-.olng-progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
-  animation: olng-progress-shimmer 2s ease-in-out infinite;
 }
 
 /* ── Branded Step Indicator ── */
@@ -444,14 +424,12 @@ input:focus, select:focus, textarea:focus { outline: none; }
   z-index: 2;
 }
 .olng-step-circle--active {
-  background: linear-gradient(135deg, #1b4c6f, #0089cf);
+  background: #1b4c6f;
   color: #fff;
-  box-shadow: 0 0 0 4px rgba(0,137,207,0.18), 0 4px 12px rgba(0,137,207,0.25);
 }
 .olng-step-circle--done {
-  background: linear-gradient(135deg, #0089cf, #00b4d8);
+  background: #0089cf;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0,137,207,0.2);
 }
 .olng-step-circle--pending {
   background: #fff;
@@ -470,7 +448,7 @@ input:focus, select:focus, textarea:focus { outline: none; }
   transition: background 0.3s ease;
 }
 .olng-step-connector--done {
-  background: linear-gradient(90deg, #0089cf, #00b4d8);
+  background: #0089cf;
 }
 
 /* ── Status Banner ── */
@@ -479,51 +457,34 @@ input:focus, select:focus, textarea:focus { outline: none; }
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(0,137,207,0.06) 0%, rgba(27,76,111,0.04) 100%);
-  border: 1px solid rgba(0,137,207,0.12);
-  border-left: 3px solid #0089cf;
+  border-radius: 6px;
+  background: #f4f9fd;
+  border: 1px solid #cce6f8;
 }
 .olng-status-banner .status-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
   background: #0089cf;
-  animation: olng-dot-pulse 2s ease-in-out infinite;
 }
 
 /* ── Generate Button ── */
 .olng-btn-generate {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%) !important;
-  box-shadow: 0 4px 20px rgba(0,137,207,0.35), 0 2px 8px rgba(27,76,111,0.2) !important;
-  transition: all 0.3s cubic-bezier(0.16,1,0.3,1) !important;
+  background: #1b4c6f !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease !important;
 }
-.olng-btn-generate:hover {
-  box-shadow: 0 6px 28px rgba(0,137,207,0.45), 0 4px 12px rgba(27,76,111,0.25) !important;
-  transform: translateY(-1px);
-}
-.olng-btn-generate::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%;
-  width: 60%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-  transition: left 0.5s ease;
-}
-.olng-btn-generate:hover::after { left: 120%; }
+.olng-btn-generate:hover { background: #163f5c !important; }
 
 /* ── Form inputs (OLNG scoped) ── */
 [data-theme='olng'] .olng-input {
-  border: 1.5px solid #cce6f8;
-  border-radius: 10px;
+  border: 1px solid #c9d6e2;
+  border-radius: 6px;
   background: #fff;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(27,76,111,0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 [data-theme='olng'] .olng-input:focus {
   border-color: #0089cf;
-  box-shadow: 0 0 0 3px rgba(0,137,207,0.12), 0 1px 3px rgba(27,76,111,0.04);
+  box-shadow: 0 0 0 2px rgba(0,137,207,0.15);
 }
 [data-theme='olng'] .olng-input::placeholder {
   color: #94a3b8;
@@ -542,12 +503,10 @@ input:focus, select:focus, textarea:focus { outline: none; }
   transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
 }
 .olng-gen-dot--done {
-  background: linear-gradient(135deg, #0089cf, #00b4d8);
-  box-shadow: 0 2px 8px rgba(0,137,207,0.25);
+  background: #0089cf;
 }
 .olng-gen-dot--active {
-  background: linear-gradient(135deg, #1b4c6f, #0089cf);
-  box-shadow: 0 0 0 4px rgba(0,137,207,0.15);
+  background: #1b4c6f;
 }
 .olng-gen-dot--pending {
   background: #e8f4fc;
@@ -559,29 +518,21 @@ input:focus, select:focus, textarea:focus { outline: none; }
   position: relative;
   overflow: hidden;
 }
-.olng-section-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 3px; height: 100%;
-  background: linear-gradient(180deg, #1b4c6f 0%, #0089cf 100%);
-  border-radius: 3px 0 0 3px;
-}
 
 /* ── Export panel decorations ── */
 .olng-export-icon {
   width: 44px; height: 44px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(0,137,207,0.12) 0%, rgba(27,76,111,0.08) 100%);
+  border-radius: 8px;
+  background: #e8f3fb;
   display: flex; align-items: center; justify-content: center;
   color: #0089cf;
 }
 
 /* ── Info Alert (brand) ── */
 .olng-info-alert {
-  background: linear-gradient(135deg, rgba(0,137,207,0.06) 0%, rgba(175,217,244,0.15) 100%);
-  border: 1px solid rgba(0,137,207,0.18);
-  border-radius: 10px;
+  background: #f4f9fd;
+  border: 1px solid #cce6f8;
+  border-radius: 6px;
   color: #1e293b;
 }
 
@@ -589,39 +540,25 @@ input:focus, select:focus, textarea:focus { outline: none; }
 .olng-success-ring {
   width: 72px; height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(0,137,207,0.1) 0%, rgba(16,185,129,0.1) 100%);
+  background: #ecfdf5;
   display: flex; align-items: center; justify-content: center;
   position: relative;
-}
-.olng-success-ring::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  background: linear-gradient(135deg, #0089cf, #10b981) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.4;
 }
 
 /* ── File upload zone ── */
 .olng-dropzone {
-  border: 2px dashed #cce6f8;
-  border-radius: 14px;
-  transition: all 0.25s ease;
-  background: rgba(236,244,252,0.4);
+  border: 1px dashed #9fbfd8;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  background: #fafcfe;
 }
 .olng-dropzone:hover,
 .olng-dropzone--active {
   border-color: #0089cf;
   background: rgba(0,137,207,0.04);
-  box-shadow: 0 0 0 4px rgba(0,137,207,0.06);
 }
 
 /* ── Subtle dot pattern for AI generation bg ── */
 .olng-dot-pattern {
-  background-image: radial-gradient(rgba(0,137,207,0.08) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: none;
 }

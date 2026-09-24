@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Target, Building2, ShieldOff, ArrowLeft, ArrowRight, FileText, AlertCircle,
-  DollarSign, Calendar, Clock, Hash, Briefcase, ShieldAlert, UserCheck,
-  UploadCloud, X, Paperclip, Sparkles, RefreshCw,
+  Target, ShieldOff, ArrowLeft, ArrowRight, FileText, AlertCircle,
+  DollarSign, Calendar, Briefcase, ShieldAlert,
+  UploadCloud, X, Paperclip, RefreshCw,
   Download, Edit3, ChevronRight, Wand2, Undo2, Plus, Bot, Check
 } from 'lucide-react'
 import Badge from '../components/ui/Badge'
@@ -343,9 +343,9 @@ export default function ContractStrategy() {
   // matches tender-management-frontend's Contract Initiating Form picker.
   if (showDraftPicker) return (
     <div className="space-y-5 w-full">
-      <Card branded className="p-5 olng-slide-up">
+      <Card branded className="p-5">
         <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+          <div className="w-8 h-8 rounded-md flex items-center justify-center" style={{ background: '#e8f3fb' }}>
             <FileText size={16} style={{ color: '#0089cf' }} />
           </div>
           <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>Contract Initiating Form</h3>
@@ -355,7 +355,7 @@ export default function ContractStrategy() {
         </p>
       </Card>
 
-      <div className="space-y-3 olng-slide-up" style={{ animationDelay: '60ms' }}>
+      <div className="space-y-3">
         {cifDraftTenders.map(dt => (
           <Card
             key={dt.id}
@@ -366,7 +366,7 @@ export default function ContractStrategy() {
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-start gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+                <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0" style={{ background: '#e8f3fb' }}>
                   <Briefcase size={16} style={{ color: '#0089cf' }} />
                 </div>
                 <div className="min-w-0">
@@ -388,7 +388,7 @@ export default function ContractStrategy() {
 
       <button
         onClick={() => setSkipDraftPicker(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all olng-slide-up"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
         style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', animationDelay: '90ms' }}
       >
         <Plus size={16} /> Start New Contract Initiating Form
@@ -705,7 +705,6 @@ export default function ContractStrategy() {
 
   return (
     <div className="space-y-5 w-full">
-
       {/* ══════════════ STEP 0: CONTRACT DETAILS FORM ══════════════ */}
       {step === 0 && (
         <>
@@ -713,131 +712,165 @@ export default function ContractStrategy() {
           {cifDraftTenders.length > 0 && (
             <button
               onClick={backToDrafts}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all olng-slide-up"
-              style={{ color: '#64748b', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all"
+              style={{
+                color: "#64748b",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+              }}
             >
               <ArrowLeft size={13} /> Back to drafts
             </button>
           )}
 
-          {/* Header Card */}
-          <Card branded className="p-5 olng-slide-up">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                <Target size={16} style={{ color: '#0089cf' }} />
-              </div>
-              <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
-                {existingTender ? `Contract Strategy — ${tenderRef(existingTender)}` : 'New Contract Strategy'}
-              </h3>
-            </div>
+          {/* Page heading */}
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "#1e293b" }}>
+              {existingTender
+                ? `Contract Strategy — ${tenderRef(existingTender)}`
+                : "New Contract Strategy"}
+            </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Define the contract details for this tender. AI will generate a Statement of Work document
-              from your inputs before proceeding to Pre-Qualification.
+              Define the contract details for this tender. AI will generate a
+              Statement of Work document from your inputs before proceeding to
+              Pre-Qualification.
             </p>
-          </Card>
+          </div>
 
           {/* CONTRACT DETAILS FORM */}
-          <Card branded className="p-6 space-y-5 olng-slide-up" style={{ animationDelay: '60ms' }}>
-            <h3 className="font-semibold flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                <FileText size={16} style={{ color: '#0089cf' }} />
-              </div>
+          <Card branded className="p-6 space-y-5">
+            <h3
+              className="text-sm font-semibold pb-3 border-b border-slate-100"
+              style={{ color: "#1e293b" }}
+            >
               Contract Initiating Form
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Contract / Project Title — full width */}
               <div className="col-span-2">
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  {t('itt.fieldTitle')}
-                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("itt.fieldTitle")}
+                  <span className="font-secondary" style={{ color: "#0089cf" }}>
+                    *
+                  </span>
                 </label>
                 <input
                   value={form.title}
-                  onChange={e => setField('title', e.target.value)}
+                  onChange={(e) => setField("title", e.target.value)}
                   placeholder="e.g. Supply of Gas Turbine Spare Parts"
-                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError('title') ? 'olng-input--error' : ''}`}
+                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError("title") ? "olng-input--error" : ""}`}
                 />
-                {fieldError('title') && (
-                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Project Title is required</p>
+                {fieldError("title") && (
+                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={10} />
+                    Project Title is required
+                  </p>
                 )}
               </div>
 
               {/* Tender Type */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Briefcase size={12} style={{ color: '#0089cf' }} />
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
                   Tender Type
                 </label>
                 <select
                   value={form.tenderType}
-                  onChange={e => setField('tenderType', e.target.value)}
+                  onChange={(e) => setField("tenderType", e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white"
                 >
-                  {TENDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {TENDER_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Department */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Building2 size={12} style={{ color: '#0089cf' }} />
-                  {t('itt.fieldDept')}
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("itt.fieldDept")}
                 </label>
                 <select
                   value={form.department}
-                  onChange={e => setField('department', e.target.value)}
+                  onChange={(e) => setField("department", e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input"
                 >
                   <option value="">Select department…</option>
                   {/* An existing tender may carry a department predating this list —
                       keep it as an option so editing doesn't silently blank it. */}
-                  {(form.department && !CONFIGURED_DEPARTMENTS.includes(form.department)
+                  {(form.department &&
+                  !CONFIGURED_DEPARTMENTS.includes(form.department)
                     ? [form.department, ...CONFIGURED_DEPARTMENTS]
                     : CONFIGURED_DEPARTMENTS
-                  ).map(d => <option key={d} value={d}>{d}</option>)}
+                  ).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Anticipated Value */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <DollarSign size={12} style={{ color: '#0089cf' }} />
-                  {t('itt.fieldBudget')}
-                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("itt.fieldBudget")}
+                  <span className="font-secondary" style={{ color: "#0089cf" }}>
+                    *
+                  </span>
                 </label>
                 <div className="flex gap-2">
                   <select
                     value={form.currency}
-                    onChange={e => handleCurrencyChange(e.target.value)}
+                    onChange={(e) => handleCurrencyChange(e.target.value)}
                     className="w-28 px-2 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white font-semibold"
-                    style={{ color: '#1e293b' }}
+                    style={{ color: "#1e293b" }}
                   >
-                    {CURRENCIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.code}</option>
+                    {CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code}
+                      </option>
                     ))}
                   </select>
                   <input
                     value={form.budget}
-                    onChange={e => setBudget(e.target.value)}
+                    onChange={(e) => setBudget(e.target.value)}
                     placeholder="e.g. 500,000"
-                    className={`flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError('budget') ? 'olng-input--error' : ''}`}
+                    className={`flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError("budget") ? "olng-input--error" : ""}`}
                   />
                 </div>
-                {fieldError('budget') && (
-                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Budget is required</p>
+                {fieldError("budget") && (
+                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={10} />
+                    Budget is required
+                  </p>
                 )}
               </div>
 
               {/* Cost Code */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Hash size={12} style={{ color: '#0089cf' }} />
-                  {t('strategy.fieldCostCode')}
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("strategy.fieldCostCode")}
                 </label>
                 <input
                   value={form.costCode}
-                  onChange={e => setField('costCode', e.target.value)}
+                  onChange={(e) => setField("costCode", e.target.value)}
                   placeholder="e.g. CC-2025-001"
                   className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input"
                 />
@@ -845,94 +878,128 @@ export default function ContractStrategy() {
 
               {/* Date Required */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Calendar size={12} style={{ color: '#0089cf' }} />
-                  {t('itt.fieldDeadline')}
-                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("itt.fieldDeadline")}
+                  <span className="font-secondary" style={{ color: "#0089cf" }}>
+                    *
+                  </span>
                 </label>
                 <input
                   type="date"
                   value={form.deadline}
-                  onChange={e => setField('deadline', e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError('deadline') ? 'olng-input--error' : ''}`}
+                  onChange={(e) => setField("deadline", e.target.value)}
+                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError("deadline") ? "olng-input--error" : ""}`}
                 />
-                {fieldError('deadline') && (
-                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Deadline is required</p>
+                {fieldError("deadline") && (
+                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={10} />
+                    Deadline is required
+                  </p>
                 )}
               </div>
 
               {/* Duration (Years + Months) */}
               <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Clock size={12} style={{ color: '#0089cf' }} />
-                  {t('itt.fieldDuration')}
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("itt.fieldDuration")}
                 </label>
                 <div className="flex gap-2">
                   <select
                     value={selYears}
-                    onChange={e => setDuration(e.target.value, selMonths)}
-                    className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white">
+                    onChange={(e) => setDuration(e.target.value, selMonths)}
+                    className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white"
+                  >
                     <option value="">Years</option>
-                    {yearOpts.map(y => <option key={y} value={y}>{y} year{y === 1 ? '' : 's'}</option>)}
+                    {yearOpts.map((y) => (
+                      <option key={y} value={y}>
+                        {y} year{y === 1 ? "" : "s"}
+                      </option>
+                    ))}
                   </select>
                   <select
                     value={selMonths}
-                    onChange={e => setDuration(selYears, e.target.value)}
-                    className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white">
+                    onChange={(e) => setDuration(selYears, e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input bg-white"
+                  >
                     <option value="">Months</option>
-                    {monthOpts.map(m => <option key={m} value={m}>{m} month{m === 1 ? '' : 's'}</option>)}
+                    {monthOpts.map((m) => (
+                      <option key={m} value={m}>
+                        {m} month{m === 1 ? "" : "s"}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-
               {/* Scope Overview — full width textarea */}
               <div className="col-span-2">
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  {t('strategy.fieldScopeOverview')}
-                  <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
+                <label
+                  className="text-xs font-semibold mb-2 block flex items-center gap-1"
+                  style={{ color: "#1e293b" }}
+                >
+                  {t("strategy.fieldScopeOverview")}
+                  <span className="font-secondary" style={{ color: "#0089cf" }}>
+                    *
+                  </span>
                 </label>
                 <textarea
                   rows={4}
                   value={form.description}
-                  onChange={e => setField('description', e.target.value)}
+                  onChange={(e) => setField("description", e.target.value)}
                   placeholder="Provide Scope Overview — describe the project scope, objectives, and key requirements..."
-                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError('description') ? 'olng-input--error' : ''}`}
+                  className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError("description") ? "olng-input--error" : ""}`}
                 />
-                {fieldError('description') && (
-                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Scope Overview is required</p>
+                {fieldError("description") && (
+                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={10} />
+                    Scope Overview is required
+                  </p>
                 )}
               </div>
-
             </div>
           </Card>
 
           {/* ── Assign Team: the three owning roles, set once here so PSF, PQQ
                and ITT Creation just read who owns each side. ── */}
-          <Card branded className="p-5 olng-slide-up" style={{ animationDelay: '90ms' }}>
+          <Card branded className="p-5">
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <UserCheck size={15} style={{ color: '#0089cf' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>Assign Team</h3>
-              <span className="text-[11px] text-slate-400">{requiresAssignment ? '— all three required' : '— set previously'}</span>
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "#1e293b" }}
+              >
+                Assign Team
+              </h3>
+              <span className="text-[11px] text-slate-400">
+                {requiresAssignment
+                  ? "— all three required"
+                  : "— set previously"}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {ASSIGNMENT_GROUPS.map(group => {
-                const options = usersByGroup[group.key] || []
-                const picked = assignedIds[group.key] || []
+              {ASSIGNMENT_GROUPS.map((group) => {
+                const options = usersByGroup[group.key] || [];
+                const picked = assignedIds[group.key] || [];
                 return (
                   <div key={group.key}>
                     <label className="text-[11px] font-medium text-slate-600 mb-1 block">
-                      {group.title} <span className="font-secondary text-red-400">*</span>
+                      {group.title}{" "}
+                      <span className="font-secondary text-red-400">*</span>
                     </label>
                     <SearchableSelect
                       multiple
                       value={picked}
-                      onChange={vals => setGroupIds(group.key, vals)}
+                      onChange={(vals) => setGroupIds(group.key, vals)}
                       options={options}
-                      getValue={u => u.id}
-                      getLabel={u => u.name}
-                      getSubLabel={u => u.username}
+                      getValue={(u) => u.id}
+                      getLabel={(u) => u.name}
+                      getSubLabel={(u) => u.username}
                       placeholder={`Select ${group.noun}…`}
                       searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
                       emptyText={group.empty}
@@ -940,48 +1007,65 @@ export default function ContractStrategy() {
                     />
                     {picked.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
-                        {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
-                          <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)' }}>
-                            {u.name}
-                            <button
-                              onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
-                              className="hover:text-red-500"
-                              title="Remove"
+                        {options
+                          .filter((u) =>
+                            picked.some((id) => String(id) === String(u.id)),
+                          )
+                          .map((u) => (
+                            <span
+                              key={u.id}
+                              className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
+                              style={{
+                                color: "#0089cf",
+                                background: "rgba(0,137,207,0.08)",
+                              }}
                             >
-                              <X size={11} />
-                            </button>
-                          </span>
-                        ))}
+                              {u.name}
+                              <button
+                                onClick={() =>
+                                  setGroupIds(
+                                    group.key,
+                                    picked.filter(
+                                      (id) => String(id) !== String(u.id),
+                                    ),
+                                  )
+                                }
+                                className="hover:text-red-500"
+                                title="Remove"
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
                       </div>
                     )}
-                    <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      {group.note}
+                    </p>
                   </div>
-                )
+                );
               })}
             </div>
             {showErrors && requiresAssignment && !isFullyAssigned && (
-              <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1"><AlertCircle size={10} />Select at least one Contract Engineer, HSE and ICV</p>
+              <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1">
+                <AlertCircle size={10} />
+                Select at least one Contract Engineer, HSE and ICV
+              </p>
             )}
           </Card>
 
           {/* Submit / Generate SOW */}
-          <div className="flex items-center justify-end gap-3 olng-slide-up" style={{ animationDelay: '120ms' }}>
+          <div className="flex items-center justify-end gap-3">
             {showErrors && !isFormValid && (
               <p className="text-[11px] text-red-500 flex items-center gap-1 mr-auto">
-                <AlertCircle size={11} />Please fill in all required fields marked with *
+                <AlertCircle size={11} />
+                Please fill in all required fields marked with *
               </p>
             )}
-            <Button variant="brand" onClick={handleGenerate} className="flex items-center gap-2 py-3 px-6 text-[15px]">
-              <Sparkles size={16} />
-              Generate SOW with AI
+            <Button variant="brand" onClick={handleGenerate}>
+              Generate SOW
             </Button>
           </div>
-
-          {!showErrors && (
-            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              AI will generate a detailed Statement of Work document based on your contract details.
-            </p>
-          )}
         </>
       )}
 
@@ -996,7 +1080,8 @@ export default function ContractStrategy() {
             steps={SOW_GEN_TASKS.map((task, i) => ({
               id: task,
               label: task,
-              status: i < genStep ? 'complete' : i === genStep ? 'active' : 'pending',
+              status:
+                i < genStep ? "complete" : i === genStep ? "active" : "pending",
             }))}
           />
         </div>
@@ -1004,18 +1089,28 @@ export default function ContractStrategy() {
 
       {/* ══════════════ STEP 2: SOW REVIEW ══════════════ */}
       {step === 2 && sowContent && (
-        <div className="space-y-5 olng-slide-up">
+        <div className="space-y-5">
           {/* SOW Header — bordered card, matches tender-management-frontend */}
           <div
             className="flex items-center justify-between"
-            style={{ background: '#fff', border: '1px solid #cce6f8', borderRadius: 8, padding: 16 }}
+            style={{
+              background: "#fff",
+              border: "1px solid #cce6f8",
+              borderRadius: 8,
+              padding: 16,
+            }}
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg" style={{ background: 'rgba(0,137,207,0.1)', color: '#0089cf' }}>
+              <div
+                className="p-2 rounded-lg"
+                style={{ background: "rgba(0,137,207,0.1)", color: "#0089cf" }}
+              >
                 <FileText size={20} />
               </div>
               <div>
-                <h2 className="font-bold" style={{ color: '#1e293b' }}>Statement of Work — Generated</h2>
+                <h2 className="font-bold" style={{ color: "#1e293b" }}>
+                  Statement of Work — Generated
+                </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {sowContent.reference} · Generated {sowContent.generatedDate}
                 </p>
@@ -1023,7 +1118,11 @@ export default function ContractStrategy() {
             </div>
             <span
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}
+              style={{
+                background: "rgba(16,185,129,0.08)",
+                color: "#059669",
+                border: "1px solid rgba(16,185,129,0.2)",
+              }}
             >
               <Bot size={14} /> AI Generated
             </span>
@@ -1032,40 +1131,62 @@ export default function ContractStrategy() {
           {/* SOW Document Card — flat top accent border, no gradient title bar */}
           <Card
             className="p-0 overflow-hidden"
-            style={{ border: '1px solid rgba(0,137,207,0.2)', boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}
+            style={{
+              border: "1px solid rgba(0,137,207,0.2)",
+              boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
+            }}
           >
-            <div style={{ height: 4, background: '#0089cf' }} />
+            <div style={{ height: 4, background: "#0089cf" }} />
 
             <div
               ref={sowBodyRef}
               onMouseUp={handleSowSelect}
               className="relative px-8 py-8 text-sm leading-relaxed"
-              style={{ color: '#334155' }}
+              style={{ color: "#334155" }}
             >
               <div className="mb-8">
-                <h2 className="text-xl font-bold mb-1" style={{ color: '#0089cf' }}>{sowContent.title}</h2>
-                <p className="text-sm text-slate-400">Reference: {sowContent.reference} · {form.budget}</p>
+                <h2
+                  className="text-xl font-bold mb-1"
+                  style={{ color: "#0089cf" }}
+                >
+                  {sowContent.title}
+                </h2>
+                <p className="text-sm text-slate-400">
+                  Reference: {sowContent.reference} · {form.budget}
+                </p>
 
                 <div className="flex justify-between items-center mt-6 gap-4 flex-wrap">
                   {!sowEditing ? (
                     <div
                       className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded"
-                      style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)', border: '1px solid rgba(0,137,207,0.2)' }}
+                      style={{
+                        color: "#0089cf",
+                        background: "rgba(0,137,207,0.08)",
+                        border: "1px solid rgba(0,137,207,0.2)",
+                      }}
                     >
-                      <Wand2 size={14} className="mr-1" /> Select any text in the document to edit it with AI
+                      <Wand2 size={14} className="mr-1" /> Select any text in
+                      the document to edit it with AI
                     </div>
-                  ) : <div />}
+                  ) : (
+                    <div />
+                  )}
                   <div className="flex gap-3">
                     {sowEditing ? (
                       <>
-                        <Button variant="secondary" size="sm" onClick={handleCancelSowEdit} className="text-[11px] py-1.5 px-3">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleCancelSowEdit}
+                          className="text-[11px] py-1.5 px-3"
+                        >
                           Cancel
                         </Button>
                         <Button
                           size="sm"
                           onClick={handleSaveSowEdit}
                           className="text-[11px] py-1.5 px-3 flex items-center gap-1.5"
-                          style={{ background: '#0089cf', color: '#fff' }}
+                          style={{ background: "#0089cf", color: "#fff" }}
                         >
                           <Check size={12} /> Save Changes
                         </Button>
@@ -1075,9 +1196,18 @@ export default function ContractStrategy() {
                         <button
                           onClick={handleEditScopeClick}
                           className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
-                          style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', background: 'transparent' }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,137,207,0.06)' }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                          style={{
+                            color: "#0089cf",
+                            border: "1px solid rgba(0,137,207,0.2)",
+                            background: "transparent",
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background =
+                              "rgba(0,137,207,0.06)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                          }}
                         >
                           <Edit3 size={11} /> Edit Scope
                         </button>
@@ -1085,9 +1215,18 @@ export default function ContractStrategy() {
                           <button
                             onClick={handleUndoAiEdit}
                             className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
-                            style={{ color: '#64748b', border: '1px solid rgba(100,116,139,0.2)', background: 'transparent' }}
-                            onMouseOver={e => { e.currentTarget.style.background = 'rgba(100,116,139,0.06)' }}
-                            onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                            style={{
+                              color: "#64748b",
+                              border: "1px solid rgba(100,116,139,0.2)",
+                              background: "transparent",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background =
+                                "rgba(100,116,139,0.06)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                            }}
                           >
                             <Undo2 size={11} /> Undo AI Edit
                           </button>
@@ -1095,9 +1234,18 @@ export default function ContractStrategy() {
                         <button
                           onClick={handleDownloadSow}
                           className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
-                          style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)', background: 'transparent' }}
-                          onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,137,207,0.06)' }}
-                          onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
+                          style={{
+                            color: "#0089cf",
+                            border: "1px solid rgba(0,137,207,0.2)",
+                            background: "transparent",
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background =
+                              "rgba(0,137,207,0.06)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                          }}
                         >
                           <Download size={11} /> Download SOW
                         </button>
@@ -1110,8 +1258,14 @@ export default function ContractStrategy() {
               <div className="space-y-8">
                 {sowContent.sections.map((section, si) => (
                   <div key={si}>
-                    <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
-                      <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
+                    <h4
+                      className="font-bold text-[13px] mb-2 flex items-center gap-2"
+                      style={{ color: "#1e293b" }}
+                    >
+                      <div
+                        className="w-1.5 h-5 rounded-full"
+                        style={{ background: "#0089cf" }}
+                      />
                       {section.heading}
                     </h4>
 
@@ -1119,9 +1273,17 @@ export default function ContractStrategy() {
                       <div className="pl-4">
                         <textarea
                           data-section-index={si}
-                          rows={Math.max(3, Math.ceil((draftTexts[si] || '').length / 70))}
-                          value={draftTexts[si] ?? ''}
-                          onChange={e => setDraftTexts(prev => ({ ...prev, [si]: e.target.value }))}
+                          rows={Math.max(
+                            3,
+                            Math.ceil((draftTexts[si] || "").length / 70),
+                          )}
+                          value={draftTexts[si] ?? ""}
+                          onChange={(e) =>
+                            setDraftTexts((prev) => ({
+                              ...prev,
+                              [si]: e.target.value,
+                            }))
+                          }
                           className="w-full text-[12.5px] px-3 py-2.5 resize-y focus:outline-none transition-all olng-input"
                         />
                         <div className="flex items-center gap-1.5 mt-1.5 text-[10.5px] font-medium text-slate-400">
@@ -1142,12 +1304,22 @@ export default function ContractStrategy() {
                         {section.items && (
                           <div className="pl-4 grid grid-cols-2 gap-2 mt-2">
                             {section.items.map((item, ii) => (
-                              <div key={ii} className="flex items-center justify-between rounded-lg px-3 py-2" style={{
-                                background: 'rgba(236,244,252,0.5)',
-                                border: '1px solid rgba(0,137,207,0.08)'
-                              }}>
-                                <span className="text-[11px] text-slate-400">{item.label}</span>
-                                <span data-sow-path={`item:${si}:${ii}`} className="text-[11px] font-semibold" style={{ color: item.color || '#1e293b' }}>
+                              <div
+                                key={ii}
+                                className="flex items-center justify-between rounded-lg px-3 py-2"
+                                style={{
+                                  background: "rgba(236,244,252,0.5)",
+                                  border: "1px solid rgba(0,137,207,0.08)",
+                                }}
+                              >
+                                <span className="text-[11px] text-slate-400">
+                                  {item.label}
+                                </span>
+                                <span
+                                  data-sow-path={`item:${si}:${ii}`}
+                                  className="text-[11px] font-semibold"
+                                  style={{ color: item.color || "#1e293b" }}
+                                >
                                   {item.value}
                                 </span>
                               </div>
@@ -1159,12 +1331,29 @@ export default function ContractStrategy() {
                           <div className="pl-4 space-y-3 mt-2">
                             {section.subsections.map((sub, si2) => (
                               <div key={si2}>
-                                <p data-sow-path={`subtitle:${si}:${si2}`} className="text-[12px] font-semibold mb-1 olng-sow-editable" style={{ color: '#1e293b' }}>{sub.title}</p>
+                                <p
+                                  data-sow-path={`subtitle:${si}:${si2}`}
+                                  className="text-[12px] font-semibold mb-1 olng-sow-editable"
+                                  style={{ color: "#1e293b" }}
+                                >
+                                  {sub.title}
+                                </p>
                                 <ul className="space-y-1">
                                   {sub.items.map((item, ii) => (
-                                    <li key={ii} className="text-[12px] text-slate-600 flex items-start gap-2">
-                                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#0089cf' }} />
-                                      <span data-sow-path={`sub:${si}:${si2}:${ii}`} className="olng-sow-editable">{item}</span>
+                                    <li
+                                      key={ii}
+                                      className="text-[12px] text-slate-600 flex items-start gap-2"
+                                    >
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                                        style={{ background: "#0089cf" }}
+                                      />
+                                      <span
+                                        data-sow-path={`sub:${si}:${si2}:${ii}`}
+                                        className="olng-sow-editable"
+                                      >
+                                        {item}
+                                      </span>
                                     </li>
                                   ))}
                                 </ul>
@@ -1184,136 +1373,203 @@ export default function ContractStrategy() {
           {selection && (
             <div
               className="fixed z-40 flex flex-col items-center olng-scale-in"
-              style={{ left: selection.x, top: selection.y - 6, transform: 'translate(-50%, -100%)' }}
+              style={{
+                left: selection.x,
+                top: selection.y - 6,
+                transform: "translate(-50%, -100%)",
+              }}
             >
               <button
                 onClick={openAiEditor}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition-colors"
-                style={{ background: '#0089cf' }}
+                style={{ background: "#0089cf" }}
               >
                 <Wand2 size={13} /> Edit with AI
               </button>
-              <div className="-mt-1 h-2 w-2 rotate-45" style={{ background: '#0089cf' }} />
+              <div
+                className="-mt-1 h-2 w-2 rotate-45"
+                style={{ background: "#0089cf" }}
+              />
             </div>
           )}
 
           {/* ── "Edit with AI" modal ── */}
-          {aiEdit && createPortal(
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-              onClick={() => { if (!aiBusy) closeAiEditor() }}
-            >
-              <div className="w-full max-w-md olng-scale-in" onClick={e => e.stopPropagation()}>
-                <Card branded className="p-0 overflow-hidden">
-                  <div
-                    className="flex items-center justify-between px-4 py-3"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))',
-                      borderBottom: '1px solid rgba(0,137,207,0.12)',
-                    }}
-                  >
-                    <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: '#0089cf' }}>
-                      <Wand2 size={14} /> Edit with AI
-                    </span>
-                    {!aiBusy && (
-                      <button onClick={closeAiEditor} className="text-slate-400 hover:text-slate-600" aria-label="Close">
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Selected text</p>
-                      <blockquote
-                        className="text-xs text-slate-500 italic line-clamp-3 pl-2.5 py-0.5"
-                        style={{ borderLeft: '2px solid rgba(0,137,207,0.3)' }}
-                      >
-                        {aiEdit.text}
-                      </blockquote>
-                    </div>
-
-                    <div>
-                      <label htmlFor="sow-ai-instruction" className="mb-1.5 block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        Instruction
-                      </label>
-                      <textarea
-                        id="sow-ai-instruction"
-                        autoFocus
-                        rows={3}
-                        value={aiPrompt}
-                        onChange={e => setAiPrompt(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyAiEdit() }
-                        }}
-                        placeholder="Tell AI how to update this… e.g. “make it more formal”, “shorten this”, “replace 14 days with 21 days”"
-                        className="w-full px-3 py-2 text-xs focus:outline-none resize-none transition-all olng-input"
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {['Make it more formal', 'Shorten this', 'Expand with more detail', 'Convert to bullet points'].map(sug => (
-                        <button
-                          key={sug}
-                          onClick={() => setAiPrompt(sug)}
-                          className="text-[10px] px-2 py-1 rounded-md transition-all hover:bg-white"
-                          style={{ color: '#0089cf', background: 'rgba(0,137,207,0.06)', border: '1px solid rgba(0,137,207,0.15)' }}
-                        >
-                          {sug}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div
-                    className="flex justify-end gap-2 px-4 py-3"
-                    style={{ borderTop: '1px solid rgba(0,137,207,0.1)', background: 'rgba(236,244,252,0.4)' }}
-                  >
-                    <Button variant="secondary" onClick={closeAiEditor} disabled={aiBusy} className="text-xs py-1.5 px-3">
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleApplyAiEdit}
-                      disabled={!aiPrompt.trim() || aiBusy}
-                      className="text-xs py-1.5 px-3 flex items-center gap-1.5"
-                      style={{ background: '#0089cf', color: '#fff' }}
+          {aiEdit &&
+            createPortal(
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                onClick={() => {
+                  if (!aiBusy) closeAiEditor();
+                }}
+              >
+                <div
+                  className="w-full max-w-md olng-scale-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Card branded className="p-0 overflow-hidden">
+                    <div
+                      className="flex items-center justify-between px-4 py-3"
+                      style={{
+                        background: "#f4f9fd",
+                        borderBottom: "1px solid rgba(0,137,207,0.12)",
+                      }}
                     >
-                      {aiBusy
-                        ? <><RefreshCw size={12} className="animate-spin" /> Applying…</>
-                        : <><Wand2 size={12} /> Apply AI Edit</>}
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            </div>,
-            document.body
-          )}
+                      <span
+                        className="flex items-center gap-1.5 text-sm font-bold"
+                        style={{ color: "#0089cf" }}
+                      >
+                        <Wand2 size={14} /> Edit with AI
+                      </span>
+                      {!aiBusy && (
+                        <button
+                          onClick={closeAiEditor}
+                          className="text-slate-400 hover:text-slate-600"
+                          aria-label="Close"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                          Selected text
+                        </p>
+                        <blockquote
+                          className="text-xs text-slate-500 italic line-clamp-3 pl-2.5 py-0.5"
+                          style={{
+                            borderLeft: "2px solid rgba(0,137,207,0.3)",
+                          }}
+                        >
+                          {aiEdit.text}
+                        </blockquote>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="sow-ai-instruction"
+                          className="mb-1.5 block text-[10px] uppercase tracking-wider text-slate-400 font-semibold"
+                        >
+                          Instruction
+                        </label>
+                        <textarea
+                          id="sow-ai-instruction"
+                          autoFocus
+                          rows={3}
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleApplyAiEdit();
+                            }
+                          }}
+                          placeholder="Tell AI how to update this… e.g. “make it more formal”, “shorten this”, “replace 14 days with 21 days”"
+                          className="w-full px-3 py-2 text-xs focus:outline-none resize-none transition-all olng-input"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "Make it more formal",
+                          "Shorten this",
+                          "Expand with more detail",
+                          "Convert to bullet points",
+                        ].map((sug) => (
+                          <button
+                            key={sug}
+                            onClick={() => setAiPrompt(sug)}
+                            className="text-[10px] px-2 py-1 rounded-md transition-all hover:bg-white"
+                            style={{
+                              color: "#0089cf",
+                              background: "rgba(0,137,207,0.06)",
+                              border: "1px solid rgba(0,137,207,0.15)",
+                            }}
+                          >
+                            {sug}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex justify-end gap-2 px-4 py-3"
+                      style={{
+                        borderTop: "1px solid rgba(0,137,207,0.1)",
+                        background: "rgba(236,244,252,0.4)",
+                      }}
+                    >
+                      <Button
+                        variant="secondary"
+                        onClick={closeAiEditor}
+                        disabled={aiBusy}
+                        className="text-xs py-1.5 px-3"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleApplyAiEdit}
+                        disabled={!aiPrompt.trim() || aiBusy}
+                        className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+                        style={{ background: "#0089cf", color: "#fff" }}
+                      >
+                        {aiBusy ? (
+                          <>
+                            <RefreshCw size={12} className="animate-spin" />{" "}
+                            Applying…
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={12} /> Apply AI Edit
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              </div>,
+              document.body,
+            )}
 
           {/* Contract Summary Strip */}
           <Card branded className="p-4">
             <div className="flex items-center gap-6 flex-wrap">
               {[
-                { label: 'Tender', value: savedTenderId, icon: Target },
-                { label: 'Budget', value: form.budget, icon: DollarSign },
-                { label: 'Deadline', value: form.deadline, icon: Calendar },
-              ].map(item => (
+                { label: "Tender", value: savedTenderId, icon: Target },
+                { label: "Budget", value: form.budget, icon: DollarSign },
+                { label: "Deadline", value: form.deadline, icon: Calendar },
+              ].map((item) => (
                 <div key={item.label} className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.06)' }}>
-                    <item.icon size={13} style={{ color: '#0089cf' }} />
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(0,137,207,0.06)" }}
+                  >
+                    <item.icon size={13} style={{ color: "#0089cf" }} />
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{item.label}</p>
-                    <p className="text-xs font-semibold" style={{ color: '#1e293b' }}>{item.value || '—'}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                      {item.label}
+                    </p>
+                    <p
+                      className="text-xs font-semibold"
+                      style={{ color: "#1e293b" }}
+                    >
+                      {item.value || "—"}
+                    </p>
                   </div>
                 </div>
               ))}
               {form.contractRisk && (
                 <div className="ml-auto">
-                  <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg" style={{
-                    background: riskBadgeStyle(form.contractRisk).bg,
-                    color: riskBadgeStyle(form.contractRisk).color,
-                    border: riskBadgeStyle(form.contractRisk).border
-                  }}>
+                  <span
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+                    style={{
+                      background: riskBadgeStyle(form.contractRisk).bg,
+                      color: riskBadgeStyle(form.contractRisk).color,
+                      border: riskBadgeStyle(form.contractRisk).border,
+                    }}
+                  >
                     Risk: {form.contractRisk}
                   </span>
                 </div>
@@ -1323,15 +1579,23 @@ export default function ContractStrategy() {
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
-            <Button variant="secondary" onClick={backToForm} className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={backToForm}
+              className="flex items-center gap-2"
+            >
               <Edit3 size={14} /> Back to Contract Initiating Form
             </Button>
-            <Button variant="brand" onClick={handleProceedToTemplates} className="flex items-center gap-2 py-3 px-6 text-[15px]">
+            <Button
+              variant="brand"
+              onClick={handleProceedToTemplates}
+              className="flex items-center gap-2 py-3 px-6 text-[15px]"
+            >
               Proceed to Templates <ChevronRight size={16} />
             </Button>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -147,11 +147,8 @@ export default function Header({ title, subtitle }) {
 
         {/* User avatar */}
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 cursor-pointer"
-          style={{
-            background: `linear-gradient(135deg, ${avatarBg}, ${avatarBg}cc)`,
-            boxShadow: `0 2px 8px ${avatarBg}40`,
-          }}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0 cursor-pointer bg red"
+          style={{ background: avatarBg }}
           title={user?.name}
         >
           {initials}

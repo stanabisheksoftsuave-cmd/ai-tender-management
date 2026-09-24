@@ -4,7 +4,7 @@ import {
   Activity, ClipboardCheck, BarChart3, Briefcase, UserCog,
   Download,
   Eye, MoreVertical, Users, Shield,
-  ChevronRight, Inbox, CheckCircle, ClipboardList
+  ChevronRight, Inbox, CheckCircle, ClipboardList, Plus
 } from 'lucide-react'
 
 // Bulb SVG — uses currentColor so any style.color is inherited
@@ -266,12 +266,6 @@ const PIPELINE_STAGES = [
   { key: 'award',       label: 'Award',               color: '#10B981' },
 ]
 
-// ── Accent bg helper ──────────────────────────────────────────────────────────
-const accentBg = (c) => ({
-  '#10B981': '#ECFDF5', '#EF4444': '#FEF2F2', '#2563EB': '#EEF2FF',
-  '#7C3AED': '#F5F3FF', '#F59E0B': '#FFFBEB', '#6366F1': '#EEF2FF', '#64748B': '#F8FAFC',
-}[c] || '#EEF2FF')
-
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate   = useNavigate()
@@ -306,8 +300,8 @@ export default function Dashboard() {
     : { card: '#FFFFFF',  border: '#E2E8F0',                text: '#0F172A', sub: '#64748B',  muted: '#94A3B8',  page: '#F1F5F9' }
 
   const cardShadow = isDark
-    ? '0 1px 3px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.15)'
-    : '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)'
+    ? 'none'
+    : '0 1px 2px rgba(15,23,42,0.05)'
 
   return (
     <div className="space-y-6">
@@ -315,14 +309,13 @@ export default function Dashboard() {
       {/* ── Greeting ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: c.text }}>
-            Dashboard Overview
+          <h2 className="text-lg font-semibold" style={{ color: c.text }}>
+            {user?.name}
           </h2>
-          <p className="text-sm mt-1" style={{ color: c.sub }}>
-            Welcome back, <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>{user?.name}</span>
-            {urgentCount > 0 && (
-              <> — <span className="text-red-500 font-medium">{urgentCount} urgent item{urgentCount > 1 ? 's' : ''}</span> need attention</>
-            )}
+          <p className="text-sm mt-0.5" style={{ color: c.sub }}>
+            {urgentCount > 0
+              ? `${urgentCount} item${urgentCount > 1 ? 's' : ''} need${urgentCount > 1 ? '' : 's'} your attention`
+              : 'Nothing needs your attention right now'}
           </p>
         </div>
         {roleId === 'pof' && (
@@ -332,13 +325,13 @@ export default function Dashboard() {
         )}
         {roleId === 'contract_holder' && (
           <Button onClick={() => navigate('/contract-strategy')}>
-            <BulbIcon size={16} style={{ color: '#ffffff' }} /> New Tender
+            <Plus size={16} /> New Tender
           </Button>
         )}
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 gap-4 ${statCards.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
         {roleId === 'contract_holder' ? statCards.map((s, i) => (
           <div key={i} className="rounded-2xl p-5"
             style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
@@ -348,8 +341,8 @@ export default function Dashboard() {
                 {s.label}
               </p>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: isDark ? `${s.accentColor}20` : accentBg(s.accentColor) }}>
-                <s.icon size={15} style={{ color: s.accentColor }} />
+                style={{ background: isDark ? `${s.accentColor}20` : `${s.accentColor}15` }}>
+                {s.icon && <s.icon size={15} style={{ color: s.accentColor }} />}
               </div>
             </div>
             <p className="text-3xl font-extrabold leading-none mb-1.5" style={{ color: c.text }}>{s.value}</p>
@@ -357,47 +350,48 @@ export default function Dashboard() {
           </div>
         )) : statCards.map((s, i) => {
           const isAccCard  = s.chipVariant === 'acc'
-          const isUrgent   = s.chipVariant === 'urgent'
+          // An "urgent" card only reads as urgent when there is something in it.
+          const isUrgent   = s.chipVariant === 'urgent' && Number(s.value) > 0
           const isSoon     = s.chipVariant === 'soon'
 
           const cardBg     = isAccCard ? (isDark ? '#1b3c5e' : '#1b4c6f') : c.card
           const cardBorder = isAccCard ? 'transparent' : c.border
-          const labelColor = isAccCard ? 'rgba(255,255,255,0.55)' : c.muted
+          const labelColor = isAccCard ? 'rgba(255,255,255,0.7)' : c.sub
           const numColor   = isAccCard ? '#ffffff' : isUrgent ? '#EF4444' : c.text
           const subColor   = isAccCard ? 'rgba(255,255,255,0.45)' : c.muted
 
           const chipBg_    = isAccCard
             ? 'rgba(255,255,255,0.15)'
             : isUrgent ? '#FEF2F2'
-            : isSoon   ? '#EFF6FF'
-            : isDark ? `${s.accentColor}20` : accentBg(s.accentColor)
+            : isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'
           const chipColor_ = isAccCard
             ? '#ffffff'
             : isUrgent ? '#DC2626'
-            : isSoon   ? '#2563EB'
-            : s.accentColor
-          const chipText_  = isUrgent ? 'URGENT' : isSoon ? 'SOON' : s.trend
+            : c.sub
+          const chipText_  = s.trend === 'URGENT' ? (isUrgent ? 'Urgent' : '') : isSoon && s.trend === 'SOON' ? 'Soon' : s.trend
 
           return (
-            <div key={i} className="rounded-2xl p-5"
+            <div key={i} className="rounded-lg p-4"
               style={{
                 background: cardBg,
                 border: `1px solid ${cardBorder}`,
                 boxShadow: cardShadow,
               }}>
               {/* top row: label + chip */}
-              <div className="flex items-start justify-between mb-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] leading-tight pr-2"
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium leading-tight pr-2"
                   style={{ color: labelColor }}>
                   {s.label}
                 </p>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 leading-tight whitespace-nowrap"
-                  style={{ background: chipBg_, color: chipColor_ }}>
-                  {chipText_}
-                </span>
+                {chipText_ && (
+                  <span className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0 leading-tight whitespace-nowrap"
+                    style={{ background: chipBg_, color: chipColor_ }}>
+                    {chipText_}
+                  </span>
+                )}
               </div>
               {/* big number */}
-              <p className="text-4xl font-extrabold leading-none mb-1.5"
+              <p className="text-3xl font-semibold leading-none mb-1.5"
                 style={{ color: numColor }}>
                 {s.value}
               </p>
@@ -410,7 +404,7 @@ export default function Dashboard() {
 
       {/* ── Admin: Workflow Pipeline Overview ── */}
       {isAdmin && (
-        <div className="rounded-2xl p-5"
+        <div className="rounded-lg p-5"
           style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -450,7 +444,7 @@ export default function Dashboard() {
 
       {/* ── IT Admin: Users & Roles Overview ── */}
       {isItAdmin && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${c.border}` }}>
             <div className="flex items-center gap-2">
               <Users size={15} style={{ color: 'var(--color-primary)' }} />
@@ -514,7 +508,7 @@ export default function Dashboard() {
 
         {/* Recent Tenders */}
         {roleId !== 'it_admin' && (
-        <div className="rounded-2xl overflow-hidden"
+        <div className="rounded-lg overflow-hidden"
           style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
 
           <div className="flex items-center justify-between px-5 py-4"
@@ -565,7 +559,7 @@ export default function Dashboard() {
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span
                         className="text-xs font-semibold cursor-pointer hover:underline"
-                        style={{ color: 'var(--color-primary)' }}
+                        style={{ color: '#0088CC' }}
                         onClick={() => navigate('/tenders')}
                       >
                         {tenderRef(tender)}
@@ -575,7 +569,14 @@ export default function Dashboard() {
                       <p className="text-xs font-semibold truncate" style={{ color: c.text }}>{tender.title}</p>
                       <p className="text-[10px] mt-0.5 truncate" style={{ color: c.muted }}>{tender.department}</p>
                     </td>
-                    <td className="px-5 py-3.5 text-xs whitespace-nowrap" style={{ color: c.sub }}>{tender.deadline}</td>
+                    <td className="px-5 py-3.5 whitespace-nowrap" style={{
+                      color: c.sub,
+                      fontFamily: 'Candara, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '13px',
+                      lineHeight: '100%',
+                      letterSpacing: '-0.42px'
+                    }}>{tender.deadline}</td>
                     <td className="px-5 py-3.5 text-xs font-medium" style={{ color: c.text }}>{tender.bidders || '—'}</td>
                     <td className="px-5 py-3.5">
                       <Badge variant={statusVariant[tender.status] || 'info'}>{tender.stage}</Badge>
@@ -662,7 +663,7 @@ export default function Dashboard() {
 
         {/* Admin: User Overview */}
         {isAdmin && (
-            <div className="rounded-2xl overflow-hidden"
+            <div className="rounded-lg overflow-hidden"
               style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
               <div className="flex items-center justify-between px-4 py-3"
                 style={{ borderBottom: `1px solid ${c.border}` }}>
@@ -700,7 +701,7 @@ export default function Dashboard() {
 
           {/* Evaluator compliance mini-table */}
           {isEvaluator(roleId) && visibleTenders.length > 0 && (
-            <div className="rounded-2xl overflow-hidden"
+            <div className="rounded-lg overflow-hidden"
               style={{ background: c.card, border: `1px solid ${c.border}`, boxShadow: cardShadow }}>
               <div className="px-4 py-3" style={{ borderBottom: `1px solid ${c.border}` }}>
                 <h3 className="font-bold text-xs" style={{ color: c.text }}>Bidder Compliance</h3>

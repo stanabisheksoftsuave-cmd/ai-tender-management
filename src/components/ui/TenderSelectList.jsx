@@ -64,7 +64,7 @@ export default function TenderSelectList({ tenders, status, basePath, title, des
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ color: '#0088CC', background: '#F0F9FF' }}>
                       {tenderRef(tender)}
                     </span>
                     <Badge variant={statusVariant[tender.status] || 'info'}>{tender.stage}</Badge>
@@ -94,7 +94,13 @@ export default function TenderSelectList({ tenders, status, basePath, title, des
                     <span className="flex items-center gap-1 text-xs text-slate-400">
                       <Building2 size={11} /> {tender.department}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-slate-400" style={{
+                      fontFamily: 'Candara, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '13px',
+                      lineHeight: '100%',
+                      letterSpacing: '-0.42px'
+                    }}>
                       <Calendar size={11} /> {tender.deadline}
                     </span>
                     {tender.bidders > 0 && (

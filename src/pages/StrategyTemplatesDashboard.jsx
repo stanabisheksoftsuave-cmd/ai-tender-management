@@ -4,7 +4,7 @@ import {
   FileText, ShieldAlert, DollarSign, BarChart2, CheckSquare,
   ArrowRight, ArrowLeft, Layout, CheckCircle, X, Plus, Trash2,
   ChevronRight, AlertTriangle, Users, Download, Bot,
-  Sparkles, Edit3, ChevronDown, FileSpreadsheet, ExternalLink, ClipboardList
+  Edit3, ChevronDown, FileSpreadsheet, ExternalLink, ClipboardList
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -591,13 +591,8 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
       {/* Form Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-            background: `linear-gradient(135deg, ${template.color}20, ${template.color}08)`
-          }}>
-            <template.icon size={20} style={{ color: template.color }} />
-          </div>
           <div>
-            <h3 className="font-bold text-[15px]" style={{ color: '#1e293b' }}>{template.title}</h3>
+            <h3 className="font-semibold text-[15px]" style={{ color: '#1e293b' }}>{template.title}</h3>
             <p className="text-[11px] text-slate-400">{template.description}</p>
           </div>
         </div>
@@ -619,14 +614,11 @@ function TemplateForm({ template, initialData, onSave, onClose, tender }) {
 
       {/* AI Notice Banner */}
       {aiFilledFields && (
-        <Card className="p-3 border border-purple-100" style={{ background: 'rgba(139,92,246,0.03)' }}>
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} style={{ color: '#7c3aed' }} />
-            <p className="text-[11px] text-slate-600">
-              <strong style={{ color: '#7c3aed' }}>AI has pre-filled the fields below.</strong> Please review and edit any values as needed before submitting the template.
-            </p>
-          </div>
-        </Card>
+        <div className="olng-info-alert px-3 py-2">
+          <p className="text-xs text-slate-600">
+            The fields below were pre-filled from the contract details. Check and correct them before submitting the template.
+          </p>
+        </div>
       )}
 
       {/* Rows */}
@@ -819,7 +811,7 @@ function SowPreviewer({ sowDocument, reference, onSave }) {
           {doc.sections.map((section, si) => (
             <div key={si}>
               <h4 className="font-bold text-[13px] mb-2 flex items-center gap-2" style={{ color: '#1e293b' }}>
-                <div className="w-1.5 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #0089cf, #1b4c6f)' }} />
+                <div className="w-1.5 h-5 rounded-full" style={{ background: '#0089cf' }} />
                 {section.heading}
               </h4>
               
@@ -1018,7 +1010,7 @@ export default function StrategyTemplatesDashboard() {
       <div className="flex items-center justify-center min-h-[70vh] w-full olng-fade-in">
         <Card branded className="w-full max-w-lg p-7 olng-scale-in">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#e8f3fb' }}>
               <Layout size={18} style={{ color: '#0089cf' }} />
             </div>
             <div>
@@ -1084,7 +1076,7 @@ export default function StrategyTemplatesDashboard() {
       {/* Header Card */}
       <Card branded className="p-5 olng-slide-up">
         <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#e8f3fb' }}>
             <Layout size={16} style={{ color: '#0089cf' }} />
           </div>
           <h3 className="font-semibold text-sm" style={{ color: '#1e293b' }}>
@@ -1182,22 +1174,14 @@ export default function StrategyTemplatesDashboard() {
                 >
                   <div>
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110" style={{
-                        background: `linear-gradient(135deg, ${card.color}15, ${card.color}05)`
-                      }}>
-                        <card.icon size={18} style={{ color: card.color }} />
-                      </div>
+                      <card.icon size={18} className="shrink-0 text-slate-500" />
                       <div className="flex-1">
-                        <h4 className="font-bold text-sm" style={{ color: '#1e293b' }}>{card.title}</h4>
-                        <span className="text-[10px] font-semibold tracking-wide uppercase" style={{ color: card.color }}>
-                          {card.isForm ? (card.id !== 'pre-qual' ? 'AI-Powered Template' : 'Form Template') : 'Workflow'}
+                        <h4 className="font-semibold text-sm" style={{ color: '#1e293b' }}>{card.title}</h4>
+                        <span className="text-[11px] text-slate-400">
+                          {card.isForm ? 'Form' : 'Workflow'}
                         </span>
                       </div>
-                      {isDone && (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                          <CheckCircle size={14} style={{ color: '#10b981' }} />
-                        </div>
-                      )}
+                      {isDone && <CheckCircle size={16} className="shrink-0" style={{ color: '#059669' }} />}
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed mb-4">
                       {card.description}
@@ -1207,11 +1191,11 @@ export default function StrategyTemplatesDashboard() {
                   {/* Card action area */}
                   <div className="space-y-2 transition-all">
                     <div
-                      className="w-full flex justify-center items-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                      className="w-full flex justify-center items-center gap-2 py-2 rounded-md text-xs font-medium transition-colors"
                       style={{
-                        background: isDone ? 'rgba(16,185,129,0.06)' : `${card.color}08`,
-                        color: isDone ? '#059669' : card.color,
-                        border: `1px solid ${isDone ? 'rgba(16,185,129,0.15)' : card.color + '20'}`,
+                        background: isDone ? '#ffffff' : '#f8fafc',
+                        color: isDone ? '#059669' : '#1b4c6f',
+                        border: '1px solid #e2e8f0',
                       }}
                     >
                       {isDone ? (
@@ -1219,7 +1203,7 @@ export default function StrategyTemplatesDashboard() {
                       ) : card.id === 'pre-qual' ? (
                         <><ArrowRight size={13} /> Start Pre-Qualification</>
                       ) : (
-                        <><Sparkles size={13} /> Open AI-Powered Form</>
+                        <>Open form <ArrowRight size={13} /></>
                       )}
                     </div>
                   </div>

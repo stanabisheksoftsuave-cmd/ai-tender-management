@@ -8,7 +8,7 @@ export default function Card({ children, className = '', hover = false, branded 
 
   return (
     <div
-      className={`rounded-2xl ${extraClasses} ${className}`}
+      className={`rounded-lg ${extraClasses} ${className}`}
       style={{
         background: glass ? undefined : 'var(--color-surface)',
         border: glass ? undefined : '1px solid var(--color-border)',
@@ -34,11 +34,7 @@ export function CardHeader({ title, subtitle, action, icon: Icon }) {
     <div className="flex items-start justify-between px-5 py-4"
       style={{ borderBottom: '1px solid var(--color-border)' }}>
       <div className="flex items-center gap-3">
-        {Icon && (
-          <div className="p-2 rounded-xl" style={{ background: 'rgba(37,99,235,0.12)' }}>
-            <Icon size={16} style={{ color: 'var(--color-primary)' }} />
-          </div>
-        )}
+        {Icon && <Icon size={16} className="shrink-0 text-slate-500" />}
         <div>
           <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
           {subtitle && <p className="text-xs mt-0.5 text-slate-500">{subtitle}</p>}
