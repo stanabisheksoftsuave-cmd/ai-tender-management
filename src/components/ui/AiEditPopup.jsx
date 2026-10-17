@@ -15,6 +15,7 @@ export default function AiEditPopup({
   onApply,
   onCancel,
   busy = false,
+  quickPrompts = AI_QUICK_ACTIONS,
   style,
   className = '',
 }) {
@@ -58,7 +59,7 @@ export default function AiEditPopup({
         />
 
         <div className="flex flex-wrap gap-1.5">
-          {AI_QUICK_ACTIONS.map(sug => (
+          {quickPrompts.map(sug => (
             <button
               key={sug}
               onClick={() => onPromptChange(sug)}

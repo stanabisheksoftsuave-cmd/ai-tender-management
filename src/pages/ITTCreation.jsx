@@ -1,23 +1,22 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import JSZip from 'jszip'
 import {
-  Sparkles, CheckCircle, RefreshCw, ChevronRight, ChevronDown,
-  FileText, FileSpreadsheet, AlertCircle, Download, ClipboardCheck,
-  UploadCloud, X, Paperclip, PackageCheck, Layers, Clock, User,
-  Briefcase, Plus, Inbox, Hash, ShieldAlert, Info, Eye, Pencil, UserCheck
+  CheckCircle, RefreshCw, ChevronRight,
+  FileText, AlertCircle,
+  UploadCloud, X, PackageCheck, Layers, Clock,
+  Briefcase, Plus, Inbox, ShieldAlert, Info, Eye, Pencil, ArrowRight
 } from 'lucide-react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import AiAnalysisLoader from '../components/ui/AiAnalysisLoader'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
-import SearchableSelect from '../components/ui/SearchableSelect'
 import { useTenders } from '../context/TenderContext'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { useBackHandler } from '../context/NavigationContext'
+import { useAiLockWhile } from '../hooks/useAiLockWhile'
 import { buildFilledDocxBlob, parseDocxTemplate } from '../utils/docxTemplate'
-import AiEditableTextarea from '../components/ui/AiEditableTextarea'
 import SectionFillStep from '../components/itt/SectionFillStep'
 import B1CategoryChooser from '../components/itt/B1CategoryChooser'
 import B2ClassEditor from '../components/itt/B2ClassEditor'
@@ -29,6 +28,20 @@ import { tenderRef } from '../utils/tenderRef'
 import { TEMPLATE_DEFS } from './StrategyTemplatesDashboard'
 import { exportTemplateExcel, exportPreQualSummaryExcel } from '../utils/exportExcel'
 import { ASSIGNMENT_GROUPS } from '../data/assignmentGroups'
+import CreateIttPicker from '../components/itt/ch/CreateIttPicker'
+import ProjectInformationCard from '../components/itt/ch/ProjectInformationCard'
+import StrategyTemplatesCard from '../components/itt/ch/StrategyTemplatesCard'
+import IttSectionPicker from '../components/itt/ch/IttSectionPicker'
+import ApprovedSectionSummary from '../components/itt/ch/ApprovedSectionSummary'
+import { WizardStatusBanner, IttWizardStepper } from '../components/itt/ch/WizardChrome'
+import { SectionAssignmentsCard, AssignedTeamSelectCard } from '../components/itt/ch/TeamCards'
+import { QualifiedBiddersCard, InternalReferenceDocumentsCard, GeneratedTemplatesCard } from '../components/itt/ch/ReferenceCards'
+import { useDescriptionUpload } from '../components/itt/ch/useDescriptionUpload'
+import {
+  tenderToForm, formToTenderFields, validateCreateIttForm, missingRequiredTemplates,
+  isDescriptionOverLimit, existingTenderStatusLabel, existingTenderDestination,
+  tenderPhase, phaseLabel, normalizeTitle, TITLE_SUGGESTION_MIN_QUERY_LENGTH, EMPTY_FORM,
+} from '../components/itt/ch/createIttForm'
 
 // Who fills which ITT section. Contract Holder owns the SOW & methodology; HSE
 // owns QHSSE; ICV owns the ICV requirements; the Contract Engineer owns the
@@ -64,7 +77,7 @@ const generationTasks = [
   'Analysing project requirements',
   'Loading Section 1 — Instructions to Tenderers',
   'Loading Section A — Form of Agreement',
-  'Loading Section D — Statement of Work',
+  'Loading Section D — Scope of Work',
   'Loading Sections B1 & B2 — General & Special Conditions of Contract',
   'Loading Section C — QHSSE Requirements',
   'Loading Sections E & F — Pricing & Methodology',
@@ -73,25 +86,13 @@ const generationTasks = [
   'Preparing fill-in workspace',
 ]
 
-// The seven strategy templates a Contract Holder uploads when they create an ITT
-// directly (skipping the PSF Strategy step, which would otherwise carry them
-// forward). Mirrors the set collected on the PSF Strategy page.
-const ITT_STRATEGY_TEMPLATES = [
-  { id: 'sow',                  title: 'Statement of Work (SOW)' },
-  { id: 'company-estimate',     title: 'Company Estimate' },
-  { id: 'contract-risk',        title: 'Contract Risk Assessment' },
-  { id: 'icv',                  title: 'ICV' },
-  { id: 'technical-eval-matrix',title: 'Technical Evaluation Matrix' },
-  { id: 'hse-risk',             title: 'HSE Risk Assessment' },
-  { id: 'negotiation-strategy', title: 'Negotiation Strategy' },
-  { id: 'pre-qual',             title: 'Pre-Qualification' },
-]
+// MAIN's owner labels for the Contract Holder's section picker / read-only
+// notes (MAIN renames ICV to "LC" in the Contract Holder UI).
+const CH_OWNER_LABEL = { pof: 'Contract Engineer', contract_holder: 'Contract Holder', hse: 'HSE', icv: 'LC' }
 
-// Statuses a tender can be in and still be awaiting ITT creation. It becomes
-// 'draft' by the time the ITT is generated/exported; the prequal_* entries cover
-// tenders whose PSF was completed before the pre-qual hand-off wrote 'draft'.
+// Statuses a tender can be in and still be awaiting ITT creation or continued editing.
 const ITT_READY_STATUSES = new Set([
-  'draft',
+  'draft', 'exported', 'in_progress', 'completed', 'awaiting_review',
   'prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4',
   'prequal_final_review',
 ])
@@ -134,7 +135,11 @@ export default function ITTCreation() {
   // blank form — a draft tender must be picked first. Only tenders that have
   // completed the PSF Strategy step qualify; the picker and the
   // /create-itt/:tenderId deep link both enforce that gate.
-  const [skipDraftPicker, setSkipDraftPicker] = useState(false)
+  // `/create-itt?new=1` (the Dashboard's "New ITT") opens the Contract
+  // Holder's blank direct-ITT form straight away instead of the picker.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const startNewParam = searchParams.get('new') === '1'
   const roleId = user?.role?.id
   // The Contract Holder now owns ITT creation: entering project details, running
   // AI generation and (on the direct path) uploading the strategy templates. The
@@ -157,8 +162,8 @@ export default function ITTCreation() {
   const draftTenders = useMemo(
     () => tenders.filter(t => {
       if (!ITT_READY_STATUSES.has(t.status)) return false
-      // Contract Holder generates the ITT — needs a PSF-complete pre-ITT tender.
-      if (isCreator) return t.psfCompleted === true
+      // Contract Holder generates the ITT — needs a PSF-complete pre-ITT tender or a direct ITT.
+      if (isCreator) return t.psfCompleted === true || t.psfSkipped === true
       // Section owners / exporter (HSE / ICV / Contract Engineer) work on any ITT
       // the Holder has already generated — sectionsGenerated is the real signal,
       // independent of the PSF path the tender took to get here.
@@ -172,46 +177,90 @@ export default function ITTCreation() {
   const afterPsfTenders  = draftTenders.filter(t => !t.psfSkipped)
   const directIttTenders = draftTenders.filter(t => t.psfSkipped)
 
-  const showDraftPicker = !tenderId && !skipDraftPicker
+  const showDraftPicker = !tenderId && !(isCreator && startNewParam)
   const psfBlocked = Boolean(existingTender) && existingTender.psfCompleted !== true
 
-  // Detect if this tender was pre-populated from Contract Strategy
-  const hasStrategyData = existingTender && (existingTender.budget || existingTender.description)
   // A "direct" ITT is one the Contract Holder started without pre-qualification /
   // PSF: either a brand-new draft (no backing tender yet) or a tender explicitly
   // flagged psfSkipped. Only these need the strategy templates uploaded here.
   const isDirectItt = !existingTender || existingTender.psfSkipped === true
 
-  // A tender that came through PSF already has its CE/HSE/ICV from the
-  // Contract Initiating Form — shown read-only. A direct ITT skipped that
-  // form entirely, so the Contract Holder assigns the team here instead.
+  // Active users per assignable role (Contract Engineer / HSE / LC).
   const usersByGroup = useMemo(() => Object.fromEntries(
     ASSIGNMENT_GROUPS.map(g => [g.key, (users || []).filter(u => u.roleId === g.roleId && u.status === 'active')])
   ), [users])
-  const [assignedIds, setAssignedIds] = useState(() => ({
-    ce: Array.isArray(existingTender?.assignedContractEngineers)
-      ? existingTender.assignedContractEngineers.map(c => c.id)
-      : existingTender?.assignedContractEngineer ? [existingTender.assignedContractEngineer.id] : [],
-    hse: (existingTender?.assignedHseOfficers || []).map(c => c.id),
-    icv: (existingTender?.assignedIcvLeads || []).map(c => c.id),
-  }))
-  const setGroupIds = (key, vals) => setAssignedIds(prev => ({ ...prev, [key]: vals }))
-  const pickedIn = (key) => (usersByGroup[key] || [])
-    .filter(u => (assignedIds[key] || []).some(id => String(id) === String(u.id)))
-    .map(u => ({ id: u.id, name: u.name }))
-  const isFullyAssigned = ASSIGNMENT_GROUPS.every(g => (assignedIds[g.key] || []).length > 0)
-  /* Read-only display for a PSF-sourced tender — who the CIF assigned. */
-  const assignmentSummary = ASSIGNMENT_GROUPS
-    .map(({ tenderKey, singleKey, short }) => {
-      const names = (existingTender?.[tenderKey] || (singleKey && existingTender?.[singleKey] ? [existingTender[singleKey]] : []))
-        .map(c => c.name).join(', ')
-      return names ? (short === 'CE' ? names : `${names} (${short})`) : null
-    })
-    .filter(Boolean).join(', ') || '—'
+  // A PSF-sourced ITT already carries its team from the Contract Initiating
+  // Form — shown read-only. A direct ITT (or a legacy PSF tender missing one of
+  // the three) gets the editable Assign Team card instead.
+  const teamNames = (key) => {
+    const g = ASSIGNMENT_GROUPS.find(x => x.key === key)
+    const list = existingTender?.[g.tenderKey] || (g.singleKey && existingTender?.[g.singleKey] ? [existingTender[g.singleKey]] : [])
+    return list.map(c => c.name).filter(Boolean).join(', ')
+  }
+  const hasCompleteAssignment = ['ce', 'hse', 'icv'].every(k => teamNames(k) !== '')
+  const showReadOnlyTeam = Boolean(existingTender) && !isDirectItt && hasCompleteAssignment
 
-  const initialForm = existingTender
-    ? { title: existingTender.title || '', department: existingTender.department || '', budget: existingTender.budget || '', deadline: existingTender.deadline || '', duration: existingTender.duration || '', description: existingTender.description || '', costCode: existingTender.costCode || '', currency: existingTender.currency || 'USD' }
-    : { title: '', department: '', budget: '', deadline: '', duration: '', description: '', costCode: '', currency: 'USD' }
+  // ── Project Details form (MAIN's create-itt-form schema) ──
+  const [form, setForm] = useState(() => tenderToForm(existingTender))
+  const [touched, setTouched] = useState({})
+  const [submitted, setSubmitted] = useState(false)
+  const formRef = useRef(form)
+  useEffect(() => { formRef.current = form })
+  const setField = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }))
+    setTouched(prev => (prev[key] ? prev : { ...prev, [key]: true }))
+  }
+  const resetForm = (values) => {
+    setForm(values)
+    setTouched({})
+    setSubmitted(false)
+  }
+  const upload = useDescriptionUpload({ getForm: () => formRef.current, setField })
+  const allErrors = useMemo(() => validateCreateIttForm(form), [form])
+  const isFormComplete = Object.keys(allErrors).length === 0
+  const visibleErrors = Object.fromEntries(Object.entries(allErrors).filter(([k]) =>
+    submitted || touched[k]))
+  if (upload.extractError && !visibleErrors.uploadedFileName) visibleErrors.uploadedFileName = upload.extractError
+  const isDirty = Object.keys(touched).length > 0
+  const showFieldErrors = !isFormComplete && (isDirty || submitted)
+  const isDescriptionTooLong = isDescriptionOverLimit(form.description)
+  const departmentOptions = form.department && !CONFIGURED_DEPARTMENTS.includes(form.department)
+    ? [form.department, ...CONFIGURED_DEPARTMENTS]
+    : CONFIGURED_DEPARTMENTS
+
+  // Title suggestions — typing a new ITT's title lists existing tenders with a
+  // matching title; picking one pre-fills from it, and while the title still
+  // names that tender the button continues it instead of creating a duplicate.
+  const canSuggestTitles = isCreator && !existingTender
+  const [linkedTenderId, setLinkedTenderId] = useState(null)
+  const titleQuery = form.title.trim().toLowerCase()
+  const titleSuggestions = useMemo(() => {
+    if (!canSuggestTitles || titleQuery.length < TITLE_SUGGESTION_MIN_QUERY_LENGTH) return []
+    return tenders
+      .filter(t => (t.title || '').toLowerCase().includes(titleQuery))
+      .slice(0, 8)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        status: existingTenderStatusLabel(t),
+        detail: [phaseLabel(tenderPhase(t)), t.department, t.costCode].filter(Boolean).join(' · '),
+      }))
+  }, [canSuggestTitles, titleQuery, tenders])
+  const linkedCandidate = linkedTenderId ? tenders.find(t => t.id === linkedTenderId) : null
+  const linkedTender = canSuggestTitles && linkedCandidate && normalizeTitle(form.title) === normalizeTitle(linkedCandidate.title)
+    ? linkedCandidate : null
+  const existingTenderNotice = linkedTender
+    ? `This tender already exists (${existingTenderStatusLabel(linkedTender)}${phaseLabel(tenderPhase(linkedTender)) ? `, ${phaseLabel(tenderPhase(linkedTender))}` : ''}). The button below takes you to its current step instead of creating a duplicate.`
+    : undefined
+  const handleSelectTitleSuggestion = (id) => {
+    const t = tenders.find(x => x.id === id)
+    if (!t) return
+    setLinkedTenderId(id)
+    const values = tenderToForm(t)
+    const fields = ['title', 'department', 'category', 'currency', 'budget', 'deadline', 'durationYears', 'durationMonths', 'costCode',
+      ...(form.descMode === 'type' ? ['description'] : [])]
+    fields.forEach(f => { if (values[f] !== '') setField(f, values[f]) })
+  }
 
   // A tender handed off from Pre-Qualification has an id but has never been
   // through this wizard's generation step (no sectionAnswers yet) — it should
@@ -239,25 +288,26 @@ export default function ITTCreation() {
   // the user picked by hand (including a view-only one) is never clobbered.
   const defaultedForRef = useRef(`${roleId}|${existingTender?.id || ''}`)
   const [ittApproved, setIttApproved] = useState(false)
-  const [form, setForm] = useState(initialForm)
-  const [showErrors, setShowErrors] = useState(false)
   const draftSavedRef  = useRef(false)
-  const fileInputRef   = useRef(null)
 
-  const [descMode,     setDescMode]     = useState('type') // 'type' | 'upload'
-  const [uploadedFile, setUploadedFile] = useState(null)
-  const [isDragging,   setIsDragging]   = useState(false)
-
-  // Direct-path strategy template uploads (Contract Holder, no PSF). Keyed by id.
+  // Direct-path strategy template uploads (Contract Holder, no PSF). Keyed by
+  // id; saved to the tender as soon as each file is chosen (MAIN uploads each
+  // one immediately against the saved ITT).
   const [templateUploads, setTemplateUploads] = useState(existingTender?.strategyTemplateUploads || {})
-  const [templatesOpen,   setTemplatesOpen]   = useState(true)
-
+  const [showTemplateError, setShowTemplateError] = useState(false)
+  const missingTemplateCount = existingTender && isDirectItt ? missingRequiredTemplates(templateUploads) : 0
   const handleTemplateUpload = (id, file) => {
     if (!file) return
-    setTemplateUploads(prev => ({ ...prev, [id]: { name: file.name, size: file.size } }))
+    const next = { ...templateUploads, [id]: { name: file.name, size: file.size } }
+    setTemplateUploads(next)
+    if (existingTender) updateTender(existingTender.id, { strategyTemplateUploads: next })
   }
-  const removeTemplateUpload = (id) =>
-    setTemplateUploads(prev => { const next = { ...prev }; delete next[id]; return next })
+  const removeTemplateUpload = (id) => {
+    const next = { ...templateUploads }
+    delete next[id]
+    setTemplateUploads(next)
+    if (existingTender) updateTender(existingTender.id, { strategyTemplateUploads: next })
+  }
 
   // Owner-attached finalised documents for sections that allow it (B1, H).
   const [sectionUploads, setSectionUploads] = useState(existingTender?.sectionUploads || {})
@@ -282,24 +332,10 @@ export default function ITTCreation() {
   // form and the wrong step.
   useEffect(() => {
     if (!existingTender) return
-    setForm({
-      title:       existingTender.title || '',
-      department:  existingTender.department || '',
-      budget:      existingTender.budget || '',
-      deadline:    existingTender.deadline || '',
-      duration:    existingTender.duration || '',
-      description: existingTender.description || '',
-      costCode:    existingTender.costCode || '',
-      currency:    existingTender.currency || 'USD',
-    })
+    setForm(tenderToForm(existingTender))
+    setTouched({})
+    setSubmitted(false)
     setDraftTenderId(existingTender.id)
-    setAssignedIds({
-      ce: Array.isArray(existingTender.assignedContractEngineers)
-        ? existingTender.assignedContractEngineers.map(c => c.id)
-        : existingTender.assignedContractEngineer ? [existingTender.assignedContractEngineer.id] : [],
-      hse: (existingTender.assignedHseOfficers || []).map(c => c.id),
-      icv: (existingTender.assignedIcvLeads || []).map(c => c.id),
-    })
     setSectionAnswers(existingTender.sectionAnswers || {})
     setSectionProse(existingTender.sectionProse || {})
     setSectionApproved(existingTender.sectionApproved || {})
@@ -311,39 +347,29 @@ export default function ITTCreation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenderId, existingTender?.id])
 
-  const handleFileUpload = (file) => {
-    if (!file) return
-    setUploadedFile(file)
-    if (file.type === 'text/plain') {
-      const reader = new FileReader()
-      reader.onload = e => setField('description', e.target.result)
-      reader.readAsText(file)
-    } else {
-      setField('description', `[Extracted from: ${file.name} — AI will parse this document during generation]`)
+  // The team the form assigns, as the tender's assignment fields. A
+  // PSF-sourced ITT's read-only team is never rewritten from here.
+  const teamPatch = () => {
+    if (showReadOnlyTeam) return {}
+    // Fall back to the tender's own record of that person (e.g. a user since
+    // deactivated) so re-saving never silently drops an existing assignment.
+    const pick = (key, id) => {
+      const active = (usersByGroup[key] || []).find(u => String(u.id) === String(id))
+      if (active) return [{ id: active.id, name: active.name }]
+      const g = ASSIGNMENT_GROUPS.find(x => x.key === key)
+      const prior = [...(existingTender?.[g.tenderKey] || []), ...(g.singleKey && existingTender?.[g.singleKey] ? [existingTender[g.singleKey]] : [])]
+        .find(c => String(c.id) === String(id))
+      return prior ? [{ id: prior.id, name: prior.name }] : []
     }
-    setDescMode('upload')
+    const ces = pick('ce', form.contractEngineerId)
+    return {
+      assignedContractEngineers: ces,
+      assignedHseOfficers: pick('hse', form.hseId),
+      assignedIcvLeads: pick('icv', form.icvId),
+      assignedContractEngineer: ces[0] || null,
+    }
   }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleFileUpload(file)
-  }
-
-  const requiredFields = ['title', 'department', 'budget', 'deadline', 'description']
-  const isFormValid = requiredFields.every(f => form[f].trim() !== '') && (!isDirectItt || isFullyAssigned)
-  const fieldError = (key) => showErrors && form[key].trim() === ''
-
-  const setField = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
-
-  const setBudget = (raw) => {
-    const digits = raw.replace(/[^0-9]/g, '')
-    if (!digits) { setField('budget', ''); return }
-    const num = parseInt(digits, 10)
-    const prefix = form.currency || 'USD'
-    setField('budget', prefix + ' ' + num.toLocaleString('en-US'))
-  }
+  const detailsPatch = () => ({ ...formToTenderFields(form), ...teamPatch() })
 
   // Auto-tick generation tasks, then add draft tender + advance to Review
   useEffect(() => {
@@ -353,17 +379,11 @@ export default function ITTCreation() {
         if (!draftSavedRef.current) {
           draftSavedRef.current = true
           if (draftTenderId) {
-            // Tender already exists (e.g. handed off from Pre-Qualification) —
-            // fill in the details CE just entered without touching bidderList/
-            // bidders/aiScore that an earlier stage may have already set.
+            // The tender always exists by now — a direct ITT is created by its
+            // first "Save & Continue". Fill in the details just entered without
+            // touching bidderList/bidders/aiScore an earlier stage may have set.
             updateTender(draftTenderId, {
-              title: form.title,
-              department: form.department,
-              budget: form.budget,
-              deadline: form.deadline,
-              description: form.description,
-              duration: form.duration,
-              costCode: form.costCode,
+              ...detailsPatch(),
               status: 'draft',
               stage: 'Draft — Pending Export',
               // Explicit flag: the section board (and non-CE visibility) keys on
@@ -373,58 +393,11 @@ export default function ITTCreation() {
               // A generated ITT is, by definition, past the PSF gate — keep the
               // flag set so the tender stays visible in every role's ITT picker.
               psfCompleted: true,
-              // Read the live record, not existingTender — on the paramless
-              // /create-itt route that is null, so re-generating after a Back to
-              // the details step would blank out answers already filled in.
+              // Read the live record so re-generating never blanks answers.
               sectionAnswers: tenders.find(t => t.id === draftTenderId)?.sectionAnswers || {},
               b1Category: tenders.find(t => t.id === draftTenderId)?.b1Category ?? null,
-              // Only a direct ITT (no CIF/PSF) assigns the team here — a
-              // PSF-sourced tender already carries it and this branch must not
-              // clobber that with a stale/empty picker the UI never showed.
-              ...(isDirectItt ? {
-                assignedContractEngineers: pickedIn('ce'),
-                assignedHseOfficers: pickedIn('hse'),
-                assignedIcvLeads: pickedIn('icv'),
-                assignedContractEngineer: pickedIn('ce')[0] || null,
-              } : {}),
+              ...(isDirectItt ? { strategyTemplateUploads: templateUploads } : {}),
             })
-          } else {
-            const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(t.id.split('-')[2]) || 0), 0)
-            const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
-            const ces = pickedIn('ce')
-            addTender({
-              id: newId,
-              title: form.title,
-              department: form.department,
-              budget: form.budget,
-              deadline: form.deadline,
-              description: form.description,
-              duration: form.duration,
-              costCode: form.costCode,
-              status: 'draft',
-              stage: 'Draft — Pending Export',
-              created: new Date().toISOString().split('T')[0],
-              bidders: 0,
-              bidderList: [],
-              aiScore: null,
-              sectionsGenerated: true,
-              sectionAnswers: {},
-              b1Category: null,
-              // Strategy templates the Contract Holder uploaded in lieu of PSF.
-              strategyTemplateUploads: templateUploads,
-              // A brand-new tender only reaches this branch via the direct-ITT
-              // path, so the team assigned here is the only one it will ever get.
-              assignedContractEngineers: ces,
-              assignedHseOfficers: pickedIn('hse'),
-              assignedIcvLeads: pickedIn('icv'),
-              assignedContractEngineer: ces[0] || null,
-              // Started here deliberately without pre-qualification, so it never
-              // passes through PSF Strategy. Without this it would fail the PSF
-              // gate below and become unreachable by every role.
-              psfCompleted: true,
-              psfSkipped: true,
-            })
-            setDraftTenderId(newId)
           }
         }
         setStep(2)
@@ -436,11 +409,58 @@ export default function ITTCreation() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, genStep])
 
-  const handleGenerate = () => {
-    if (!isFormValid) { setShowErrors(true); return }
+  // A brand-new direct ITT: "Save & Continue" creates it (no PSF, flagged
+  // psfSkipped) and reopens it at /create-itt/:id, where its strategy templates
+  // are uploaded before continuing to the sections.
+  const createDirectDraft = () => {
+    const maxNum = tenders.reduce((max, t) => Math.max(max, parseInt(String(t.id).split('-')[2]) || 0), 0)
+    const newId = `ITT-2025-${String(maxNum + 1).padStart(3, '0')}`
+    addTender({
+      id: newId,
+      ...detailsPatch(),
+      status: 'draft',
+      stage: 'Draft — Pending Export',
+      created: new Date().toISOString().split('T')[0],
+      bidders: 0,
+      bidderList: [],
+      aiScore: null,
+      sectionsGenerated: false,
+      sectionAnswers: {},
+      b1Category: null,
+      strategyTemplateUploads: {},
+      // Started here deliberately without pre-qualification, so it never
+      // passes through PSF Strategy. Without this it would fail the PSF gate
+      // and become unreachable by every role.
+      psfCompleted: true,
+      psfSkipped: true,
+    })
+    navigate(`/create-itt/${newId}`, { replace: true, state: { ittSaved: true } })
+  }
+
+  // "Save & Continue" / "Save & Continue to Sections" on Project Details.
+  const handleSaveAndContinue = () => {
+    if (linkedTender) { navigate(existingTenderDestination(linkedTender)); return }
+    if (upload.isExtracting) return
+    setSubmitted(true)
+    if (!isFormComplete) {
+      if (missingTemplateCount > 0) setShowTemplateError(true)
+      return
+    }
+    if (!existingTender) { createDirectDraft(); return }
+    if (missingTemplateCount > 0) { setShowTemplateError(true); return }
+    if (existingTender.sectionsGenerated === true) {
+      // Already generated — save the details and go straight back to the sections.
+      updateTender(existingTender.id, detailsPatch())
+      setStep(2)
+      return
+    }
+    draftSavedRef.current = false
     setGenStep(0)
     setStep(1)
   }
+
+  // Hold the app-wide AI lock while the ITT is being generated.
+  useAiLockWhile(isCreator && step === 1, 'Generating the ITT')
   const prefillMap = useMemo(() => {
     const map = {}
     if (form.title) map['contract title'] = form.title
@@ -493,6 +513,24 @@ export default function ITTCreation() {
   // the original flow index as their value, so selection logic is unchanged.
   const editableOptions = flow.map((item, idx) => ({ item, idx })).filter(o => canEditSection(o.item.id))
   const viewOnlyOptions = flow.map((item, idx) => ({ item, idx })).filter(o => !canEditSection(o.item.id))
+  // Contract Holder: MAIN's searchable section picker rows, its read-only
+  // copy, and the approved-section summary's "Edit this section" unlock.
+  const pickerRows = [
+    ...editableOptions.map(({ item, idx }) => ({
+      idx, title: item.title, owner: CH_OWNER_LABEL[ownerOf(item.id)] || ownerOf(item.id),
+      status: isSectionComplete(item)
+        ? { label: 'Approved', tone: 'success' }
+        : item.optional ? { label: 'Optional', tone: 'neutral' } : { label: 'Needs review', tone: 'warning' },
+    })),
+    ...viewOnlyOptions.map(({ item, idx }) => ({
+      idx, title: item.title, owner: CH_OWNER_LABEL[ownerOf(item.id)] || ownerOf(item.id),
+      status: { label: 'View only', tone: 'neutral' },
+    })),
+  ]
+  const readOnlyNoteFor = (sectionId) => (isCreator
+    ? `This section is owned by the ${CH_OWNER_LABEL[ownerOf(sectionId)] || ownerOf(sectionId)}. You can review it but not edit.`
+    : `Read-only — owned by ${ownerDisplay(ownerOf(sectionId))}`)
+  const [unlockedSectionId, setUnlockedSectionId] = useState(null)
   // Re-seed the picker when the role changes or the opened tender first resolves
   // (its sectionApproved decides which of the role's sections is still pending).
   // Keyed by role + tender so navigation inside one tender leaves the manual
@@ -522,6 +560,7 @@ export default function ITTCreation() {
   // navigation never dead-ends.
   const approveAndAdvance = () => {
     if (current && canEditSection(current.id)) approveSection(current.id)
+    setUnlockedSectionId(null)
     const nextOwn = myIndices.find(i => i > currentIndex && !isSectionComplete(flow[i]))
     if (nextOwn != null) setMySectionIndex(nextOwn)
     else goToNextSection()
@@ -595,6 +634,21 @@ export default function ITTCreation() {
     setStep(0)
   }
 
+  // Contract Holder picker → blank direct-ITT form (and back).
+  const startNewItt = () => {
+    resetForm({ ...EMPTY_FORM })
+    upload.resetUpload()
+    setLinkedTenderId(null)
+    setSearchParams({ new: '1' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const backToPicker = () => {
+    resetForm({ ...EMPTY_FORM })
+    upload.resetUpload()
+    setLinkedTenderId(null)
+    setSearchParams({}, { replace: true })
+  }
+
   // Global Back unwinds this wizard inside-out: section -> major step -> route.
   useBackHandler(() => {
     if (showDraftPicker) return false
@@ -609,8 +663,8 @@ export default function ITTCreation() {
     }
     // Return to the picker even when it is empty — its empty state explains the
     // PSF gate, which beats silently discarding the form and leaving for /dashboard.
-    if (skipDraftPicker) {
-      setSkipDraftPicker(false)
+    if (isCreator && startNewParam && !tenderId) {
+      backToPicker()
       return true
     }
     return false
@@ -757,6 +811,18 @@ export default function ITTCreation() {
     )
   }
 
+  if (showDraftPicker && isCreator) {
+    return (
+      <div className="space-y-3">
+        <CreateIttPicker
+          tenders={draftTenders}
+          onSelect={dt => navigate(`/create-itt/${dt.id}`)}
+          onStartNew={startNewItt}
+        />
+      </div>
+    )
+  }
+
   if (showDraftPicker) {
     return (
       <div className="space-y-5">
@@ -811,21 +877,26 @@ export default function ITTCreation() {
           </div>
         )}
 
-        {isCreator && (
-          <Button
-            variant="secondary"
-            onClick={() => setSkipDraftPicker(true)}
-            className="w-full justify-center py-3"
-          >
-            <Plus size={14} /> Start New ITT (No Pre-Qualification)
-          </Button>
-        )}
       </div>
     )
   }
 
   return (
     <div className="space-y-5">
+      {isCreator ? (
+        <>
+          <WizardStatusBanner
+            statusText={step === 2
+              ? 'Filling in section templates'
+              : step === 1
+                ? 'Preparing document templates...'
+                : existingTender ? 'Project details and strategy templates' : 'Filling in project details'}
+            reference={existingTender ? tenderRef(existingTender) : 'New Draft'}
+          />
+          <IttWizardStepper current={step} />
+        </>
+      ) : (
+        <>
       {/* ── Branded Status Banner ── */}
       <div className="flex items-center justify-between olng-slide-up">
         <div className="olng-status-banner">
@@ -841,7 +912,7 @@ export default function ITTCreation() {
         </span>
       </div>
 
-      {/* ── Premium Step Indicator ── */}
+          {/* ── Premium Step Indicator ── */}
       <div className="flex items-center gap-0 olng-slide-up" style={{ animationDelay: '60ms' }}>
         {steps.map((s, i) => (
           <div key={i} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
@@ -866,6 +937,9 @@ export default function ITTCreation() {
         ))}
       </div>
 
+        </>
+      )}
+
       {/* Section-owner / exporter roles wait until the Contract Holder has generated the ITT */}
       {!isCreator && step < 2 && (
         <Card branded className="p-8 text-center olng-slide-up">
@@ -882,503 +956,96 @@ export default function ITTCreation() {
       {/* ── Step 0: Project Details (Contract Holder only) ── */}
       {step === 0 && isCreator && (
         <div className="space-y-4 olng-slide-up" style={{ animationDelay: '120ms' }}>
-          {/* Pre-fill Banner — shown when data comes from Contract Strategy (not on direct ITTs) */}
-          {hasStrategyData && !isDirectItt && (
-            <div className="flex items-start gap-2.5 rounded-xl px-4 py-3" style={{
-              background: 'linear-gradient(135deg, rgba(0,137,207,0.06), rgba(16,185,129,0.04))',
-              border: '1px solid rgba(0,137,207,0.15)',
-              borderLeft: '3px solid #0089cf'
-            }}>
-              <Info size={16} style={{ color: '#0089cf' }} className="mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#1e293b' }}>{t('strategy.prefillBanner')}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Fields below are populated from the Contract Strategy stage. You can modify them before generating.</p>
-              </div>
+          {location.state?.ittSaved && existingTender && isDirectItt && !existingTender.sectionsGenerated && (
+            <div role="status" className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <CheckCircle size={14} /> ITT saved. Upload the 8 strategy templates to continue.
             </div>
           )}
 
-          <Card branded className="p-6">
-            <h3 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                <FileText size={16} style={{ color: '#0089cf' }} />
-              </div>
-              Project Information
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { key: 'title',      label: t('itt.fieldTitle'),    placeholder: 'e.g. Enterprise Cloud Infrastructure Upgrade', span: 2, required: true },
-                // A tender created before this list existed can carry a department that
-                // isn't in it — keep its value as an option so the select isn't blank.
-                { key: 'department', label: t('itt.fieldDept'),
-                  options: form.department && !CONFIGURED_DEPARTMENTS.includes(form.department)
-                    ? [form.department, ...CONFIGURED_DEPARTMENTS]
-                    : CONFIGURED_DEPARTMENTS,
-                  placeholder: 'Select department…', required: true },
-                { key: 'budget',     label: t('itt.fieldBudget'),   placeholder: 'e.g. 500000', required: true, onChangeFn: setBudget },
-                { key: 'deadline',   label: t('itt.fieldDeadline'), type: 'date', required: true },
-              ].map(f => (
-                <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
-                  <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                    {f.label}
-                    {f.required && <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>}
-                  </label>
-                  {f.options ? (
-                    <select
-                      value={form[f.key]}
-                      onChange={e => setField(f.key, e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError(f.key) ? 'olng-input--error' : ''}`}
-                    >
-                      <option value="">{f.placeholder}</option>
-                      {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : (
-                    <input
-                      type={f.type || 'text'}
-                      placeholder={f.placeholder}
-                      value={form[f.key]}
-                      onChange={e => f.onChangeFn ? f.onChangeFn(e.target.value) : setField(f.key, e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input ${fieldError(f.key) ? 'olng-input--error' : ''}`}
-                    />
-                  )}
-                  {fieldError(f.key) && (
-                    <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />{f.label} is required</p>
-                  )}
-                </div>
-              ))}
+          <ProjectInformationCard
+            form={form}
+            errors={visibleErrors}
+            setField={setField}
+            departmentOptions={departmentOptions}
+            upload={upload}
+            titleSuggestions={titleSuggestions}
+            onSelectTitleSuggestion={canSuggestTitles ? handleSelectTitleSuggestion : undefined}
+            existingTenderNotice={existingTenderNotice}
+          />
 
-              {/* Contract Duration — years + months duration picker */}
-              {(() => {
-                const yearOpts  = Array.from({ length: 11 }, (_, i) => i)   // 0–10 years
-                const monthOpts = Array.from({ length: 12 }, (_, i) => i)   // 0–11 months
-                const match     = (form.duration || '').match(/^(\d+)\s+year[s]?\s+(\d+)\s+month[s]?$/)
-                const selYears  = match ? match[1] : ''
-                const selMonths = match ? match[2] : ''
-                const setDuration = (y, m) => {
-                  if (y === '' && m === '') { setField('duration', ''); return }
-                  const yv = y !== '' ? y : '0'
-                  const mv = m !== '' ? m : '0'
-                  setField('duration', `${yv} year${yv === '1' ? '' : 's'} ${mv} month${mv === '1' ? '' : 's'}`)
-                }
-                return (
-                  <div>
-                    <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                      <Clock size={12} style={{ color: '#0089cf' }} />
-                      {t('itt.fieldDuration')}
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={selYears}
-                        onChange={e => setDuration(e.target.value, selMonths)}
-                        className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input">
-                        <option value="">Years</option>
-                        {yearOpts.map(y => <option key={y} value={y}>{y} year{y === 1 ? '' : 's'}</option>)}
-                      </select>
-                      <select
-                        value={selMonths}
-                        onChange={e => setDuration(selYears, e.target.value)}
-                        className="flex-1 px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input">
-                        <option value="">Months</option>
-                        {monthOpts.map(m => <option key={m} value={m}>{m} month{m === 1 ? '' : 's'}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* Cost Code */}
-              <div>
-                <label className="text-xs font-semibold mb-2 block flex items-center gap-1" style={{ color: '#1e293b' }}>
-                  <Hash size={12} style={{ color: '#0089cf' }} />
-                  {t('strategy.fieldCostCode')}
-                </label>
-                <input
-                  value={form.costCode}
-                  onChange={e => setField('costCode', e.target.value)}
-                  placeholder="e.g. CC-2025-001"
-                  className="w-full px-3.5 py-2.5 text-sm focus:outline-none transition-all olng-input"
-                />
-              </div>
-
-
-              <div className="col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold flex items-center gap-1" style={{ color: '#1e293b' }}>
-                    Project Description / Key Requirements
-                    <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
-                  </label>
-                  {/* Mode toggle */}
-                  <div className="flex gap-0.5 rounded-lg p-0.5" style={{ background: 'rgba(0,137,207,0.06)', border: '1px solid rgba(0,137,207,0.1)' }}>
-                    {[{ id: 'type', icon: FileText, label: 'Type' }, { id: 'upload', icon: UploadCloud, label: 'Upload File' }].map(m => (
-                      <button key={m.id} type="button" onClick={() => setDescMode(m.id)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
-                        style={descMode === m.id
-                          ? { background: '#fff', color: '#1e293b', boxShadow: '0 1px 3px rgba(27,76,111,0.1)' }
-                          : { color: '#94a3b8' }
-                        }>
-                        <m.icon size={11} /> {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── Type mode: plain textarea ── */}
-                {descMode === 'type' && (
-                  <AiEditableTextarea
-                    rows={4}
-                    placeholder="Describe the project scope, objectives, and key requirements..."
-                    value={form.description}
-                    onChange={val => setField('description', val)}
-                    className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError('description') ? 'olng-input--error' : ''}`}
-                  />
-                )}
-
-                {/* ── Upload mode ── */}
-                {descMode === 'upload' && (
-                  <div className="space-y-2">
-                    {/* Drop zone (hidden once file attached) */}
-                    {!uploadedFile && (
-                      <div
-                        onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`olng-dropzone w-full cursor-pointer flex flex-col items-center justify-center gap-3 py-8 transition-all
-                          ${isDragging ? 'olng-dropzone--active' : ''}
-                          ${fieldError('description') ? 'olng-input--error' : ''}`}>
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
-                          style={{ background: isDragging ? 'rgba(0,137,207,0.1)' : 'rgba(0,137,207,0.06)' }}>
-                          <UploadCloud size={22} style={{ color: isDragging ? '#0089cf' : '#94a3b8' }} />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs font-medium" style={{ color: '#1e293b' }}>
-                            Drag & drop or <span style={{ color: '#0089cf' }} className="underline underline-offset-2 cursor-pointer">browse</span>
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-1">.pdf · .docx · .txt · .doc</p>
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".pdf,.docx,.txt,.doc,.rtf"
-                          className="hidden"
-                          onChange={e => handleFileUpload(e.target.files?.[0])}
-                        />
-                      </div>
-                    )}
-
-                    {/* File attached chip + extracted textarea */}
-                    {uploadedFile && (
-                      <>
-                        <div className="flex items-center gap-2 rounded-lg px-3 py-2.5" style={{
-                          background: 'rgba(0,137,207,0.05)',
-                          border: '1px solid rgba(0,137,207,0.15)',
-                          borderLeft: '3px solid #0089cf'
-                        }}>
-                          <Paperclip size={13} style={{ color: '#0089cf' }} className="shrink-0" />
-                          <span className="text-xs font-medium flex-1 truncate" style={{ color: '#1e293b' }}>{uploadedFile.name}</span>
-                          <span className="text-[10px] text-slate-400">{(uploadedFile.size / 1024).toFixed(0)} KB</span>
-                          <button type="button"
-                            onClick={() => { setUploadedFile(null); setField('description', '') }}
-                            className="p-0.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
-                            <X size={12} />
-                          </button>
-                        </div>
-                        <AiEditableTextarea
-                          rows={4}
-                          placeholder="Extracted content will appear here — you can edit before generating…"
-                          value={form.description}
-                          onChange={val => setField('description', val)}
-                          className={`w-full px-3.5 py-2.5 text-sm focus:outline-none resize-none transition-all olng-input ${fieldError('description') ? 'olng-input--error' : ''}`}
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {fieldError('description') && (
-                  <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1"><AlertCircle size={10} />Project description is required</p>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* ── Assign Team: a PSF-sourced tender already has this from the Contract
-               Initiating Form (read-only here); a direct ITT never passed through
-               that form, so the Contract Holder sets it here instead. ── */}
-          <Card branded className="p-5">
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <UserCheck size={15} style={{ color: '#0089cf' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>{isDirectItt ? 'Assign Team' : 'Assigned Team'}</h3>
-              <span className="text-[11px] text-slate-400">
-                {isDirectItt ? '— all three required' : '— set at the Contract Initiating Form'}
-              </span>
-            </div>
-
-            {isDirectItt ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {ASSIGNMENT_GROUPS.map(group => {
-                  const options = usersByGroup[group.key] || []
-                  const picked = assignedIds[group.key] || []
-                  return (
-                    <div key={group.key}>
-                      <label className="text-[11px] font-medium text-slate-600 mb-1 block">
-                        {group.title} <span className="font-secondary text-red-400">*</span>
-                      </label>
-                      <SearchableSelect
-                        multiple
-                        value={picked}
-                        onChange={vals => setGroupIds(group.key, vals)}
-                        options={options}
-                        getValue={u => u.id}
-                        getLabel={u => u.name}
-                        getSubLabel={u => u.username}
-                        placeholder={`Select ${group.noun}…`}
-                        searchPlaceholder={`Search ${group.noun.toLowerCase()}…`}
-                        emptyText={group.empty}
-                        ariaLabel={group.title}
-                      />
-                      {picked.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {options.filter(u => picked.some(id => String(id) === String(u.id))).map(u => (
-                            <span key={u.id} className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: '#0089cf', background: 'rgba(0,137,207,0.08)' }}>
-                              {u.name}
-                              <button
-                                onClick={() => setGroupIds(group.key, picked.filter(id => String(id) !== String(u.id)))}
-                                className="hover:text-red-500"
-                                title="Remove"
-                              >
-                                <X size={11} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-[11px] text-slate-400 mt-1.5">{group.note}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                <CheckCircle size={14} /> Assigned to {assignmentSummary}
-              </div>
-            )}
-            {isDirectItt && showErrors && !isFullyAssigned && (
-              <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1"><AlertCircle size={10} />Select at least one Contract Engineer, HSE and ICV</p>
-            )}
-          </Card>
-
-          {/* Strategy templates upload — shown on the direct path (Contract Holder
-              creating an ITT without PSF). PSF-prefilled tenders skip this. */}
-          {isDirectItt && (
-            <Card branded className="overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setTemplatesOpen(o => !o)}
-                className="w-full flex items-center justify-between gap-3 px-5 py-4"
-              >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                    <FileText size={16} style={{ color: '#0089cf' }} />
-                  </span>
-                  <span className="text-left min-w-0">
-                    <span className="block font-semibold" style={{ color: '#1e293b', fontSize: '15px' }}>Strategy Templates</span>
-                    <span className="block text-[11px] text-slate-400 mt-0.5">Upload the completed strategy templates for this ITT</span>
-                  </span>
-                </span>
-                <span className="flex items-center gap-2.5 shrink-0">
-                  <span className="text-[11px] font-semibold" style={{ color: '#0089cf' }}>
-                    {Object.keys(templateUploads).length} of {ITT_STRATEGY_TEMPLATES.length} uploaded
-                  </span>
-                  <ChevronDown size={16} className="text-slate-400 transition-transform" style={{ transform: templatesOpen ? 'rotate(180deg)' : 'none' }} />
-                </span>
-              </button>
-
-              {templatesOpen && (
-                <div className="border-t border-slate-100 divide-y divide-slate-50">
-                  {ITT_STRATEGY_TEMPLATES.map(tpl => {
-                    const up = templateUploads[tpl.id]
-                    return (
-                      <div key={tpl.id} className="flex items-center justify-between gap-4 px-5 py-3 flex-wrap">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <FileText size={14} style={{ color: '#0089cf' }} className="shrink-0" />
-                          <span className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{tpl.title}</span>
-                        </div>
-                        {up ? (
-                          <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 shrink-0">
-                            <CheckCircle size={13} />
-                            <span className="max-w-40 truncate">{up.name}</span>
-                            <button type="button" onClick={() => removeTemplateUpload(tpl.id)} className="text-emerald-600 hover:text-emerald-800" title="Remove">
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="flex items-center gap-1.5 text-xs font-medium border border-dashed border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:border-[#0089cf] transition-colors text-slate-600 shrink-0">
-                            <UploadCloud size={13} className="text-slate-400" />
-                            Upload
-                            <input type="file" className="hidden" onChange={e => handleTemplateUpload(tpl.id, e.target.files?.[0])} />
-                          </label>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </Card>
+          {/* A tender that came through the PSF already has its CE/HSE/LC from
+              the Contract Initiating Form — shown read-only. A direct ITT (or a
+              PSF tender missing one of the three) assigns the team here. */}
+          {showReadOnlyTeam ? (
+            <AssignedTeamSelectCard namesByGroup={{ ce: teamNames('ce'), hse: teamNames('hse'), icv: teamNames('icv') }} />
+          ) : (
+            <SectionAssignmentsCard
+              form={form}
+              errors={visibleErrors}
+              setField={setField}
+              optionsByGroup={usersByGroup}
+            />
           )}
 
-          {/* Pre-Qualification Handoff Section — if this tender came from pre-qual */}
-          {existingTender?.bidderList && existingTender?.bidderList.length > 0 && (
-            <Card branded accent className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                  <User size={16} style={{ color: '#0089cf' }} />
-                </div>
-                Qualified Bidders — From Pre-Qualification
-              </h3>
-              <div className="space-y-2">
-                {existingTender.bidderList.map((bidder, idx) => (
-                  <div key={bidder.id} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold" style={{ background: '#0089cf', color: '#fff' }}>
-                      {idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: '#1e293b' }}>{bidder.name}</p>
-                      <p className="text-xs text-slate-400">{bidder.country}</p>
-                    </div>
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: '#10b98130', color: '#059669' }}>
-                      ✓ Passed Pre-Qual
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
+          {existingTender?.bidderList?.length > 0 && (
+            <QualifiedBiddersCard bidders={existingTender.bidderList} />
           )}
 
-          {/* Generated Templates — the completed Strategy Templates and, if this
-              tender came from Pre-Qualification, the PQQ summary — from before
-              PSF submission, each downloadable so the Contract Engineer has them
-              without leaving this page. */}
-          {(generatedTemplates.length > 0 || hasPreQual) && (
-            <Card branded accent className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                  <FileSpreadsheet size={16} style={{ color: '#0089cf' }} />
-                </div>
-                Generated Templates
-              </h3>
-              <div className="space-y-2">
-                {hasPreQual && (
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,137,207,0.1)' }}>
-                      <ClipboardCheck size={15} style={{ color: '#0089cf' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>Pre-Qualification Document</p>
-                      <p className="text-xs text-slate-400">
-                        {qualifiedBidders.length} qualified bidder{qualifiedBidders.length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => exportPreQualSummaryExcel(existingTender, qualifiedBidders)}
-                      title="Download Pre-Qualification Document as Excel"
-                      aria-label="Download Pre-Qualification Document as Excel"
-                      className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
-                      style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
-                    >
-                      <Download size={12} /> Excel
-                    </button>
-                  </div>
-                )}
-                {generatedTemplates.map(({ template, rows }) => (
-                  <div
-                    key={template.id}
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${template.color}15` }}>
-                      <template.icon size={15} style={{ color: template.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{template.title}</p>
-                      <p className="text-xs text-slate-400">
-                        {rows.length} {template.rowLabel?.toLowerCase() || 'row'}{rows.length === 1 ? '' : 's'} completed
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => exportTemplateExcel(template, rows, existingTender)}
-                      title={`Download ${template.title} as Excel`}
-                      aria-label={`Download ${template.title} as Excel`}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0 transition-all hover:bg-white"
-                      style={{ color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}
-                    >
-                      <Download size={12} /> Excel
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Handoff Documents Section — if pre-qual documents exist */}
           {existingTender?.handoffDocuments && Object.keys(existingTender.handoffDocuments).length > 0 && (
-            <Card branded accent className="p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-                  <Paperclip size={16} style={{ color: '#0089cf' }} />
-                </div>
-                Internal Reference Documents
-              </h3>
-              <div className="space-y-2 text-sm">
-                {Object.entries(existingTender.handoffDocuments).map(([key, value]) => {
-                  const docLabel = {
-                    icv: 'ICV Plan',
-                    companyEstimate: 'Company Estimate',
-                    riskAssessment: 'Contract Risk Assessment'
-                  }[key] || key
-                  const fileName = value instanceof Blob ? value.name : value
-                  return (
-                    <div key={key} className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0,137,207,0.1)' }}>
-                      <FileText size={13} style={{ color: '#0089cf' }} className="shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium" style={{ color: '#1e293b' }}>{docLabel}</span>
-                        <span className="ml-1.5 text-xs truncate" style={{ color: '#94a3b8' }}>— {fileName}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadHandoffDoc(value, docLabel)}
-                        className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors hover:bg-white shrink-0"
-                        style={{ color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}>
-                        <Download size={11} /> Download
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
+            <InternalReferenceDocumentsCard documents={existingTender.handoffDocuments} onDownload={handleDownloadHandoffDoc} />
           )}
 
-          <Button
-            variant="brand"
-            onClick={handleGenerate}
-            className="w-full justify-center py-3.5 text-[15px]"
-            disabled={showErrors && !isFormValid}
-          >
-            <Sparkles size={16} />
-            Generate with AI
-          </Button>
+          {/* Direct ITT: the strategy templates are uploaded here, once the ITT
+              has been saved. A PSF-sourced ITT already generated them. */}
+          {existingTender && isDirectItt && (
+            <StrategyTemplatesCard
+              uploads={templateUploads}
+              onUpload={handleTemplateUpload}
+              onClear={removeTemplateUpload}
+              showError={showTemplateError && missingTemplateCount > 0}
+            />
+          )}
 
-          {showErrors && !isFormValid && (
+          {!isDirectItt && (generatedTemplates.length > 0 || hasPreQual) && (
+            <GeneratedTemplatesCard
+              templates={generatedTemplates}
+              preQual={hasPreQual ? { count: qualifiedBidders.length } : null}
+              onExportTemplate={(template, rows) => exportTemplateExcel(template, rows, existingTender)}
+              onExportPreQual={() => exportPreQualSummaryExcel(existingTender, qualifiedBidders)}
+            />
+          )}
+
+          {existingTender ? (
+            <Button
+              variant="brand"
+              onClick={handleSaveAndContinue}
+              className="w-full justify-center py-3.5 text-[15px]"
+              disabled={missingTemplateCount > 0 || isDescriptionTooLong || upload.isExtracting}
+            >
+              Save &amp; Continue to Sections
+            </Button>
+          ) : (
+            <Button
+              variant="brand"
+              onClick={handleSaveAndContinue}
+              className="w-full justify-center py-3.5 text-[15px]"
+              disabled={linkedTender ? false : upload.isExtracting || !isFormComplete}
+            >
+              Save &amp; Continue <ArrowRight size={16} />
+            </Button>
+          )}
+
+          {showFieldErrors ? (
             <p className="text-[11px] text-red-500 text-center flex items-center justify-center gap-1">
               <AlertCircle size={11} /> Please fill in all required fields marked with *
             </p>
-          )}
-
-          {!showErrors && (
+          ) : missingTemplateCount > 0 ? (
+            <p className="text-[11px] text-red-500 text-center flex items-center justify-center gap-1">
+              <AlertCircle size={11} /> Please upload the {missingTemplateCount} missing Strategy Template{missingTemplateCount === 1 ? '' : 's'} before continuing
+            </p>
+          ) : existingTender ? null : (
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              AI will generate the ITT from your project details. Choose a template after generation.
+              Saving creates the ITT. You will then upload the 8 strategy templates one by one.
             </p>
           )}
         </div>
@@ -1392,7 +1059,9 @@ export default function ITTCreation() {
               Your ITT Sections
               <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle" style={{ color: OWNER_COLOR[roleId] || '#1B4F8A', background: `${OWNER_COLOR[roleId] || '#1B4F8A'}14` }}>{OWNER_LABEL[roleId] || 'Contract Engineer'}</span>
             </h3>
-            <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>{myCompletedCount} of {myFlow.length} approved</span>
+            <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>
+              {isCreator ? <span className="font-semibold" style={{ color: '#1e293b' }}>{myCompletedCount}</span> : myCompletedCount} of {myFlow.length} approved
+            </span>
           </div>
 
           {flow.length === 0 ? (
@@ -1406,6 +1075,9 @@ export default function ITTCreation() {
                   never ambiguous whether the section being opened is editable.
                   Group 1: the sections this role owns and may edit.
                   Group 2: everyone else's sections, opened read-only. */}
+              {isCreator ? (
+                <IttSectionPicker rows={pickerRows} currentIdx={currentIndex} onChange={setMySectionIndex} />
+              ) : (
               <Card branded className="p-4">
                 <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>Select Section</label>
                 <select
@@ -1443,10 +1115,11 @@ export default function ITTCreation() {
                   </span>
                 </div>
               </Card>
+              )}
 
               {/* Mode banner — restates, in the section's own colour, which half of
                   the dropdown the open section came from. */}
-              {current && (
+              {current && !isCreator && (
                 <div
                   className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 flex-wrap"
                   style={canEditCurrent
@@ -1524,7 +1197,9 @@ export default function ITTCreation() {
               })()}
 
               <ErrorBoundary>
-                {current && current.kind === 'b1-chooser' ? (
+                {isCreator && current && canEditCurrent && isSectionComplete(current) && unlockedSectionId !== current.id ? (
+                  <ApprovedSectionSummary title={current.title} onEdit={() => setUnlockedSectionId(current.id)} />
+                ) : current && current.kind === 'b1-chooser' ? (
                   canEditCurrent ? (
                     <B1CategoryChooser
                       selected={b1Category}
@@ -1562,7 +1237,7 @@ export default function ITTCreation() {
                        gates it on every clause class being approved first. */
                     nextApproves
                     readOnly={!canEditCurrent}
-                    readOnlyNote={`Read-only — owned by ${ownerDisplay(ownerOf(current.id))}`}
+                    readOnlyNote={readOnlyNoteFor(current.id)}
                   />
                 ) : current ? (
                   canEditCurrent ? (
@@ -1585,7 +1260,7 @@ export default function ITTCreation() {
                          they are all approved the button is spent: Draft & Export
                          below takes over as soon as every other owner is done. */
                       lastLabel={isLastOwn
-                        ? (isExporter ? 'Review & Approve' : 'Approve & Send to Contract Engineer')
+                        ? (isExporter || isCreator ? 'Review & Approve' : 'Approve & Send to Contract Engineer')
                         : undefined}
                       nextDisabled={isExporter && isLastOwn && isSectionComplete(current)}
                       standInNotice={current.isStandIn && (
@@ -1610,7 +1285,7 @@ export default function ITTCreation() {
                       isFirst={currentIndex === 0}
                       isLast={false}
                       readOnly
-                      readOnlyNote={`Read-only — owned by ${ownerDisplay(ownerOf(current.id))}`}
+                      readOnlyNote={readOnlyNoteFor(current.id)}
                     />
                   )
                 ) : null}

@@ -22,9 +22,16 @@ const PARENT_ROUTES = {
   '/tenders':                     '/dashboard',
   '/audit-log':                   '/dashboard',
   '/users':                       '/dashboard',
+  // Contract Strategy flow (main app's strategyFlow.ts: initiatingFormBackHref
+  // + strategyBackStepId). '/contract-strategy/new' resolves through ':id'.
+  '/strategy-hub':                '/dashboard',
   '/contract-strategy':           '/dashboard',
-  '/contract-strategy/:id':       '/tenders',
+  '/contract-strategy/:id':       '/contract-strategy',
+  '/contract-strategy/:id/sow':   '/contract-strategy/:id',
   '/strategy-templates/:id':      '/contract-strategy/:id',
+  // A template register (?form=…) goes back to the Strategy Templates screen —
+  // see parentPathOf.
+  '/strategy-templates/:id?form': '/strategy-templates/:id',
   '/psf-strategy/:id':            '/strategy-templates/:id',
   '/pre-qualification':           '/dashboard',
   '/pre-qualification/:id':       '/strategy-templates/:id',
@@ -54,14 +61,39 @@ const PARENT_ROUTES = {
   '/contract-closure/:id':        '/contract-closure',
 }
 
+/*
+ * The Contract Holder's strategy wizard routes. As in the main app's Header,
+ * Back on these walks the *flow* (drafts picker -> form -> SOW, template ->
+ * Strategy Templates, PSF -> Strategy Templates) rather than raw browser
+ * history — but only when the role may open that flow parent, so the Contract
+ * Engineer on /pre-qualification/:id keeps plain history back.
+ */
+const FLOW_PATTERNS = new Set([
+  '/strategy-hub',
+  '/contract-strategy',
+  '/contract-strategy/:id',
+  '/contract-strategy/:id/sow',
+  '/strategy-templates/:id',
+  '/strategy-templates/:id?form',
+  '/psf-strategy/:id',
+  '/pre-qualification/:id',
+])
+
 // '/upload/T-1042' -> pattern '/upload/:id' + id 'T-1042'
-function toPattern(pathname) {
-  const [, base, id] = pathname.split('/')
-  return { pattern: id ? `/${base}/:id` : `/${base}`, id }
+// '/contract-strategy/T-1/sow' -> '/contract-strategy/:id/sow'
+// '/strategy-templates/T-1' + '?form=icv' -> '/strategy-templates/:id?form'
+function toPattern(pathname, search = '') {
+  const [, base, id, rest] = pathname.split('/')
+  let pattern = id ? `/${base}/:id` : `/${base}`
+  if (id && rest) pattern += `/${rest}`
+  if (base === 'strategy-templates' && id && !rest && new URLSearchParams(search).get('form')) {
+    pattern += '?form'
+  }
+  return { pattern, id }
 }
 
-export function parentPathOf(pathname) {
-  const { pattern, id } = toPattern(pathname)
+export function parentPathOf(pathname, search = '') {
+  const { pattern, id } = toPattern(pathname, search)
   const parent = PARENT_ROUTES[pattern]
   if (!parent) return null
   return id ? parent.replace(':id', id) : parent
@@ -115,8 +147,12 @@ export function NavigationProvider({ children }) {
   // the logical parent is closed to this role — statically, or because an admin
   // just revoked the module — fall back to its own landing page rather than a
   // route the router would only bounce them out of.
-  const rawParent = parentPathOf(location.pathname)
+  const rawParent = parentPathOf(location.pathname, location.search)
   const parent = rawParent && !can(rawParent) ? home : rawParent
+  // Strategy wizard: the flow parent beats history (see FLOW_PATTERNS).
+  const flowParent = rawParent && can(rawParent)
+    && FLOW_PATTERNS.has(toPattern(location.pathname, location.search).pattern)
+    ? rawParent : null
 
   const goBack = useCallback(() => {
     // Topmost overlay first — a modal must never let Back tear down the page
@@ -125,9 +161,10 @@ export function NavigationProvider({ children }) {
     if (open.length) { open[open.length - 1].fn(); return }
     // Then the page's own step unwinding, but only if it consumed the press.
     if (handlerRef.current && handlerRef.current() === true) return
+    if (flowParent) { navigate(flowParent); return }
     if (depth > 0) { navigate(-1); return }
     if (parent) navigate(parent, { replace: true })
-  }, [depth, navigate, parent])
+  }, [depth, navigate, parent, flowParent])
 
   const canGoBack = depth > 0 || !!parent || openCount > 0
 

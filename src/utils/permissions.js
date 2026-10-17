@@ -53,6 +53,8 @@ export const DASHBOARD_ROLES = [...ADMIN_ROLES, ROLE.CONTRACT_HOLDER]
 export const ROUTE_ROLES = {
   '/dashboard':           DASHBOARD_ROLES,
   '/tenders':             null,
+  // Contract Strategy hub — the sidebar's "Contract Strategy" parent.
+  '/strategy-hub':        [ROLE.CONTRACT_HOLDER],
   '/contract-strategy':   [ROLE.CONTRACT_HOLDER],
   '/strategy-templates':  [ROLE.CONTRACT_HOLDER],
   '/psf-strategy':        [ROLE.CONTRACT_HOLDER],

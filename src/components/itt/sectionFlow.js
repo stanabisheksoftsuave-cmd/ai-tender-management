@@ -11,7 +11,7 @@ import { B1_CATEGORY_MAP } from './b1Categories'
 export const SECTION_FLOW = [
   { id: 'section1', title: 'Section 1 — Instructions to Tenderers', docxUrl: '/itt-templates/section-1-instructions.docx', exportFilename: 'Section 1 - Instructions.docx' },
   { id: 'sectionA', title: 'Section A — Form of Agreement', docxUrl: '/itt-templates/section-a-form-of-agreement.docx', exportFilename: 'Section A - Form of Agreement.docx' },
-  { id: 'sectionD', title: 'Section D — Statement of Work', docxUrl: '/itt-templates/section-d-scope-of-work.docx', exportFilename: 'Section D - Statement of Work.docx' },
+  { id: 'sectionD', title: 'Section D — Scope of Work', docxUrl: '/itt-templates/section-d-scope-of-work.docx', exportFilename: 'Section D - Scope of Work.docx' },
   { id: 'sectionB1', title: 'Section B1 — General Conditions of Contract', kind: 'b1-chooser' },
   { id: 'sectionB2', title: 'Section B2 — Special Conditions of Contract', docxUrl: '/itt-templates/section-b2-special-conditions.docx', exportFilename: 'Section B2 - Special Conditions.docx', optional: true },
   { id: 'sectionC', title: 'Section C — QHSSE Requirements', docxUrl: '/itt-templates/section-c-qhsse.docx', exportFilename: 'Section C - QHSSE Requirements.docx' },

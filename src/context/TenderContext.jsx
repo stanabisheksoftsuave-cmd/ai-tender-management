@@ -132,7 +132,7 @@ const TENDERS_VERSION_KEY = 'atm_tenders_v'
 // `bidderList` and evaluator assignments. Without them a gate return set the
 // right status but the tender never appeared in any evaluator's queue, so
 // persisted copies of the old seeds have to be replaced.
-const TENDERS_VERSION = '5'
+const TENDERS_VERSION = '8'
 
 function loadTenders() {
   try {

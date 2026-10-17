@@ -24,6 +24,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { TenderProvider } from './context/TenderContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { NavigationProvider } from './context/NavigationContext'
+import { AiLockProvider } from './context/AiLockContext'
 import MainLayout from './components/layout/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -39,6 +40,7 @@ import ContractTemplate from './pages/ContractTemplate'
 import AuditLog from './pages/AuditLog'
 import UserManagement from './pages/UserManagement'
 import ContractStrategy from './pages/ContractStrategy'
+import ContractStrategyHub from './pages/ContractStrategyHub'
 import PreQualification from './pages/PreQualification'
 import LegalReview from './pages/LegalReview'
 import ContractExecution from './pages/ContractExecution'
@@ -84,8 +86,10 @@ function ProtectedRoutes() {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tenders" element={<TenderList />} />
+          <Route path="/strategy-hub" element={<ContractStrategyHub />} />
           <Route path="/contract-strategy" element={<ContractStrategy />} />
           <Route path="/contract-strategy/:tenderId" element={<ContractStrategy />} />
+          <Route path="/contract-strategy/:tenderId/sow" element={<ContractStrategy />} />
           <Route path="/strategy-templates/:tenderId" element={<StrategyTemplatesDashboard />} />
           <Route path="/psf-strategy/:tenderId" element={<PsfStrategy />} />
           <Route path="/pre-qualification" element={<PreQualification />} />
@@ -137,12 +141,14 @@ export default function App() {
             <TenderProvider>
               <LanguageProvider>
                 <NavigationProvider>
-                  <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/excel-viewer" element={<ExcelViewer />} />
-                    <Route path="/docx-viewer" element={<DocxViewer />} />
-                    <Route path="/*" element={<ProtectedRoutes />} />
-                  </Routes>
+                  <AiLockProvider>
+                    <Routes>
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/excel-viewer" element={<ExcelViewer />} />
+                      <Route path="/docx-viewer" element={<DocxViewer />} />
+                      <Route path="/*" element={<ProtectedRoutes />} />
+                    </Routes>
+                  </AiLockProvider>
                 </NavigationProvider>
               </LanguageProvider>
             </TenderProvider>

@@ -28,6 +28,7 @@ export default function AiEditableField({
   disabled = false,
   inputRef,          // callback ref: (el) => void
   className = '',
+  quickPrompts,      // optional chips for the popup; defaults to AI_QUICK_ACTIONS
   ...rest
 }) {
   const elRef = useRef(null)
@@ -136,6 +137,7 @@ export default function AiEditableField({
             onApply={apply}
             onCancel={close}
             busy={busy}
+            quickPrompts={quickPrompts}
           />
         </div>,
         document.body,

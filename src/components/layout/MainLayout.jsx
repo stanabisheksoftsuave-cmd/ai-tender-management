@@ -4,10 +4,12 @@ import { useLocation } from 'react-router-dom'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { templateLabel } from '../shell/chFlow'
 
 const pageMeta = {
   '/dashboard':      { titleKey: 'page.dashboard',  subKey: 'page.dashboard.sub' },
   '/tenders':        { titleKey: 'page.tenders',     subKey: 'page.tenders.sub' },
+  '/strategy-hub':       { titleKey: 'page.strategyHub',       subKey: 'page.strategyHub.sub' },
   '/contract-strategy':  { titleKey: 'page.contractStrategy',  subKey: 'page.contractStrategy.sub' },
   '/strategy-templates': { titleKey: 'page.strategyTemplates', subKey: 'page.strategyTemplates.sub' },
   '/psf-strategy':       { titleKey: 'page.psfStrategy',       subKey: 'page.psfStrategy.sub' },
@@ -40,12 +42,25 @@ const ITT_REVIEWER_ROLES = ['pof', 'hse', 'icv']
 // to a neutral off-white here is what actually makes it visible, rather than
 // adding a second, heavier shadow on top.
 const LIGHT_CANVAS_ROUTES = new Set([
-  '/tenders', '/create-itt', '/contract-strategy',
+  '/tenders', '/create-itt', '/contract-strategy', '/strategy-hub',
   '/technical-eval', '/commercial-eval', '/upload', '/commercial-eval-profile',
 ])
 
+/*
+ * The Contract Holder's header titles follow the main app's sidebar labels
+ * (findNavMeta): a Contract Strategy child shows its own label with no
+ * description, a template register shows the template's name.
+ */
+const CONTRACT_HOLDER_META = {
+  '/contract-strategy':  { titleKey: 'page.cif',                subKey: '' },
+  '/strategy-templates': { titleKey: 'page.strategyTemplates',  subKey: '' },
+  '/psf-strategy':       { titleKey: 'page.psfStrategy',        subKey: '' },
+  '/pre-qualification':  { titleKey: 'page.pqqDocument',        subKey: '' },
+  '/technical-eval':     { titleKey: 'page.ittTechEval',        subKey: 'page.techEval.sub' },
+}
+
 export default function MainLayout({ children }) {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const { lang, t } = useLanguage()
   const { user } = useAuth()
   const { isDark } = useTheme()
@@ -56,13 +71,20 @@ export default function MainLayout({ children }) {
   if (basePath === '/create-itt' && ITT_REVIEWER_ROLES.includes(user?.role?.id)) {
     meta = { titleKey: 'page.ittReviewApprove', subKey: 'page.ittReviewApprove.sub' }
   }
+  let titleOverride = null
+  if (user?.role?.id === 'contract_holder' && CONTRACT_HOLDER_META[basePath]) {
+    meta = CONTRACT_HOLDER_META[basePath]
+    if (basePath === '/strategy-templates') {
+      titleOverride = templateLabel(new URLSearchParams(search).get('form'))
+    }
+  }
   // Dark theme already has its own (dark) canvas via var(--color-background) —
   // this override is only for the OLNG light theme's pale-blue tint.
   const lightCanvas = !isDark && LIGHT_CANVAS_ROUTES.has(basePath)
 
   return (
     <div className="app-root flex min-h-screen">
-      <Header title={t(meta.titleKey)} subtitle={meta.subKey ? t(meta.subKey) : ''} />
+      <Header title={titleOverride || t(meta.titleKey)} subtitle={meta.subKey ? t(meta.subKey) : ''} />
       <Sidebar />
       <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}
         style={lightCanvas ? { background: '#F8FAFC' } : undefined}>

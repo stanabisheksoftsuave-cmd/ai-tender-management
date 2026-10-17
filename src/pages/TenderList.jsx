@@ -12,6 +12,10 @@ import { useLanguage } from '../context/LanguageContext'
 import { useDismissable, useBackHandler } from '../context/NavigationContext'
 import { exportTenderPDF } from '../utils/exportPDF'
 import { tenderRef } from '../utils/tenderRef'
+import { useAccess } from '../utils/permissions'
+import { BudgetAmount, CostCodeChip } from '../components/shell/TableBits'
+import ListPagination from '../components/shell/ListPagination'
+import { formatDate } from '../components/shell/chFlow'
 
 const REASSIGN_OPTIONS = [
   { status: 'upload',      stage: 'Awaiting Ingestion',      label: 'Bid Ingestion' },
@@ -26,6 +30,8 @@ const getTenderRoute = (t) => {
   if (t.status === 'draft')        return `/create-itt/${t.id}`
   if (t.status === 'upload')       return `/upload/${t.id}`
   if (t.status === 'tech_eval')    return `/technical-eval/${t.id}`
+  // Parallel mode runs both evaluations at once; the technical side opens.
+  if (t.status === 'parallel_eval') return `/technical-eval/${t.id}`
   if (t.status === 'comm_eval')    return `/commercial-eval/${t.id}`
   if (t.status === 'scm_gate1')    return `/scm-tech-review/${t.id}`
   if (t.status === 'scm_gate2')    return `/scm-review/${t.id}`
@@ -42,7 +48,8 @@ const getTimelineStage = (t) => {
   if (['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review','prequal_rejected'].includes(t.status)) return 'prequal'
   if (t.status === 'draft')        return 'approval'
   if (t.status === 'upload')       return 'upload'
-  if (t.status === 'tech_eval')    return 'tech_eval'
+  // Parallel mode runs both evaluations at once; the first of them is current.
+  if (t.status === 'tech_eval' || t.status === 'parallel_eval') return 'tech_eval'
   if (t.status === 'comm_eval')    return 'comm_eval'
   if (t.status === 'scm_gate1')    return 'scm_gate1'
   if (t.status === 'scm_gate2')    return 'scm_gate2'
@@ -51,9 +58,33 @@ const getTimelineStage = (t) => {
   if (t.status === 'legal_review')       return 'legal'
   if (t.status === 'contract_execution') return 'execution'
   if (t.status === 'active')             return 'management'
-  if (t.status === 'contract_closure')   return 'closure'
+  if (t.status === 'contract_closure' || t.status === 'closed') return 'closure'
   return 'draft'
 }
+
+const PREQUAL_STATUSES = ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review']
+
+/*
+ * Contract Holder row actions — the main app's ROW_ACTIONS that apply to the
+ * Contract Holder, derived here from the tender's status (no server board).
+ */
+const chRowActions = (td) => {
+  const actions = ['view_detail']
+  if (PREQUAL_STATUSES.includes(td.status)) actions.push('continue_prequalification')
+  if (td.status === 'tech_eval' || td.status === 'parallel_eval') actions.push('technical_evaluation')
+  if (td.status === 'draft' && td.sectionsGenerated) actions.push('continue_review')
+  if ((td.status === 'draft' && td.sectionsGenerated) || td.status === 'upload') actions.push('export_tender')
+  return actions
+}
+
+const CH_ROW_ACTIONS = {
+  view_detail:               { label: 'View Detail', icon: Eye, variant: 'secondary', route: getTenderRoute },
+  continue_prequalification: { label: 'Continue Pre-Qualification', route: td => `/pre-qualification/${td.id}` },
+  technical_evaluation:      { label: 'Technical Evaluation', icon: FileText, route: td => `/technical-eval/${td.id}` },
+  continue_review:           { label: 'Continue Review', icon: FileText, route: td => `/create-itt/${td.id}` },
+  export_tender:             { label: 'Export Tender', icon: Download, variant: 'secondary', route: null },
+}
+const NO_SCREEN_REASON = 'There is no detail screen for this stage yet.'
 
 const statusVariant = {
   prequal_stage1:   'prequal_stage1',
@@ -66,6 +97,7 @@ const statusVariant = {
   upload:       'upload',
   tech_eval:    'tech_eval',
   comm_eval:    'comm_eval',
+  parallel_eval: 'parallel_eval',
   scm_gate1:    'scm_gate',
   scm_gate2:    'scm_gate',
   scm_gate3:    'scm_gate',
@@ -88,6 +120,7 @@ const statusLabelsEn = {
   upload:       'Awaiting Ingestion',
   tech_eval:    'Technical Evaluation',
   comm_eval:    'Commercial Evaluation',
+  parallel_eval: 'Parallel Evaluation',
   scm_gate1:    'SCM Review — Technical',
   scm_gate2:    'SCM Review — Award',
   scm_gate3:    'SCM Review — Contract Draft',
@@ -110,6 +143,7 @@ const statusLabelsAr = {
   upload:       'في انتظار الاستيعاب',
   tech_eval:    'التقييم الفني',
   comm_eval:    'التقييم التجاري',
+  parallel_eval: 'التقييم المتوازي',
   scm_gate1:    'مراجعة مدير سلسلة التوريد — الفني',
   scm_gate2:    'مراجعة مدير سلسلة التوريد — الترسية',
   scm_gate3:    'مراجعة مدير سلسلة التوريد — مسودة العقد',
@@ -133,6 +167,10 @@ export default function TenderList() {
   const [evalModal, setEvalModal] = useState(null)               // biz_admin: evaluator reassign
   const [selectedEvaluator, setSelectedEvaluator] = useState('')
   const [evalSearch, setEvalSearch] = useState('')
+  // Contract Holder list paging (main app's ListPagination).
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const { can } = useAccess()
 
   useDismissable(!!reassignModal, () => setReassignModal(null))
   useDismissable(!!evalModal, () => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') })
@@ -175,8 +213,8 @@ export default function TenderList() {
     { key: 'all',      label: lang === 'ar' ? 'جميع المناقصات' : 'All Tenders', fn: () => true },
     { key: 'prequal',  label: lang === 'ar' ? 'التأهيل المسبق' : 'Pre-Qual',    fn: td => ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review'].includes(td.status) },
     { key: 'progress', label: lang === 'ar' ? 'قيد التقدم'     : 'In Progress',  fn: td => ['draft', 'upload'].includes(td.status) },
-    { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' },
-    { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' },
+    { key: 'tech',     label: lang === 'ar' ? 'التقييم الفني'  : 'Tech Eval',    fn: td => td.status === 'tech_eval' || td.status === 'parallel_eval' },
+    { key: 'comm',     label: lang === 'ar' ? 'التقييم التجاري': 'Comm Eval',    fn: td => td.status === 'comm_eval' || td.status === 'parallel_eval' },
     { key: 'review',   label: lang === 'ar' ? 'مراجعة سلسلة التوريد' : 'SCM Review', fn: td => ['scm_gate1','scm_gate2','scm_gate3'].includes(td.status) },
     { key: 'award',    label: lang === 'ar' ? 'الترسية'        : 'Awarded',      fn: td => td.status === 'award' },
     { key: 'contract', label: lang === 'ar' ? 'العقد'          : 'Contract',     fn: td => ['legal_review','contract_execution','active','contract_closure'].includes(td.status) },
@@ -191,9 +229,23 @@ export default function TenderList() {
   const filtered = nonDraftTenders.filter(t => {
     const tabFn = tabs.find(tab => tab.key === activeFilter)?.fn ?? (() => true)
     const tabFilter = activeFilter === 'all' ? true : tabFn(t)
-    const searchFilter = t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase())
+    const q = search.toLowerCase()
+    // The ID column shows tenderRef (the cost code), so search that too.
+    const searchFilter = t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
+      || tenderRef(t).toLowerCase().includes(q)
     return tabFilter && searchFilter
   })
+
+  // Contract Holder: one page of rows at a time.
+  const chTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const chPage = Math.min(page, chTotalPages)
+  const rows = isContractHolder ? filtered.slice((chPage - 1) * pageSize, chPage * pageSize) : filtered
+
+  const runChAction = (td, key) => {
+    if (key === 'export_tender') { exportTenderPDF(td); return }
+    const href = CH_ROW_ACTIONS[key]?.route?.(td)
+    if (href) navigate(href)
+  }
 
   return (
     <div className="space-y-5">
@@ -331,18 +383,29 @@ export default function TenderList() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); setExpanded(null) }}
             placeholder={lang === 'ar' ? 'البحث بالرقم أو العنوان...' : 'Search by ID or title...'}
+            aria-label={lang === 'ar' ? 'البحث بالرقم أو العنوان' : 'Search by ID or title'}
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm">
-            <Filter size={13} /> {t('common.filter')}
-          </Button>
+          {/* The Filter button never did anything — the main app dropped it;
+              the Contract Holder's list follows it. */}
+          {!isContractHolder && (
+            <Button variant="secondary" size="sm">
+              <Filter size={13} /> {t('common.filter')}
+            </Button>
+          )}
           {isContractHolder && (
-            <Button onClick={() => navigate('/contract-strategy')} size="sm">
-              <Plus size={13} /> New Tender
+            <Button onClick={() => navigate('/contract-strategy/new')} size="sm">
+              <Plus size={13} /> New CIF
+            </Button>
+          )}
+          {isContractHolder && (
+            <Button variant="secondary" onClick={() => navigate('/create-itt?new=1')} size="sm"
+              className="border border-slate-200 bg-white">
+              <Plus size={13} /> New ITT
             </Button>
           )}
           {isPof && (
@@ -362,7 +425,7 @@ export default function TenderList() {
       <div className="w-full max-w-xs">
         <SearchableSelect
           value={activeFilter}
-          onChange={key => setActiveFilter(key)}
+          onChange={key => { setActiveFilter(key); setPage(1); setExpanded(null) }}
           options={tabs}
           getValue={tab => tab.key}
           getLabel={tab => `${tab.label} (${nonDraftTenders.filter(tab.fn).length})`}
@@ -374,7 +437,21 @@ export default function TenderList() {
       {/* Table */}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className={isContractHolder ? 'w-full min-w-[56rem] table-fixed' : 'w-full'}>
+            {isContractHolder ? (
+            // Main app column set: ID · Title · Deadline · Bidders · Budget · Stage · Actions.
+            <thead className="bg-slate-50">
+              <tr className="border-b border-slate-100">
+                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.id')}</th>
+                <th className="w-[24%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.title')}</th>
+                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.deadline')}</th>
+                <th className="w-[8%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.bidders')}</th>
+                <th className="w-[14%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.budget')}</th>
+                <th className="w-[20%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.stage')}</th>
+                <th className="w-[8%] px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.actions')}</th>
+              </tr>
+            </thead>
+            ) : (
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.id')}</th>
@@ -386,9 +463,47 @@ export default function TenderList() {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
+            )}
             <tbody className="divide-y divide-slate-50">
-              {filtered.map(td => (
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
+                    {search.trim() || activeFilter !== 'all' ? 'No tenders match.' : 'No tenders to show.'}
+                  </td>
+                </tr>
+              )}
+              {rows.map(td => (
                 <Fragment key={td.id}>
+                  {isContractHolder ? (
+                  <tr
+                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    onClick={() => setExpanded(expanded === td.id ? null : td.id)}
+                  >
+                    <td className="px-4 py-1.5"><CostCodeChip value={tenderRef(td)} /></td>
+                    <td className="px-4 py-1.5">
+                      <p className="text-sm font-medium text-slate-800 truncate" title={td.title}>{td.title}</p>
+                      <p className="text-xs text-slate-400 truncate">{td.department}</p>
+                    </td>
+                    <td className="px-4 py-1.5 text-sm text-slate-500">{td.deadline ? formatDate(td.deadline) : '—'}</td>
+                    <td className="px-4 py-1.5 text-sm text-slate-600">{td.bidders || '—'}</td>
+                    <td className="px-4 py-1.5 text-sm"><BudgetAmount value={td.budget} fallback="—" /></td>
+                    <td className="px-4 py-1.5">
+                      <Badge variant="info">{statusLabels[td.status] || td.stage}</Badge>
+                    </td>
+                    <td className="px-4 py-1.5 text-right">
+                      <button
+                        type="button"
+                        aria-expanded={expanded === td.id}
+                        aria-label={`${expanded === td.id ? 'Hide' : 'Show'} actions for ${tenderRef(td)}`}
+                        onClick={e => { e.stopPropagation(); setExpanded(expanded === td.id ? null : td.id) }}
+                        className="ml-auto flex w-7 h-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-slate-100"
+                      >
+                        <ChevronRight size={14} aria-hidden="true"
+                          className={`text-slate-400 transition-transform ${expanded === td.id ? 'rotate-90' : ''}`} />
+                      </button>
+                    </td>
+                  </tr>
+                  ) : (
                   <tr
                     className="hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => setExpanded(expanded === td.id ? null : td.id)}
@@ -412,23 +527,43 @@ export default function TenderList() {
                       <ChevronRight size={14} className={`text-slate-400 transition-transform ${expanded === td.id ? 'rotate-90' : ''}`} />
                     </td>
                   </tr>
+                  )}
                   {expanded === td.id && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={7} className="px-4 py-4">
                         <div className="space-y-3">
-                          <div className="overflow-x-auto">
-                            <StageTimeline currentStage={getTimelineStage(td)} />
+                          <div className="w-0 min-w-full overflow-x-auto">
+                            <StageTimeline currentStage={getTimelineStage(td)} isComplete={td.status === 'closed'} />
                           </div>
+                          {/* Contract Holder: the main app's row actions. An action
+                              whose screen this role cannot open is shown disabled
+                              with the reason, rather than bouncing them home. */}
+                          {isContractHolder && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {chRowActions(td).map(key => {
+                                const config = CH_ROW_ACTIONS[key]
+                                const Icon = config.icon
+                                const href = config.route ? config.route(td) : null
+                                const hasScreen = config.route === null
+                                  || (href && href !== '/tenders' && can(href))
+                                return (
+                                  <span key={key} title={hasScreen ? undefined : NO_SCREEN_REASON}>
+                                    <Button size="sm" variant={config.variant || 'primary'}
+                                      className={config.variant === 'secondary' ? 'border border-slate-300 bg-white' : ''}
+                                      disabled={!hasScreen}
+                                      onClick={e => { e.stopPropagation(); runChAction(td, key) }}>
+                                      {Icon ? <Icon size={13} /> : null} {config.label}
+                                    </Button>
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {!isContractHolder && (
                           <div className="flex items-center gap-2 flex-wrap">
                             <Button variant="secondary" size="sm" onClick={() => navigate(getTenderRoute(td))}>
                               <Eye size={13} /> View Detail
                             </Button>
-                            {/* Contract Holder actions */}
-                            {isContractHolder && ['prequal_stage1','prequal_stage2','prequal_stage3','prequal_stage4','prequal_final_review'].includes(td.status) && (
-                              <Button size="sm" onClick={() => navigate(`/pre-qualification/${td.id}`)}>
-                                Continue Pre-Qualification
-                              </Button>
-                            )}
                             {isPof && td.status === 'legal_review' && (
                               <Button size="sm" onClick={() => navigate(`/legal-review/${td.id}`)}>
                                 View Legal Review
@@ -462,11 +597,6 @@ export default function TenderList() {
                             {isPof && td.status === 'upload' && (
                               <Button size="sm" onClick={() => navigate(`/upload/${td.id}`)}>
                                 <Upload size={13} /> Ingestion
-                              </Button>
-                            )}
-                            {isContractHolder && td.status === 'tech_eval' && (
-                              <Button size="sm" onClick={() => navigate(`/technical-eval/${td.id}`)}>
-                                <FileText size={13} /> Technical Evaluation
                               </Button>
                             )}
                             {isPof && td.status === 'comm_eval' && (
@@ -504,6 +634,7 @@ export default function TenderList() {
                               </span>
                             )}
                           </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -513,6 +644,17 @@ export default function TenderList() {
             </tbody>
           </table>
         </div>
+        {isContractHolder && (
+          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <ListPagination
+              page={chPage}
+              pageSize={pageSize}
+              total={filtered.length}
+              onPageChange={p => { setPage(p); setExpanded(null) }}
+              onPageSizeChange={size => { setPageSize(size); setPage(1); setExpanded(null) }}
+            />
+          </div>
+        )}
       </Card>
     </div>
   )

@@ -1,69 +1,48 @@
 import { useState, useMemo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Lock, LogOut } from 'lucide-react'
+import { ChevronDown, ChevronRight, Loader2, Lock, LogOut, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useTenders } from '../../context/TenderContext'
 import { useDismissable } from '../../context/NavigationContext'
+import { useAiLock } from '../../context/aiLockStore'
 import { useAccess, staticRouteAllows } from '../../utils/permissions'
 import { MODULES } from '../../utils/permissionMatrix'
-import Badge from '../ui/Badge'
-import { tenderRef } from '../../utils/tenderRef'
-import { TEMPLATE_DEFS } from '../../pages/StrategyTemplatesDashboard'
+import TenderPickerPopup from '../shell/TenderPickerPopup'
+import ConfirmDialog from '../shell/ConfirmDialog'
+import { includedTemplateIds, isTemplateComplete } from '../../utils/strategyTemplates'
+import {
+  STRATEGY_TEMPLATE_ITEMS,
+  cifStageOf,
+  isPickableStrategyTender,
+  strategyTenderIdFromPath,
+} from '../shell/chFlow'
 
-// ── Custom SVG icons from assets/icons ────────────────────────────────────────
-const Icon = ({ src, size = 16, color }) => (
-  <img
-    src={src}
-    alt=""
-    width={size}
-    height={size}
-    style={{
-      filter: color === 'active'
-        ? 'brightness(0) invert(1)'
-        : 'brightness(0) invert(0.65)',
-      transition: 'filter 0.15s',
-    }}
-    className="shrink-0"
-  />
-)
-
-// Fixed items always shown, ahead of the Strategy Templates sub-group.
-const STRATEGY_BASE_ITEMS = [
-  { key: 'sow',                label: 'Contract Initiating Form' },
-  { key: 'strategy-templates', label: 'Strategy Templates' },
-]
-
-// Individual templates render nested under "Strategy Templates" — shown only
-// when included in the tender's selected templates. Keys must match the
-// template ids used on the Strategy Templates page (?form=<key>).
-const STRATEGY_TEMPLATE_ITEMS = [
-  { key: 'company-estimate',    label: 'Company Estimate' },
-  { key: 'contract-risk',       label: 'Contract Risk' },
-  { key: 'icv',                 label: 'ICV' },
-  { key: 'technical-eval-matrix', label: 'Technical Evaluation Matrix' },
-  { key: 'hse-risk',            label: 'HSE Risk Assessment' },
-  { key: 'negotiation-strategy',label: 'Negotiation Strategy' },
-  { key: 'pre-qual',            label: 'Pre-Qualification' },
-]
-
-// PSF Strategy sits outside (after) the Strategy Templates sub-group — it
-// only unlocks once every selected template is complete.
+/*
+ * Contract Strategy sub-navigation — main app's navigation.config.ts children
+ * of "Contract Strategy": Contract Initiating Form, Strategy Templates (whose
+ * own children are the *selected* templates, shown only while inside the
+ * Strategy Templates area) and PSF Strategy.
+ */
+const CIF_ITEM = { key: 'sow', label: 'Contract Initiating Form' }
+const STRATEGY_TEMPLATES_ITEM = { key: 'strategy-templates', label: 'Strategy Templates' }
 const PSF_STRATEGY_ITEM = { key: 'psf-strategy', label: 'PSF Strategy' }
 
-// A tender "created by the Contract Initiating Form" is one still inside the
-// Contract Holder's strategy flow: the CIF saves new tenders as prequal_stage1
-// and they walk the prequal_* stages from there. A `draft` tender only belongs
-// here once selectedTemplates exists, which the Strategy Templates
-// acknowledgement gate writes — that keeps ITT/CE-created drafts out of the picker.
-const CIF_STATUSES = [
-  'prequal_stage1', 'prequal_stage2', 'prequal_stage3', 'prequal_stage4',
-  'prequal_final_review', 'prequal_rejected',
-]
-const isCifTender = (t) =>
-  CIF_STATUSES.includes(t.status) ||
-  (t.status === 'draft' && Array.isArray(t.selectedTemplates))
+// The Strategy Templates area: its own screen plus every template register
+// (?form=…) and the Pre-Qualification Document page it links to.
+const isWithinStrategyTemplates = (pathname) =>
+  pathname.startsWith('/strategy-templates/') || pathname.startsWith('/pre-qualification/')
+const isWithinInitiatingForm = (pathname) =>
+  pathname === '/contract-strategy' || pathname.startsWith('/contract-strategy/')
+
+// Same copy as the main app (AUTO_GENERATE_CONFIRM_TITLE / _DESCRIPTION).
+const AUTO_GENERATE_CONFIRM_TITLE = 'Open the AI-powered form?'
+const AUTO_GENERATE_CONFIRM_DESCRIPTION =
+  'The AI will pre-fill this template for your review. The whole application will be disabled until it finishes.'
+
+const PSF_EMPTY_STATE_MESSAGE =
+  'No tenders have reached PSF Strategy yet. Complete at least one Strategy Template first — its tender will then appear here.'
 
 // Menu per role. Every entry is still run through canAccess() below, so an item
 // can never appear for a role the route itself would turn away — the Dashboard,
@@ -88,6 +67,8 @@ const navByRole = {
     { to: '/contract-management',icon: '/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
     { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
+  // Main app order: Dashboard · Contract Strategy (→ the strategy hub, with its
+  // sub-navigation) · Create ITT · ITT Technical Evaluation · Tender Tracking.
   contract_holder: [
     { to: '/dashboard',          icon: '/icons/dashboard.svg',   labelKey: 'nav.dashboard'   },
     { to: '/contract-strategy',  icon: '/icons/bulb.svg',        labelKey: 'nav.contractStrategy',
@@ -145,16 +126,21 @@ const MODULE_NAV = {
 // with no curated menu is never left staring at an empty sidebar.
 const TENDERS_ITEM = { to: '/tenders', icon: '/icons/tenders.svg', labelKey: 'nav.tenderTrack' }
 
+// Routes that belong to the Contract Strategy umbrella (parent row active).
+const STRATEGY_PATHS = ['/strategy-hub', '/contract-strategy', '/strategy-templates', '/pre-qualification', '/psf-strategy']
+
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const { lang, t } = useLanguage()
   const { theme } = useTheme()
   const { tenders } = useTenders()
+  const { isGenerating } = useAiLock()
   const location = useLocation()
   const navigate = useNavigate()
   const roleId = user?.role?.id
   const { can } = useAccess()
   const isRtl = lang === 'ar'
+  const { pathname } = location
 
   /*
    * The menu is the curated navByRole list minus anything Access Control has
@@ -175,53 +161,48 @@ export default function Sidebar() {
     return [...curated, ...granted, ...fallback]
   }, [roleId, can])
 
-  // Tender id from the current URL (/…/:tenderId) drives which strategy sub-items appear.
-  const pathParts = location.pathname.split('/')
-  const tenderIdFromUrl = pathParts.length > 2 ? pathParts[2] : null
+  // The tender the current *strategy* route is about (never another page's id).
+  const tenderIdFromUrl = strategyTenderIdFromPath(pathname)
   const activeTender = tenderIdFromUrl ? tenders.find(t => t.id === tenderIdFromUrl) : null
 
-  // Which templates the Contract Holder chose to include — hidden until the
-  // Strategy Templates acknowledgement gate has been confirmed, then only the
-  // selected ones appear (matches the Next.js reference's hiddenStrategyHrefs).
-  const selectedTemplateKeys = Array.isArray(activeTender?.selectedTemplates)
-    ? activeTender.selectedTemplates
+  const viewingTemplates = isWithinStrategyTemplates(pathname)
+  const viewingInitiatingForm = isWithinInitiatingForm(pathname)
+
+  // The selected templates nest under "Strategy Templates" — only while browsing
+  // that area, and only once the selection has been saved.
+  // includedTemplateIds always carries the mandatory Technical Evaluation Matrix.
+  const hasSelection = Array.isArray(activeTender?.selectedTemplates)
+  const includedIds = hasSelection ? includedTemplateIds(activeTender) : []
+  const visibleTemplateItems = viewingTemplates
+    ? STRATEGY_TEMPLATE_ITEMS.filter(it => includedIds.includes(it.key))
     : []
-  const visibleTemplateItems = STRATEGY_TEMPLATE_ITEMS.filter(it => selectedTemplateKeys.includes(it.key))
 
-  // A template is "complete" by the same rule the Strategy Templates page's own
-  // Proceed button uses: at least one row saved for form templates, or the
-  // tender still sitting in 'draft' for the non-form Pre-Qualification card.
-  const isTemplateItemComplete = (key) => {
-    const dataKey = TEMPLATE_DEFS.find(t => t.id === key)?.dataKey
-    if (dataKey) return (activeTender?.[dataKey]?.length || 0) > 0
-    return activeTender?.status === 'draft'
+  /*
+   * PSF Strategy row lock (main app's canMoveForwardToPsf):
+   *  - in the Strategy Templates area: every included template completed;
+   *  - on the Initiating Form: the draft has already moved forward to PSF;
+   *  - anywhere else the gate does not apply (no tender → the picker).
+   */
+  const canMoveForwardToPsf = viewingTemplates
+    ? hasSelection && includedIds.every(id => isTemplateComplete(activeTender, id))
+    : viewingInitiatingForm
+      ? cifStageOf(activeTender) === 'psf'
+      : true
+  const psfLockReason = viewingInitiatingForm
+    ? 'Locked. This draft has not reached PSF Strategy yet.'
+    : 'Locked. Complete every included template before moving forward to PSF Strategy.'
+
+  // Strategy drafts offered by the tender picker.
+  const pickerTenders = useMemo(() => tenders.filter(isPickableStrategyTender), [tenders])
+
+  const pathFor = (key, id) => {
+    const enc = id ? encodeURIComponent(id) : ''
+    if (key === 'sow') return id ? `/contract-strategy/${enc}` : '/contract-strategy'
+    if (key === 'strategy-templates') return `/strategy-templates/${enc}`
+    if (key === 'pre-qual') return `/pre-qualification/${enc}`
+    if (key === 'psf-strategy') return `/psf-strategy/${enc}`
+    return `/strategy-templates/${enc}?form=${key}`
   }
-  const allTemplatesComplete = visibleTemplateItems.length > 0
-    && visibleTemplateItems.every(it => isTemplateItemComplete(it.key))
-  // Only lock the visual once a tender is actually in view — without one there's
-  // nothing to evaluate completion against, so the picker flow below still applies
-  // and PSF Strategy's own page-level guard is what enforces the real block.
-  const psfLocked = !!tenderIdFromUrl && !allTemplatesComplete
-
-  const strategySubItems = [
-    ...STRATEGY_BASE_ITEMS,
-    ...visibleTemplateItems,
-  ]
-
-  // Tenders the Contract Holder started from the Contract Initiating Form —
-  // offered as a picker when a strategy sub-item is clicked without a tenderId.
-  const cifTenders = useMemo(() => tenders.filter(isCifTender), [tenders])
-
-  const pathFor = (key, id) =>
-    key === 'pre-qual'
-      ? `/pre-qualification/${id || ''}`
-      : key === 'psf-strategy'
-      ? `/psf-strategy/${id || ''}`
-      : key === 'sow'
-        ? (id ? `/contract-strategy/${id}` : '/contract-strategy')
-        : key === 'strategy-templates'
-          ? `/strategy-templates/${id || ''}`
-          : `/strategy-templates/${id || ''}?form=${key}`
 
   // Sub-item awaiting a tender choice (null when the picker is closed).
   const [pickerItem, setPickerItem] = useState(null)
@@ -233,28 +214,41 @@ export default function Sidebar() {
     if (key) navigate(pathFor(key, id))
   }
 
+  // "Open the AI-powered form?" — asked before opening a template that has not
+  // been submitted yet (Pre-Qualification aside), same rule as the cards.
+  const [pendingTemplateOpen, setPendingTemplateOpen] = useState(null)
+
   // Sign Out asks for confirmation first, same as the reference app.
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   useDismissable(showSignOutConfirm, () => setShowSignOutConfirm(false))
 
-  const isOlng   = theme === 'olng'
+  const isOlng = theme === 'olng'
 
-  // Is the current path under the Contract Strategy umbrella?
-  const strategyPaths = ['/contract-strategy', '/strategy-templates', '/pre-qualification', '/psf-strategy']
-  const isStrategySection = strategyPaths.some(p => location.pathname.startsWith(p))
+  // Is the current path under the Contract Strategy umbrella? Entering it opens
+  // the section (adjust-state-on-change, so a hand-collapsed section stays shut
+  // while you stay inside it).
+  const isStrategySection = STRATEGY_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`))
   const [strategyOpen, setStrategyOpen] = useState(isStrategySection)
+  const [wasStrategySection, setWasStrategySection] = useState(isStrategySection)
+  if (wasStrategySection !== isStrategySection) {
+    setWasStrategySection(isStrategySection)
+    if (isStrategySection) setStrategyOpen(true)
+  }
+  const [templatesOpen, setTemplatesOpen] = useState(true)
+  const [wasViewingTemplates, setWasViewingTemplates] = useState(viewingTemplates)
+  if (wasViewingTemplates !== viewingTemplates) {
+    setWasViewingTemplates(viewingTemplates)
+    if (viewingTemplates) setTemplatesOpen(true)
+  }
 
-  // Determine which sub-item is active based on current path
+  // Which sub-item the current route is.
   const activeSubKey = (() => {
-    if (location.pathname.startsWith('/pre-qualification')) return 'pre-qual'
-    if (location.pathname.startsWith('/psf-strategy')) return 'psf-strategy'
-    if (location.pathname.startsWith('/strategy-templates')) {
-      const searchParams = new URLSearchParams(location.search)
-      const formParam = searchParams.get('form')
-      if (formParam) return formParam
-      return 'strategy-templates'
+    if (pathname.startsWith('/pre-qualification')) return 'pre-qual'
+    if (pathname.startsWith('/psf-strategy')) return 'psf-strategy'
+    if (pathname.startsWith('/strategy-templates')) {
+      return new URLSearchParams(location.search).get('form') || 'strategy-templates'
     }
-    if (location.pathname.startsWith('/contract-strategy')) return 'sow'
+    if (isWithinInitiatingForm(pathname)) return 'sow'
     return null
   })()
 
@@ -277,73 +271,99 @@ export default function Sidebar() {
   const logoutHoverBg    = 'rgba(239,68,68,0.12)'
   const logoutHoverColor = '#F87171'
 
-  const handleStrategyToggle = () => {
-    setStrategyOpen(prev => !prev)
-  }
-
-  // One Contract Strategy sub-item — a template nests further in (`nested`); PSF
-  // Strategy renders inert with a lock icon (`locked`) until every selected
-  // template is complete, rather than navigating to a page that would just
-  // bounce the user back.
-  const renderStrategySubRow = (sub, { nested = false, locked = false } = {}) => {
-    const isSubActive = !locked && activeSubKey === sub.key
-    // Without a tenderId in the URL the sub-item cannot resolve a target, so it
-    // asks the user which CIF tender to open instead.
+  /*
+   * One Contract Strategy row. Without a tender in the URL it opens the tender
+   * picker (the Initiating Form excepted — it has its own drafts picker); PSF
+   * Strategy renders inert with a lock icon while its gate is closed; a
+   * not-yet-submitted template asks before opening the AI-powered form.
+   */
+  const renderStrategySubRow = (sub, { depth = 0, trailing = null } = {}) => {
     const needsTender = !tenderIdFromUrl && sub.key !== 'sow'
+    const locked = sub.key === 'psf-strategy' && !needsTender && !canMoveForwardToPsf
+    const isSubActive = !locked && activeSubKey === sub.key
     const targetPath = pathFor(sub.key, tenderIdFromUrl)
 
-    const row = (
-      <div
-        className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
-        style={{
-          marginLeft: nested ? '10px' : 0,
-          background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
-          color: locked ? 'rgba(255,255,255,0.25)' : (isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)'),
-          borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
-          cursor: locked ? 'not-allowed' : undefined,
-        }}
-        onMouseOver={e => { if (!isSubActive && !locked) e.currentTarget.style.background = hoverBg }}
-        onMouseOut={e => { if (!isSubActive && !locked) e.currentTarget.style.background = 'transparent' }}
-      >
+    const rowStyle = {
+      background: isSubActive ? 'rgba(0,137,207,0.12)' : 'transparent',
+      color: locked ? 'rgba(255,255,255,0.25)' : (isSubActive ? '#ffffff' : 'rgba(255,255,255,0.40)'),
+      borderLeft: isSubActive ? `2px solid ${accent}` : '2px solid transparent',
+      cursor: locked ? 'not-allowed' : undefined,
+    }
+    const rowInner = (
+      <>
         {locked ? (
-          <Lock size={9} className="shrink-0" />
+          <Lock size={9} className="shrink-0 mt-[3px]" aria-hidden="true" />
         ) : (
-          <span className="w-1 h-1 rounded-full shrink-0" style={{
+          <span className="mt-[5px] w-1 h-1 rounded-full shrink-0" style={{
             background: isSubActive ? accent : 'rgba(255,255,255,0.25)',
             boxShadow: isSubActive ? `0 0 4px ${accent}` : 'none',
           }} />
         )}
-        {sub.label}
-      </div>
+        <span className="min-w-0 flex-1 leading-snug">{sub.label}</span>
+      </>
     )
-
-    if (locked) {
-      return (
-        <div key={sub.key} title="Complete every selected Strategy Template first" aria-disabled="true">
-          {row}
-        </div>
-      )
+    const rowClass = 'flex flex-1 items-start gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-start transition-all'
+    const hover = {
+      onMouseOver: e => { if (!isSubActive && !locked) e.currentTarget.style.background = hoverBg },
+      onMouseOut:  e => { if (!isSubActive && !locked) e.currentTarget.style.background = 'transparent' },
     }
 
-    if (needsTender) {
-      return (
-        <button
-          key={sub.key}
-          type="button"
-          onClick={() => setPickerItem(sub)}
-          className="block w-full text-start"
-        >
-          {row}
+    let row
+    if (locked) {
+      row = (
+        <span className={rowClass} style={rowStyle} aria-disabled="true"
+          title="Complete every selected Strategy Template first">
+          {rowInner}
+          <span className="sr-only">{psfLockReason}</span>
+        </span>
+      )
+    } else if (needsTender) {
+      row = (
+        <button type="button" className={`${rowClass} w-full cursor-pointer`} style={rowStyle} {...hover}
+          onClick={e => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setPickerItem({ key: sub.key, label: sub.label, top: rect.top })
+          }}>
+          {rowInner}
         </button>
+      )
+    } else {
+      const isTemplate = STRATEGY_TEMPLATE_ITEMS.some(it => it.key === sub.key)
+      row = (
+        <NavLink to={targetPath} className={rowClass} style={rowStyle} {...hover}
+          onClick={event => {
+            if (event.ctrlKey || event.metaKey) return
+            // Not-yet-submitted AI template (PQQ aside) → confirm first.
+            if (isTemplate && sub.key !== 'pre-qual' && activeSubKey !== sub.key
+              && !isTemplateComplete(activeTender, sub.key)) {
+              event.preventDefault()
+              setPendingTemplateOpen({ href: targetPath })
+            }
+          }}>
+          {rowInner}
+        </NavLink>
       )
     }
 
     return (
-      <NavLink key={sub.key} to={targetPath} className="block">
+      <div key={sub.key} className="flex items-center gap-0.5" style={{ marginLeft: depth ? '10px' : 0 }}>
         {row}
-      </NavLink>
+        {trailing}
+      </div>
     )
   }
+
+  const templatesToggle = visibleTemplateItems.length > 0 ? (
+    <button type="button" aria-expanded={templatesOpen}
+      aria-label={templatesOpen ? 'Collapse Strategy Templates' : 'Expand Strategy Templates'}
+      onClick={() => setTemplatesOpen(o => !o)}
+      className="shrink-0 cursor-pointer rounded p-1 transition-colors hover:text-white"
+      style={{ color: 'rgba(255,255,255,0.40)' }}>
+      {templatesOpen
+        ? <ChevronDown size={12} strokeWidth={2.5} aria-hidden="true" />
+        : <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />}
+    </button>
+  ) : null
 
   return (
     <>
@@ -355,6 +375,20 @@ export default function Sidebar() {
         borderLeft:  isRtl ? `1px solid ${divider}` : 'none',
       }}
     >
+      {/* ── AI lock: while a long AI generation runs, nothing in the rail is
+          reachable — the page owning the call must not be navigated away from. ── */}
+      {isGenerating && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center cursor-wait px-4"
+          style={{ background: 'rgba(15,40,60,0.60)' }}
+          title="AI is running — please wait for it to finish">
+          <span role="status" className="flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-semibold text-white"
+            style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+            AI is running — please wait…
+          </span>
+        </div>
+      )}
+
       {/* ── Logo ── */}
       <div className="px-5 pt-5 pb-4 flex items-center gap-3">
         <img src="/olng-logo-white.svg" alt="OLNG" className="h-10 w-10 object-contain shrink-0" />
@@ -398,17 +432,21 @@ export default function Sidebar() {
       </div>
 
       {/* ── Nav items ── */}
-      <nav className="flex-1 px-3 overflow-y-auto space-y-0.5">
+      <nav className="flex-1 px-3 overflow-y-auto space-y-0.5" aria-label="Main" inert={isGenerating}>
         {navItems.map((item) => {
           // ── Contract Strategy with collapsible children ──
           if (item.hasChildren) {
             const isParentActive = isStrategySection
             return (
               <div key={item.to}>
-                {/* Parent: Contract Strategy */}
+                {/* Parent: Contract Strategy → the strategy hub; the chevron
+                    alone toggles the sub-navigation. */}
                 <button
-                  onClick={handleStrategyToggle}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+                  type="button"
+                  aria-expanded={strategyOpen}
+                  aria-label={strategyOpen ? `Collapse ${t(item.labelKey)}` : `Expand ${t(item.labelKey)}`}
+                  onClick={() => setStrategyOpen(prev => !prev)}
+                  className="w-full flex items-center justify-between rounded-xl text-xs font-medium cursor-pointer transition-all px-3 py-2.5 text-left"
                   style={{
                     background: isParentActive ? activeNavBg : 'transparent',
                     borderLeft: isParentActive ? activeNavBorder : '2px solid transparent',
@@ -431,29 +469,19 @@ export default function Sidebar() {
                     />
                     {t(item.labelKey)}
                   </span>
-                  {/* Chevron indicator */}
-                  <svg
-                    width="12" height="12" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    style={{
-                      transition: 'transform 0.2s ease',
-                      transform: strategyOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                      opacity: 0.5,
-                    }}
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
+                  <span className="shrink-0 opacity-50 flex items-center" style={{ transform: strategyOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                    <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
+                  </span>
                 </button>
 
-                {/* Children: sub-items — CIF, then Strategy Templates with its
-                    selected templates nested beneath it, then PSF Strategy last. */}
+                {/* Children: CIF, Strategy Templates (+ its selected templates
+                    while inside that area), then PSF Strategy. */}
                 {strategyOpen && (
                   <div className="mt-0.5 space-y-px" style={{ paddingLeft: isRtl ? 0 : '18px', paddingRight: isRtl ? '18px' : 0 }}>
-                    {strategySubItems.map(sub => {
-                      const nested = visibleTemplateItems.some(it => it.key === sub.key)
-                      return renderStrategySubRow(sub, { nested })
-                    })}
-                    {renderStrategySubRow(PSF_STRATEGY_ITEM, { locked: psfLocked })}
+                    {renderStrategySubRow(CIF_ITEM)}
+                    {renderStrategySubRow(STRATEGY_TEMPLATES_ITEM, { trailing: templatesToggle })}
+                    {templatesOpen && visibleTemplateItems.map(sub => renderStrategySubRow(sub, { depth: 1 }))}
+                    {renderStrategySubRow(PSF_STRATEGY_ITEM)}
                   </div>
                 )}
               </div>
@@ -500,7 +528,7 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Footer ── */}
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-4" inert={isGenerating}>
         <div className="h-px mb-3" style={{ background: divider }} />
 
         {/* Sign Out */}
@@ -551,92 +579,35 @@ export default function Sidebar() {
       </div>
     )}
 
-    {/* ── Tender picker: choose which CIF tender the strategy sub-item opens ── */}
-    {pickerItem && (
-      <>
-        <div
-          className="fixed inset-0 z-30"
-          style={{ background: 'rgba(2,10,20,0.45)' }}
-          onClick={() => setPickerItem(null)}
-        />
-        <div
-          className={`fixed top-24 ${isRtl ? 'right-[228px]' : 'left-[228px]'} w-[320px] max-h-[70vh] flex flex-col z-50 rounded-2xl overflow-hidden`}
-          style={{
-            background: sidebarBg,
-            border: `1px solid ${divider}`,
-            boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
-          }}
-        >
-          <div className="px-4 pt-4 pb-3" style={{ borderBottom: `1px solid ${divider}` }}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: navLabel }}>
-                  Select Tender
-                </p>
-                <p className="text-xs font-semibold mt-1 truncate" style={{ color: '#ffffff' }}>
-                  {pickerItem.label}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPickerItem(null)}
-                className="text-sm leading-none px-1.5 py-1 rounded-md shrink-0"
-                style={{ color: 'rgba(255,255,255,0.55)' }}
-                onMouseOver={e => { e.currentTarget.style.background = hoverBg }}
-                onMouseOut={e => { e.currentTarget.style.background = 'transparent' }}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
+    {/* ── "Open the AI-powered form?" before a not-yet-submitted template ── */}
+    <ConfirmDialog
+      isOpen={pendingTemplateOpen !== null}
+      icon={Sparkles}
+      title={AUTO_GENERATE_CONFIRM_TITLE}
+      description={AUTO_GENERATE_CONFIRM_DESCRIPTION}
+      confirmLabel="Open form"
+      onConfirm={() => {
+        const target = pendingTemplateOpen
+        setPendingTemplateOpen(null)
+        // autogen=1 — answered here, so the register does not ask again.
+        if (target) navigate(`${target.href}&autogen=1`)
+      }}
+      onClose={() => setPendingTemplateOpen(null)}
+    />
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {cifTenders.length === 0 ? (
-              <div className="px-3 py-5 text-center">
-                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                  No tenders yet. Complete a Contract Initiating Form first — its tender
-                  will then appear here.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => { setPickerItem(null); navigate('/contract-strategy') }}
-                  className="mt-3 w-full px-3 py-2 rounded-lg text-[11px] font-semibold"
-                  style={{ background: accent, color: '#ffffff' }}
-                >
-                  Contract Initiating Form
-                </button>
-              </div>
-            ) : (
-              cifTenders.map(tender => (
-                <button
-                  key={tender.id}
-                  type="button"
-                  onClick={() => chooseTender(tender.id)}
-                  className="w-full text-start px-3 py-2.5 rounded-xl transition-all"
-                  style={{ background: chipBg, border: chipBorder }}
-                  onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.14)' }}
-                  onMouseOut={e => { e.currentTarget.style.background = chipBg }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold tracking-wide" style={{ color: accent }}>
-                      {tenderRef(tender)}
-                    </span>
-                    <Badge variant={tender.status}>{tender.status.replace(/_/g, ' ')}</Badge>
-                  </div>
-                  <p className="text-[11px] font-medium mt-1 leading-snug" style={{ color: '#ffffff' }}>
-                    {tender.title}
-                  </p>
-                  {tender.stage && (
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                      {tender.stage}
-                    </p>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </>
+    {/* ── Tender picker: which strategy draft the sub-item opens ── */}
+    {pickerItem && (
+      <TenderPickerPopup
+        itemLabel={pickerItem.label}
+        top={pickerItem.top}
+        tenders={pickerTenders}
+        isRtl={isRtl}
+        stageFilter={pickerItem.key === 'psf-strategy' ? 'psf' : undefined}
+        emptyStateMessage={pickerItem.key === 'psf-strategy' ? PSF_EMPTY_STATE_MESSAGE : undefined}
+        onChoose={chooseTender}
+        onOpenInitiatingForm={() => { setPickerItem(null); navigate('/contract-strategy') }}
+        onClose={() => setPickerItem(null)}
+      />
     )}
     </>
   )

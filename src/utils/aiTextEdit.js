@@ -21,6 +21,14 @@ const FORMAL_SWAPS = [
   [/\buse\b/gi, 'utilise'], [/\bshow\b/gi, 'demonstrate'], [/\babout\b/gi, 'regarding'],
 ]
 
+// Vague wording → the precise term a reviewer can verify ("Make it more specific").
+const VAGUE_SWAPS = [
+  [/\bsome\b/gi, 'the specified'], [/\bvarious\b/gi, 'the listed'], [/\betc\.?/gi, 'and the items listed above'],
+  [/\bas needed\b/gi, 'as defined in the Scope of Work'], [/\bappropriate\b/gi, 'compliant'],
+  [/\bregular(ly)?\b/gi, 'monthly'], [/\btimely\b/gi, 'within the agreed schedule'],
+  [/\bsufficient\b/gi, 'the minimum required'], [/\brelevant\b/gi, 'applicable'],
+]
+
 const sentenceCase = s => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function applyAiInstruction(selected, instruction) {
@@ -66,6 +74,15 @@ export function applyAiInstruction(selected, instruction) {
         : l).join('\n')
     }
     return `${selected.trimEnd()} All such activities shall be planned, documented and executed in accordance with Oman LNG procedures, and evidence of compliance shall be made available for audit on request.`
+  }
+
+  if (/\b(specific|precise|concrete|clarify|exact)\b/.test(q)) {
+    const sharpened = VAGUE_SWAPS.reduce((acc, [rx, to]) => acc.replace(rx, to), selected)
+    if (isBulleted) return sharpened
+    const body = sharpened.trimEnd()
+    return /measurable|verifiable/i.test(body)
+      ? body
+      : `${body.replace(/\.$/, '')}, with measurable acceptance criteria and documentary evidence to be provided for verification.`
   }
 
   if (/\b(formal|professional|contractual|legal)\b/.test(q)) {

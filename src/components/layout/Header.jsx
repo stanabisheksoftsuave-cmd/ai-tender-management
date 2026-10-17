@@ -5,11 +5,13 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useAiLock } from '../../context/aiLockStore'
 
 const roleColors = {
   it_admin:    '#7C3AED',
   biz_admin:   '#0F766E',
   pof:         '#1B4F8A',
+  contract_holder: '#0891B2',
   tech_eval:   '#059669',
   comm_eval:   '#D97706',
   scm:         '#0F766E',
@@ -22,12 +24,12 @@ export default function Header({ title, subtitle }) {
   const { lang, t } = useLanguage()
   const { user } = useAuth()
   const { pathname } = useLocation()
+  const { isGenerating } = useAiLock()
   const [showTheme, setShowTheme] = useState(false)
   const isRtl = lang === 'ar'
   // The dashboard is where Back would land anyway — no control for it there.
   const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/')
 
-  const isOlng = theme === 'olng'
 
   const bg     = isDark ? 'rgba(10,15,30,0.92)' : '#ffffff'
   const border = isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid #E8EDF5'
@@ -63,8 +65,17 @@ export default function Header({ title, subtitle }) {
         boxShadow: isDark ? 'none' : '0 1px 6px rgba(0,0,0,0.05)',
       }}>
 
+      {/* While an AI generation holds the app-wide lock, Back would navigate
+          away from the page owning it — same blocker the sidebar carries. */}
+      {isGenerating && (
+        <div className="absolute inset-0 z-30 cursor-wait"
+          style={{ background: isDark ? 'rgba(10,15,30,0.55)' : 'rgba(255,255,255,0.6)' }}
+          title="AI is running — please wait for it to finish"
+          aria-hidden="true" />
+      )}
+
       {/* Back + page title */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 min-w-0" inert={isGenerating}>
         {!isDashboard && <BackButton />}
         <div className="min-w-0">
           <h1 className="font-bold text-[15px] leading-tight tracking-tight truncate" style={{ color: title_ }}>{title}</h1>

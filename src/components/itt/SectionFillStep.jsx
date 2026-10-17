@@ -11,13 +11,15 @@ import { useDismissable } from '../../context/NavigationContext'
 
 const normKey = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.:]+$/, '')
 
+const HIDDEN_TEMPLATE_LINES = { sectionA: ['FORM OF AGREEMENT'], sectionD: ['FORM OF AGREEMENT'] }
+
 const POPUP_W = 340
 const POPUP_H = 300
 
 // bodyMaxHeight caps the scrolling document area. The wizard gives it most of
 // the viewport; a caller that nests this inside its own chrome (the contract
 // page's review popup) passes something smaller so the whole card still fits.
-export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, nextDisabled = false, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange, bodyMaxHeight = '62vh' }) {
+export default function SectionFillStep({ section, answers, onAnswersChange, onNext, onSkip, onBack, isFirst, isLast, nextLabel, lastLabel, nextDisabled = false, standInNotice, prefill = {}, readOnly = false, readOnlyNote, proseEdits = {}, onProseChange, bodyMaxHeight = '62vh', quickPrompts }) {
   const [load, setLoad] = useState({ docxUrl: null, model: null, error: null })
   const [values, setValues] = useState([])
   const debounceRef = useRef(null)
@@ -262,13 +264,13 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
     return long ? (
       <AiEditableField
         key={i} as="textarea" inputRef={setRef} onFocus={onFocus} value={value}
-        onChange={val => updateValue(seg.fieldIndex, val)} rows={2}
+        onChange={val => updateValue(seg.fieldIndex, val)} rows={2} quickPrompts={quickPrompts}
         className={`block w-full my-1 px-2 py-1 text-[13px] rounded-md border focus:outline-none focus:ring-2 resize-y transition-colors ${tone}`}
       />
     ) : (
       <AiEditableField
         key={i} as="input" inputRef={setRef} onFocus={onFocus} value={value}
-        onChange={val => updateValue(seg.fieldIndex, val)}
+        onChange={val => updateValue(seg.fieldIndex, val)} quickPrompts={quickPrompts}
         style={{ width: `${Math.max(6, value.length + 2)}ch`, maxWidth: '100%' }}
         className={`inline-block px-1.5 py-0.5 mx-0.5 align-baseline text-[13px] rounded border focus:outline-none focus:ring-2 transition-colors ${tone} ${filled ? '' : 'font-medium'}`}
       />
@@ -293,6 +295,15 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
     return <p key={block.id} className="whitespace-pre-wrap mb-1.5">{block.segments.map(renderSegment)}</p>
   }
 
+  // Template lines left off the on-screen view (MAIN's HIDDEN_TEMPLATE_LINES):
+  // Section A's cover repeats its own name, and Section D's cover carries a
+  // stray "FORM OF AGREEMENT" copied from Section A. Plain-text paragraphs
+  // only, so field / text indexes and the export are unchanged.
+  const hiddenLines = HIDDEN_TEMPLATE_LINES[section.id]
+  const visibleTopBlocks = (blocks) => (hiddenLines
+    ? blocks.filter(b => b.type !== 'p' || b.segments.some(sg => sg.type !== 'text')
+      || !hiddenLines.includes(b.segments.map(sg => sg.text || '').join('').trim()))
+    : blocks)
   const isEmptyPara = (b) => b.type === 'p' && b.segments.every(s => s.type === 'text' && !s.text.trim())
   const cellHasContent = (cell) => cell.blocks.some(b => b.type === 'table' || !isEmptyPara(b))
 
@@ -466,7 +477,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
             onMouseUp={captureProseSelection}
             className="px-6 py-6 sm:px-8 text-[13px] leading-6 text-slate-700"
           >
-            {renderBlocks(model.blocks)}
+            {renderBlocks(visibleTopBlocks(model.blocks))}
           </div>
         </div>
       )}
@@ -481,6 +492,7 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
             onApply={applyProseEdit}
             onCancel={closeProse}
             busy={proseBusy}
+            quickPrompts={quickPrompts}
           />
         </div>,
         document.body,

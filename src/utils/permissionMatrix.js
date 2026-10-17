@@ -44,8 +44,8 @@ export const MODULE_KEYS = MODULES.map(m => m.key)
  * Toggling either changes nothing about routing; they exist as capability flags.
  *
  * Routes that appear in ROUTE_ROLES but in no module here (the Dashboard, tender
- * list, Contract Strategy / Strategy Templates / PSF / Pre-Qualification, the
- * legacy legal-review and contract execution/closure screens) stay governed by
+ * list, the Contract Strategy hub / Contract Strategy / Strategy Templates / PSF /
+ * Pre-Qualification, the legacy legal-review and contract execution/closure screens) stay governed by
  * their static ROUTE_ROLES entry — the matrix has no switch for them.
  */
 export const MODULE_ROUTES = {

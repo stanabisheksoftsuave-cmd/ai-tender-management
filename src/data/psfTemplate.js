@@ -8,6 +8,9 @@
  *
  * A "checkbox seed" is `{ id, label, checked }`. The id is stable so a relabel
  * never loses a Contract Holder's tick.
+ *
+ * Labels follow the Next.js app (tender-management-frontend mock/psf-strategy.ts),
+ * which renames ICV to "LC" throughout the Contract Holder strategy UI.
  */
 
 /** The seven header scalars, in template order. */
@@ -124,7 +127,7 @@ export const PSF_COMPETITIVE_DROP_LIST = [
   { id: 'company-estimate', label: 'Company estimate',          checked: true },
   { id: 'benchmark',        label: 'Benchmark/ market intel',   checked: true },
   { id: 'spend-analysis',   label: 'Spend analysis comparison', checked: true },
-  { id: 'icv',              label: 'ICV (if applicable)',       checked: true },
+  { id: 'icv',              label: 'LC (if applicable)',        checked: true },
 ]
 
 /** SINGLE SOURCE /OEM: DROP LIST. */
@@ -132,7 +135,7 @@ export const PSF_SINGLE_SOURCE_DROP_LIST = [
   { id: 'form-of-oem',          label: 'Form of OEM/SJJ',      checked: false },
   { id: 'negotiation-strategy', label: 'Negotiation Strategy', checked: false },
   { id: 'efa',                  label: 'EFA (if applicable)',  checked: false },
-  { id: 'icv',                  label: 'ICV (if applicable)',  checked: true  },
+  { id: 'icv',                  label: 'LC (if applicable)',   checked: true  },
 ]
 
 /** Blank rows the TENDERER LIST table starts with. */
@@ -146,15 +149,15 @@ export const PSF_TENDERER_ROW_COUNT = 4
  */
 export const PSF_ICV_REQUIREMENTS = [
   { ordinal: '1',  requirement: 'Check MOL Omanization', kind: 'yesno' },
-  { ordinal: '2',  requirement: 'Is ICV Plan Applicable', kind: 'yesno' },
+  { ordinal: '2',  requirement: 'Is LC Plan Applicable', kind: 'yesno' },
   { ordinal: '3',  requirement: 'If No, is it suitable for unbundle?', kind: 'yesno' },
-  { ordinal: '4',  requirement: 'Award based on preference of ICV Index at commercial evaluation (up to 10%).', kind: 'yesno' },
+  { ordinal: '4',  requirement: 'Award based on preference of LC Index at commercial evaluation (up to 10%).', kind: 'yesno' },
   { ordinal: '5',  requirement: 'Scope identified for ring-fencing.', kind: 'yesno' },
   { ordinal: '6',  requirement: 'Scope identified for VDP', kind: 'yesno' },
   { ordinal: '7',  requirement: 'Allocation of minimum 10% sub-contract value or direct award to SME, if applicable', kind: 'yesno' },
   { ordinal: '8',  requirement: 'Is the subcontract scope to SME will be announced in e-tendering', kind: 'yesno' },
   { ordinal: '9',  requirement: '1.2% Training Levy', kind: 'yesno' },
-  { ordinal: '10', requirement: 'Estimated ICV retained percentage out of the total estimated contract value', kind: 'percentage' },
+  { ordinal: '10', requirement: 'Estimated LC retained percentage out of the total estimated contract value', kind: 'percentage' },
   { ordinal: '11', requirement: 'Omanization percentage reference to subject contract at top 4 skill categories', kind: 'percentage' },
   { ordinal: 'A',  requirement: 'Senior Management', kind: 'percentage' },
   { ordinal: 'B',  requirement: 'Professional', kind: 'percentage' },
@@ -169,3 +172,81 @@ export const EM_DASH = '—'
 
 /** Seeds carry their template default; state diverges from there on. */
 export const toCheckboxes = (seeds) => seeds.map(seed => ({ ...seed }))
+
+/*
+ * The six steps the generation stage walks through (Next.js
+ * PSF_GENERATION_TASKS). One lights up per tick.
+ */
+export const PSF_GENERATION_TASKS = [
+  'Reading uploaded strategy templates',
+  'Extracting contract history from previous awards',
+  'Summarising the statement of work',
+  'Compiling anticipated value & funding source',
+  'Drafting background and executive summary',
+  'Assembling Procurement Submission Form',
+]
+
+/** How long each generation task holds before the next one lights up. */
+export const PSF_GENERATION_TICK_MS = 550
+
+/** Supporting documents collected alongside the templates on the upload stage. */
+export const PSF_SUPPORTING_DOCUMENTS = [
+  { id: 'single-source-justification', label: 'Single Source Justification' },
+  { id: 'contract-strategy-workshop',  label: 'Contract Strategy Workshop' },
+  { id: 'other-documents',             label: 'Other Documents' },
+]
+
+/*
+ * The strategy templates the upload stage lists, keyed by the TEMPLATE_DEFS id
+ * (src/pages/StrategyTemplatesDashboard.jsx). Every one is listed whatever was
+ * selected at the acknowledgement gate. `summary(n)` is the completion line
+ * under the title.
+ */
+export const PSF_STRATEGY_TEMPLATES = [
+  { id: 'company-estimate',      label: 'Company Estimate',            summary: n => `${n} line items completed` },
+  { id: 'contract-risk',         label: 'Contract Risk Assessment',    summary: n => `${n} risks completed` },
+  { id: 'icv',                   label: 'LC',                          summary: n => `${n} LC commitments completed` },
+  { id: 'technical-eval-matrix', label: 'Technical Evaluation Matrix', summary: n => `${n} ${n === 1 ? 'criterion' : 'criteria'} completed` },
+  { id: 'hse-risk',              label: 'HSE Risk Assessment',         summary: n => `${n} hazards completed` },
+  { id: 'negotiation-strategy',  label: 'Negotiation Strategy',        summary: n => `${n} negotiation themes completed` },
+]
+
+/** The pre-qualification document — collected here, but not a strategy template. */
+export const PSF_PREQUAL_DOCUMENT = { id: 'pre-qual', label: 'Pre-Qualification Document' }
+
+/** Review & Submit's eight sub-steps (Next.js psf-review-steps.ts). */
+export const PSF_REVIEW_STEPS = [
+  { key: 'overview',       label: 'Overview' },
+  { key: 'reviews',        label: 'Reviews & Estimate' },
+  { key: 'narrative',      label: 'Narrative' },
+  { key: 'plan',           label: 'Tender Plan' },
+  { key: 'assessment',     label: 'Assessment' },
+  { key: 'tenderers',      label: 'Tenderers' },
+  { key: 'recommendation', label: 'Recommendation & LC' },
+  { key: 'team',           label: 'Team & Submit' },
+]
+
+/** The three team roles the PSF displays (and assigns, when the CIF did not). */
+export const PSF_TEAM_ROLES = [
+  {
+    role: 'contract_engineer', roleId: 'pof', label: 'Contract Engineer', field: 'Contract Engineers',
+    suffix: null, tenderKey: 'assignedContractEngineers', singleKey: 'assignedContractEngineer',
+    searchLabel: 'Contract Engineers', placeholder: 'Select Contract Engineers...',
+    emptyText: 'No active Contract Engineers',
+    note: 'Picks this up for the PQQ financial assessment, PSF and ITT creation.',
+  },
+  {
+    role: 'hse', roleId: 'hse', label: 'HSE', field: 'HSE',
+    suffix: 'HSE', tenderKey: 'assignedHseOfficers',
+    searchLabel: 'HSE Officers', placeholder: 'Select HSE Officers...',
+    emptyText: 'No active HSE Officers',
+    note: 'Owns Section C - QHSSE Requirements on the ITT.',
+  },
+  {
+    role: 'icv', roleId: 'icv', label: 'LC', field: 'LC',
+    suffix: 'LC', tenderKey: 'assignedIcvLeads',
+    searchLabel: 'LC Leads', placeholder: 'Select LC Leads...',
+    emptyText: 'No active LC Officers',
+    note: 'Owns Section H - LC Requirements on the ITT.',
+  },
+]

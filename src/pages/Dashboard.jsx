@@ -25,6 +25,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { useTheme } from '../context/ThemeContext'
 import { technicalCriteria } from '../data/mockData'
 import { tenderRef } from '../utils/tenderRef'
+import ContractHolderDashboard from '../components/shell/ContractHolderDashboard'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // The three approval gates owned by Supply Chain.
@@ -273,7 +274,16 @@ const accentBg = (c) => ({
 }[c] || '#EEF2FF')
 
 // ── Component ─────────────────────────────────────────────────────────────────
+// The Contract Holder gets the main app's ContractHolderDashboard (header
+// actions, KPIs and the "Needs your attention" table); every other role keeps
+// the role dashboard below unchanged.
 export default function Dashboard() {
+  const { user } = useAuth()
+  if (user?.role?.id === 'contract_holder') return <ContractHolderDashboard />
+  return <RoleDashboard />
+}
+
+function RoleDashboard() {
   const navigate   = useNavigate()
   const { user, users } = useAuth()
   const { tenders }= useTenders()
