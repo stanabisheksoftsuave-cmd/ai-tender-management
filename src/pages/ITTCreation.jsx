@@ -61,8 +61,8 @@ function defaultSectionIndexFor(flow, roleId, approved = {}) {
   return pending ?? owned[0]
 }
 
-const OWNER_LABEL = { pof: 'Contract Engineer', contract_holder: 'Contract Holder', hse: 'Contract HSE', icv: 'ICV' }
-const OWNER_COLOR = { pof: '#1B4F8A', contract_holder: '#0891B2', hse: '#0EA5E9', icv: '#DB2777' }
+const OWNER_LABEL = { pof: 'Contract Engineer', contract_holder: 'Contract Holder', hse: 'HSE', icv: 'LC' }
+const OWNER_COLOR = { pof: '#0089cf', contract_holder: '#0089cf', hse: '#0089cf', icv: '#0089cf' }
 // Where each section-owner role's Contract Initiating Form assignment lives on
 // the tender — Contract Holder has none (they're the tender's own creator).
 const ASSIGNEE_FIELD = { pof: 'assignedContractEngineers', hse: 'assignedHseOfficers', icv: 'assignedIcvLeads' }
@@ -167,15 +167,10 @@ export default function ITTCreation() {
       // Section owners / exporter (HSE / ICV / Contract Engineer) work on any ITT
       // the Holder has already generated — sectionsGenerated is the real signal,
       // independent of the PSF path the tender took to get here.
-      return t.sectionsGenerated === true
+      return t.sectionsGenerated === true || t.psfSkipped === true
     }),
     [tenders, isCreator]
   )
-  // Split the picker: tenders that came through the PSF Strategy flow vs. ITTs
-  // the Contract Holder started directly (no pre-qualification / PSF — flagged
-  // psfSkipped when created via "Start New ITT").
-  const afterPsfTenders  = draftTenders.filter(t => !t.psfSkipped)
-  const directIttTenders = draftTenders.filter(t => t.psfSkipped)
 
   const showDraftPicker = !tenderId && !(isCreator && startNewParam)
   const psfBlocked = Boolean(existingTender) && existingTender.psfCompleted !== true
@@ -738,35 +733,6 @@ export default function ITTCreation() {
     ? { label: 'ITT Exported', sub: 'Exported — awaiting bid upload', cls: 'bg-green-100 text-green-700 border-green-200' }
     : draftStatusMap[step] || draftStatusMap[0]
 
-  // Shared card for a tender row in the Create ITT picker.
-  const renderDraftCard = (dt) => (
-    <Card
-      key={dt.id}
-      branded
-      className="p-4 cursor-pointer transition-shadow hover:shadow-md"
-      onClick={() => navigate(`/create-itt/${dt.id}`)}
-    >
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
-            <Briefcase size={16} style={{ color: '#0089cf' }} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Cost code and draft state only — no provenance or assignee chips. */}
-              <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf' }}>{tenderRef(dt)}</span>
-              <Badge variant="draft">{dt.stage || 'Draft — Pending Export'}</Badge>
-            </div>
-            <p className="text-sm font-semibold mt-1 truncate" style={{ color: '#1e293b' }}>{dt.title || 'Untitled tender'}</p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {dt.department || 'No department set'}{dt.deadline ? ` · Deadline ${dt.deadline}` : ''}
-            </p>
-          </div>
-        </div>
-        <ChevronRight size={16} className="shrink-0" style={{ color: '#94a3b8' }} />
-      </div>
-    </Card>
-  )
 
   if (psfBlocked) {
     return (
@@ -781,7 +747,7 @@ export default function ITTCreation() {
           </p>
         </div>
 
-        <Card branded className="p-5 olng-slide-up">
+        <Card className="p-5 olng-slide-up">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(217,119,6,0.12)' }}>
               <Info size={16} style={{ color: '#d97706' }} />
@@ -811,142 +777,43 @@ export default function ITTCreation() {
     )
   }
 
-  if (showDraftPicker && isCreator) {
+  if (showDraftPicker) {
     return (
       <div className="space-y-3">
         <CreateIttPicker
           tenders={draftTenders}
+          title={isIttReviewer ? 'ITT Review and Approve' : 'Create ITT'}
+          description={
+            isIttReviewer
+              ? 'Select a tender to review and approve its ITT.'
+              : undefined
+          }
           onSelect={dt => navigate(`/create-itt/${dt.id}`)}
-          onStartNew={startNewItt}
+          onStartNew={isCreator ? startNewItt : undefined}
         />
-      </div>
-    )
-  }
-
-  if (showDraftPicker) {
-    return (
-      <div className="space-y-5">
-        <div className="olng-slide-up">
-          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: '#1e293b' }}>
-            <Inbox size={20} style={{ color: '#0089cf' }} />
-            {isIttReviewer ? 'ITT Review & Approve' : 'Create ITT'}
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            {isIttReviewer
-              ? <>Select a tender to review and approve your <strong>ITT</strong> sections.</>
-              : <>Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.</>}
-          </p>
-        </div>
-
-        {draftTenders.length === 0 && (
-          <Card branded className="p-6 text-center olng-slide-up">
-            <div className="w-11 h-11 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
-              <ShieldAlert size={18} style={{ color: '#0089cf' }} />
-            </div>
-            <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>{isIttReviewer ? 'No ITTs waiting on your review' : 'No tenders ready for ITT creation'}</p>
-            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-md mx-auto">
-              A tender must complete the <strong>PSF Strategy</strong> (Procurement Submission Form) step before its ITT can be created.
-              Finish Strategy Templates and submit the PSF for a tender, then it will appear here.
-            </p>
-          </Card>
-        )}
-
-        {/* Group 1 — came through the PSF Strategy flow */}
-        {afterPsfTenders.length > 0 && (
-          <div className="olng-slide-up" style={{ animationDelay: '60ms' }}>
-            <div className="flex items-center gap-2 mb-1">
-              <CheckCircle size={14} style={{ color: '#059669' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>From PSF Strategy</h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>{afterPsfTenders.length}</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-2.5">Completed pre-qualification and PSF — details are pre-populated.</p>
-            <div className="space-y-3">{afterPsfTenders.map(renderDraftCard)}</div>
-          </div>
-        )}
-
-        {/* Group 2 — started directly, skipping PSF */}
-        {directIttTenders.length > 0 && (
-          <div className="olng-slide-up" style={{ animationDelay: '90ms' }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Plus size={14} style={{ color: '#0089cf' }} />
-              <h3 className="text-sm font-semibold" style={{ color: '#1e293b' }}>Direct ITT (No PSF)</h3>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,137,207,0.12)', color: '#0089cf' }}>{directIttTenders.length}</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-2.5">Started directly without pre-qualification / PSF, with templates uploaded here.</p>
-            <div className="space-y-3">{directIttTenders.map(renderDraftCard)}</div>
-          </div>
-        )}
-
       </div>
     )
   }
 
   return (
     <div className="space-y-5">
-      {isCreator ? (
-        <>
-          <WizardStatusBanner
-            statusText={step === 2
-              ? 'Filling in section templates'
-              : step === 1
-                ? 'Preparing document templates...'
-                : existingTender ? 'Project details and strategy templates' : 'Filling in project details'}
-            reference={existingTender ? tenderRef(existingTender) : 'New Draft'}
-          />
-          <IttWizardStepper current={step} />
-        </>
-      ) : (
-        <>
-      {/* ── Branded Status Banner ── */}
-      <div className="flex items-center justify-between olng-slide-up">
-        <div className="olng-status-banner">
-          <span className="status-dot" />
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: '#1e293b' }}>{currentDraftStatus.label}</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-xs text-slate-500">{currentDraftStatus.sub}</span>
-          </div>
-        </div>
-        <span className="text-xs font-mono px-3 py-1 rounded-lg font-medium" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.15)' }}>
-          {draftTenderId || 'New Draft'}
-        </span>
-      </div>
-
-          {/* ── Premium Step Indicator ── */}
-      <div className="flex items-center gap-0 olng-slide-up" style={{ animationDelay: '60ms' }}>
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <div className={`olng-step-circle ${
-                i < step ? 'olng-step-circle--done' :
-                i === step ? 'olng-step-circle--active' :
-                'olng-step-circle--pending'
-              }`}>
-                {i < step ? <CheckCircle size={15} /> : i + 1}
-              </div>
-              <span className={`text-sm whitespace-nowrap ${
-                i === step ? 'font-semibold' : i < step ? 'font-medium' : ''
-              }`} style={{
-                color: i === step ? '#1e293b' : i < step ? '#0089cf' : '#94a3b8'
-              }}>{s}</span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className={`olng-step-connector mx-3 ${i < step ? 'olng-step-connector--done' : ''}`} />
-            )}
-          </div>
-        ))}
-      </div>
-
-        </>
-      )}
+      <WizardStatusBanner
+        statusText={step === 2
+          ? 'Filling in section templates'
+          : step === 1
+            ? 'Preparing document templates...'
+            : existingTender ? 'Project details and strategy templates' : 'Filling in project details'}
+        reference={existingTender ? (tenderRef(existingTender) || existingTender.reference || draftTenderId) : (draftTenderId || 'New Draft')}
+      />
+      <IttWizardStepper current={step} />
 
       {/* Section-owner / exporter roles wait until the Contract Holder has generated the ITT */}
       {!isCreator && step < 2 && (
-        <Card branded className="p-8 text-center olng-slide-up">
+        <Card className="p-8 text-center olng-slide-up">
           <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center" style={{ background: 'rgba(0,137,207,0.1)' }}>
             <Clock size={20} style={{ color: '#0089cf' }} />
           </div>
-          <p className="text-sm font-semibold mt-3" style={{ color: '#1e293b' }}>ITT is being prepared</p>
+          <p className="text-sm font-semibold mt-3 text-slate-800 dark:text-slate-100">ITT is being prepared</p>
           <p className="text-xs text-slate-400 mt-1.5 max-w-md mx-auto leading-relaxed">
             The Contract Holder is still setting up this ITT. Your assigned sections will appear here for editing once the ITT has been generated.
           </p>
@@ -1055,12 +922,16 @@ export default function ITTCreation() {
       {step === 2 && (
         <div className="space-y-4 olng-slide-up">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="font-semibold" style={{ color: '#1e293b' }}>
-              Your ITT Sections
-              <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full align-middle" style={{ color: OWNER_COLOR[roleId] || '#1B4F8A', background: `${OWNER_COLOR[roleId] || '#1B4F8A'}14` }}>{OWNER_LABEL[roleId] || 'Contract Engineer'}</span>
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold" style={{ color: '#1e293b' }}>
+                Your ITT Sections
+              </h3>
+              <span className="rounded-full border border-[#0089cf]/25 bg-[#afd9f4] px-2.5 py-0.5 text-[11px] font-semibold text-[#0089cf]">
+                {OWNER_LABEL[roleId] || 'Contract Engineer'}
+              </span>
+            </div>
             <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>
-              {isCreator ? <span className="font-semibold" style={{ color: '#1e293b' }}>{myCompletedCount}</span> : myCompletedCount} of {myFlow.length} approved
+              <span className="font-semibold" style={{ color: '#1e293b' }}>{myCompletedCount}</span> of {myFlow.length} approved
             </span>
           </div>
 
@@ -1071,79 +942,8 @@ export default function ITTCreation() {
             </Card>
           ) : (
             <>
-              {/* Section dropdown — the two access modes are kept apart so it is
-                  never ambiguous whether the section being opened is editable.
-                  Group 1: the sections this role owns and may edit.
-                  Group 2: everyone else's sections, opened read-only. */}
-              {isCreator ? (
-                <IttSectionPicker rows={pickerRows} currentIdx={currentIndex} onChange={setMySectionIndex} />
-              ) : (
-              <Card branded className="p-4">
-                <label className="text-xs font-semibold mb-2 block" style={{ color: '#1e293b' }}>Select Section</label>
-                <select
-                  value={currentIndex}
-                  onChange={e => setMySectionIndex(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2"
-                  style={{ borderColor: 'rgba(0,137,207,0.2)', backgroundColor: '#fff', color: '#1e293b' }}
-                >
-                  {editableOptions.length > 0 && (
-                    <optgroup label={`✏️  YOUR SECTIONS — you can edit (${editableOptions.length})`}>
-                      {editableOptions.map(({ item, idx }) => (
-                        <option key={item.id} value={idx}>
-                          {item.title}
-                          {isSectionComplete(item) ? '  —  ✓ Approved' : item.optional ? '  —  optional, not yet approved' : '  —  needs your review'}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {viewOnlyOptions.length > 0 && (
-                    <optgroup label={`👁  OTHER ROLES' SECTIONS — view only (${viewOnlyOptions.length})`}>
-                      {viewOnlyOptions.map(({ item, idx }) => (
-                        <option key={item.id} value={idx}>
-                          {item.title}  —  {ownerDisplay(ownerOf(item.id))}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <div className="flex items-center gap-4 flex-wrap mt-2.5">
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: '#0089cf' }}>
-                    <Pencil size={11} /> Editable — {editableOptions.length} section{editableOptions.length === 1 ? '' : 's'} you own
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: '#64748b' }}>
-                    <Eye size={11} /> View only — {viewOnlyOptions.length} owned by other roles
-                  </span>
-                </div>
-              </Card>
-              )}
-
-              {/* Mode banner — restates, in the section's own colour, which half of
-                  the dropdown the open section came from. */}
-              {current && !isCreator && (
-                <div
-                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 flex-wrap"
-                  style={canEditCurrent
-                    ? { background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))', border: '1px solid rgba(0,137,207,0.25)' }
-                    : { background: 'rgba(100,116,139,0.06)', border: '1px solid rgba(100,116,139,0.2)' }}
-                >
-                  <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                    style={canEditCurrent
-                      ? { background: 'rgba(0,137,207,0.14)', color: '#0089cf' }
-                      : { background: 'rgba(100,116,139,0.14)', color: '#64748b' }}>
-                    {canEditCurrent ? <Pencil size={13} /> : <Eye size={13} />}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold" style={{ color: canEditCurrent ? '#1e293b' : '#475569' }}>
-                      {canEditCurrent ? 'Edit mode' : 'View-only mode'}
-                    </p>
-                    <p className="text-[11px]" style={{ color: '#94a3b8' }}>
-                      {canEditCurrent
-                        ? 'You own this section — fill the fields, refine the wording, then approve it.'
-                        : `Owned by ${ownerDisplay(ownerOf(current.id))} — you can read it, but nothing here can be changed.`}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Section dropdown — searchable popover showing open section, status pills */}
+              <IttSectionPicker rows={pickerRows} currentIdx={currentIndex} onChange={setMySectionIndex} />
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -1153,11 +953,8 @@ export default function ITTCreation() {
                   </div>
                   <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Section {currentIndex + 1} of {flow.length}</span>
                   {current && canEditCurrent && isSectionComplete(current) && (
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Approved</span>
+                    <span className="rounded-full border border-[#a7f3d0] bg-[#ecfdf5] px-1.5 py-0.5 text-[10px] font-semibold text-[#059669]">Approved</span>
                   )}
-                </div>
-                <div className="olng-progress-bar w-40 h-2">
-                  <div className="olng-progress-fill" style={{ width: `${myFlow.length ? Math.round((myCompletedCount / myFlow.length) * 100) : 0}%` }} />
                 </div>
               </div>
 
@@ -1166,7 +963,7 @@ export default function ITTCreation() {
                 const up = sectionUploads[current.id]
                 const label = SECTION_UPLOAD_LABELS[current.id]
                 return (
-                  <Card branded className="p-4">
+                  <Card className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
@@ -1197,7 +994,7 @@ export default function ITTCreation() {
               })()}
 
               <ErrorBoundary>
-                {isCreator && current && canEditCurrent && isSectionComplete(current) && unlockedSectionId !== current.id ? (
+                {current && canEditCurrent && isSectionComplete(current) && unlockedSectionId !== current.id ? (
                   <ApprovedSectionSummary title={current.title} onEdit={() => setUnlockedSectionId(current.id)} />
                 ) : current && current.kind === 'b1-chooser' ? (
                   canEditCurrent ? (
@@ -1207,11 +1004,11 @@ export default function ITTCreation() {
                       onBack={goToPrevSection}
                     />
                   ) : (
-                    <Card branded className="p-6">
-                      <h3 className="font-semibold" style={{ color: '#1e293b' }}>Section B1 — General Conditions of Contract</h3>
+                    <Card className="p-6">
+                      <h3 className="font-semibold text-slate-800 dark:text-slate-100">Section B1 — General Conditions of Contract</h3>
                       {b1Category ? (
                         <div className="mt-3 rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.05), rgba(236,244,252,0.6))', border: '1px solid rgba(0,137,207,0.2)' }}>
-                          <p className="text-sm font-bold" style={{ color: '#1e293b' }}>{B1_CATEGORY_MAP[b1Category]?.label}</p>
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{B1_CATEGORY_MAP[b1Category]?.label}</p>
                           <p className="text-[11px] text-slate-500 mt-0.5">{B1_CATEGORY_MAP[b1Category]?.sub}</p>
                         </div>
                       ) : (
@@ -1294,28 +1091,28 @@ export default function ITTCreation() {
           )}
 
           {/* Export / handoff — Contract Engineer drafts & exports once all approved */}
-          <Card branded className="p-4">
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:flex-nowrap sm:p-5">
             {isExporter ? (
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>Draft &amp; Export ITT</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {allSectionsComplete ? 'Every owner has approved their required sections — draft and export the ITT to share with bidders.' : `${requiredPending} required section(s) still awaiting owner approval.`}
+              <>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Draft &amp; Export ITT</p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    {allSectionsComplete ? 'Every owner has approved their required sections - proceed to export.' : `${requiredPending} required section(s) still awaiting owner approval.`}
                   </p>
                 </div>
-                <Button variant="brand" disabled={!allSectionsComplete} onClick={() => {
+                <Button variant="brand" className="shrink-0 flex items-center gap-2" disabled={!allSectionsComplete} onClick={() => {
                   if (draftTenderId) advanceTender(draftTenderId)
                   setIttApproved(true)
                   setStep(3)
                 }}>
-                  <ChevronRight size={14} /> Draft &amp; Export ITT
+                  Proceed to Export <ArrowRight size={16} />
                 </Button>
-              </div>
+              </>
             ) : (
               <div className="flex items-start gap-2.5">
                 <Info size={15} style={{ color: '#0089cf' }} className="mt-0.5 shrink-0" />
                 <p className="text-xs text-slate-500">
-                  {myPendingCount > 0 ? `Review and approve your ${myPendingCount} remaining section(s).` : 'Your sections are approved and sent to the Contract Engineer.'} The Contract Engineer drafts and exports the ITT once every owner has approved.
+                  {myPendingCount > 0 ? `Review and approve your ${myPendingCount} remaining section(s). ` : 'Your sections are approved and sent to the Contract Engineer. '}The Contract Engineer drafts and exports the ITT once every owner has approved.
                 </p>
               </div>
             )}
@@ -1344,12 +1141,12 @@ export default function ITTCreation() {
       {/* ── ITT Exported & Created — the tender is advanced and marked exported the
            moment "Draft & Export ITT" is clicked, so step 3 always lands here. ── */}
       {step === 3 && (
-        <Card branded className="p-12 text-center olng-scale-in">
+        <Card className="p-12 text-center olng-scale-in">
           <div className="olng-success-ring mx-auto mb-5">
             <CheckCircle size={32} style={{ color: '#0089cf' }} />
           </div>
           <Badge variant="success" className="mb-3">ITT Exported</Badge>
-          <h2 className="text-xl font-bold mb-1" style={{ color: '#1e293b' }}>ITT Exported & Created</h2>
+          <h2 className="text-xl font-bold mb-1 text-slate-800 dark:text-slate-100">ITT Exported & Created</h2>
           <p className="text-sm mb-1" style={{ color: '#64748b' }}>Exported by {approverName} · {approverRole}</p>
           <p className="text-xs mb-6" style={{ color: '#94a3b8' }}>{draftTenderId} — {form.title} is exported for external review. Upload the finalised version when ready.</p>
           {zipError && (

@@ -135,7 +135,7 @@ function TemplatesProgressFooter({ includedDocs, completed, onBack, onNext }) {
   const shortLabel = doc => (doc.id === PRE_QUAL_ID ? 'Pre-Qual' : doc.label.split(' ').slice(0, 2).join(' '))
   return (
     <div className="flex flex-col gap-5">
-      <Card branded className="p-4">
+      <Card className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="flex flex-wrap items-center gap-2">
             {includedDocs.map(doc => {
@@ -226,7 +226,7 @@ export default function StrategiesHub({ tender, tenderId, navigate, updateTender
 
   return (
     <div className="space-y-5 w-full">
-      <Card branded className="p-5 olng-slide-up">
+      <Card className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-slide-up">
         <div className="flex items-center gap-2.5 mb-1">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-[#e8f3fb] text-[#0089cf]">
             <Layout size={16} aria-hidden="true" />

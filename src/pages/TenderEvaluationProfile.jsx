@@ -26,18 +26,19 @@ const ShieldOff   = p => <Svg {...p}><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8
 const Lock        = p => <Svg {...p}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Svg>
 const Save         = p => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></Svg>
 const SlidersHorizontal = p => <Svg {...p}><line x1="21" y1="4" x2="14" y2="4" /><line x1="10" y1="4" x2="3" y2="4" /><line x1="21" y1="12" x2="12" y2="12" /><line x1="8" y1="12" x2="3" y2="12" /><line x1="21" y1="20" x2="16" y2="20" /><line x1="12" y1="20" x2="3" y2="20" /><line x1="14" y1="2" x2="14" y2="6" /><line x1="8" y1="10" x2="8" y2="14" /><line x1="16" y1="18" x2="16" y2="22" /></Svg>
+const ShieldCheck = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></Svg>
 
-const inputCls = 'mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 disabled:text-slate-400'
+const inputCls = 'mt-1 w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-400'
 const toggleRow = 'flex items-center gap-2.5 py-1.5 cursor-pointer'
 
 function SectionCard({ letter, title, hint, children }) {
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 py-3.5 border-b border-slate-100 flex items-center gap-3">
+      <div className="px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
         <span className="w-7 h-7 rounded-lg bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-bold text-xs flex items-center justify-center shrink-0">{letter}</span>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+          {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{hint}</p>}
         </div>
       </div>
       <div className="p-4 space-y-3">{children}</div>
@@ -50,7 +51,7 @@ function Toggle({ checked, onChange, label, disabled }) {
     <label className={toggleRow}>
       <input type="checkbox" checked={checked} disabled={disabled}
         onChange={e => onChange(e.target.checked)} className="accent-[var(--color-primary)]" />
-      <span className="text-xs text-slate-700">{label}</span>
+      <span className="text-xs text-slate-700 dark:text-slate-300">{label}</span>
     </label>
   )
 }
@@ -138,28 +139,76 @@ export default function TenderEvaluationProfile() {
 
   return (
     <div className="space-y-5">
-      <Card className="p-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <button onClick={goBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+      <Card className="overflow-hidden">
+        <div className="p-4 sm:p-5 flex items-start justify-between flex-wrap gap-4">
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <button onClick={goBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                 <ArrowLeft size={12} /> Back
               </button>
-              <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-              {locked ? <Badge variant="compliant"><Lock size={10} /> Locked</Badge> : <Badge variant="draft">Draft — editable</Badge>}
+              <span className="text-slate-300 dark:text-slate-700">/</span>
+              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded">
+                {tenderRef(tender)}
+              </span>
+              <span className="rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5">
+                Commercial Evaluation
+              </span>
+              {locked ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
+                  <ShieldCheck size={11} /> Locked
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-[10px] font-semibold">
+                  Draft — editable
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal size={15} className="text-[var(--color-primary)]" />
-              <h3 className="font-semibold text-slate-800">Tender Evaluation Profile</h3>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">{tender.title}</p>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 wrap-anywhere">{tender.title}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {tender.department} · {tender.bidders || 0} bidders · Closes {tender.deadline}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!locked && (
+              <>
+                <Button variant="secondary" size="sm" onClick={saveDraft}>
+                  <Save size={13} /> {saved ? 'Saved!' : 'Save Draft'}
+                </Button>
+                <Button size="sm" onClick={lockProfile}>
+                  <Lock size={13} /> Lock Profile
+                </Button>
+              </>
+            )}
           </div>
         </div>
+
+        {/* CommercialEvaluationTabs */}
+        <div className="flex items-center gap-6 border-t border-slate-200 dark:border-slate-800 px-4 sm:px-6 bg-slate-50/50 dark:bg-slate-900/50 overflow-x-auto">
+          <div className="relative inline-flex items-center gap-2 py-3 text-xs font-bold text-[var(--color-primary)] shrink-0">
+            <span>Tender Evaluation Profile</span>
+            {locked ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
+                <ShieldCheck size={11} /> Profile locked
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-[10px] font-semibold">
+                Draft
+              </span>
+            )}
+            <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--color-primary)] shadow-sm" />
+          </div>
+          <button
+            onClick={() => navigate(`/commercial-eval/${tenderId}`)}
+            className="relative inline-flex items-center gap-2 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors shrink-0 cursor-pointer"
+          >
+            <span>Commercial Evaluation</span>
+          </button>
+        </div>
+
         {locked && (
-          <div className="mt-3 flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <Lock size={14} className="text-amber-600 shrink-0 mt-0.5" />
-            <span className="text-xs text-amber-800 leading-relaxed">
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-amber-50/60 dark:bg-amber-950/30 flex items-start gap-2.5">
+            <Lock size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <span className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
               Locked at issuance by <strong>{tender.commercialEvalProfileLockedBy}</strong> on {new Date(tender.commercialEvalProfileLockedAt).toLocaleString('en-GB')}.
               Every commercial evaluation agent below reads its configuration from this profile — it is read-only from here on.
             </span>
@@ -188,17 +237,17 @@ export default function TenderEvaluationProfile() {
         <div className="overflow-x-auto -mx-4">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
+              <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400">
                 <th className="text-left px-4 py-2 text-xs font-semibold">Group</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold">Requirement</th>
                 <th className="text-left px-3 py-2 text-xs font-semibold min-w-52">Treatment</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
               {profile.sectionB.map(row => (
                 <tr key={row.id}>
                   <td className="px-4 py-2 text-[11px] text-slate-400">{row.group}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{row.name}</td>
+                  <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">{row.name}</td>
                   <td className="px-3 py-2">
                     <SearchableSelect
                       value={row.treatment} disabled={dis}
@@ -220,17 +269,17 @@ export default function TenderEvaluationProfile() {
       <SectionCard letter="C" title="Price-Benchmark Thresholds" hint="Variance-from-estimate and outlier thresholds, per tender">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] font-semibold text-slate-500">Abnormally Low %</label>
+            <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Abnormally Low %</label>
             <input type="number" value={profile.sectionC.abnormallyLowPct} disabled={dis} className={inputCls}
               onChange={e => set('sectionC', { abnormallyLowPct: Number(e.target.value) || 0 })} />
           </div>
           <div>
-            <label className="text-[11px] font-semibold text-slate-500">Abnormally High %</label>
+            <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Abnormally High %</label>
             <input type="number" value={profile.sectionC.abnormallyHighPct} disabled={dis} className={inputCls}
               onChange={e => set('sectionC', { abnormallyHighPct: Number(e.target.value) || 0 })} />
           </div>
           <div>
-            <label className="text-[11px] font-semibold text-slate-500">Line-Item Outlier %</label>
+            <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Line-Item Outlier %</label>
             <input type="number" value={profile.sectionC.outlierRatePct} disabled={dis} className={inputCls}
               onChange={e => set('sectionC', { outlierRatePct: Number(e.target.value) || 0 })} />
           </div>
@@ -247,8 +296,8 @@ export default function TenderEvaluationProfile() {
                   ...prev,
                   sectionD: { ...prev.sectionD, families: prev.sectionD.families.map(x => x.family === f.family ? { ...x, enabled: e.target.checked } : x) },
                 }))} />
-              <span className="text-xs text-slate-700">{f.family}</span>
-              <span className="text-[11px] text-slate-400">{f.range}</span>
+              <span className="text-xs text-slate-700 dark:text-slate-200">{f.family}</span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">{f.range}</span>
             </label>
           ))}
           <Toggle checked={profile.sectionD.userDefinedIndexEnabled} disabled={dis} label="Allow a user-defined index adjustment"

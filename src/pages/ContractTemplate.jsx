@@ -25,6 +25,7 @@ const CheckCircle   = p => <Svg {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.
 const Eye           = p => <Svg {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Svg>
 const Send          = p => <Svg {...p}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Svg>
 const ChevronRight  = p => <Svg {...p}><polyline points="9 18 15 12 9 6"/></Svg>
+const ChevronLeft   = p => <Svg {...p}><polyline points="15 18 9 12 15 6"/></Svg>
 const Globe         = p => <Svg {...p}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Svg>
 const BarChart3     = p => <Svg {...p}><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></Svg>
 const Award         = p => <Svg {...p}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></Svg>
@@ -92,7 +93,7 @@ export default function ContractTemplate() {
       basePath="/contract"
       title="Contract Drafting"
       description="Select an awarded tender to begin contract drafting"
-      emptyText="No tenders at the award stage"
+      emptyText="No tenders pending contract drafting"
     />
   )
 
@@ -138,20 +139,20 @@ export default function ContractTemplate() {
   const openRejectionLetter = (b) => openRegretLetter(tender, b, awardedBidder?.name)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 pb-12">
 
       {/* ── Tender header ── */}
-      <Card className="p-4">
+      <Card className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
+              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200/80 dark:border-slate-700">{tenderRef(tender)}</span>
               <Badge variant="award">Contract Drafting</Badge>
             </div>
-            <h3 className="font-semibold text-slate-800">{tender.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{tender.department} · Deadline: {tender.deadline} · {tender.budget}</p>
+            <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">{tender.title}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{tender.department} · Deadline: {tender.deadline} · {tender.budget}</p>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 shrink-0">
+          <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2 shrink-0">
             <Bot size={13} /> AI contract drafting from the ITT
           </div>
         </div>
@@ -159,15 +160,15 @@ export default function ContractTemplate() {
 
       {/* ── Supply Chain returned the draft — the gate comment is the brief ── */}
       {scmReturn && (
-        <Card className="p-4 border border-amber-200 bg-amber-50/60">
+        <Card className="p-4 border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 rounded-xl">
           <div className="flex items-start gap-3">
             <RotateCcw size={15} className="text-amber-500 mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-amber-800">Returned by Supply Chain for redraft</p>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Returned by Supply Chain for redraft</p>
               {scmReturn.comment
-                ? <p className="text-xs text-amber-700 mt-1 leading-relaxed italic">“{scmReturn.comment}”</p>
-                : <p className="text-xs text-amber-700 mt-1">No comment was recorded with the return.</p>}
-              <p className="text-[11px] text-amber-600 mt-1.5">
+                ? <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 leading-relaxed italic">“{scmReturn.comment}”</p>
+                : <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">No comment was recorded with the return.</p>}
+              <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1.5">
                 Returned {new Date(scmReturn.at).toLocaleString('en-GB')} · redraft below and submit again. Nothing has been issued to any bidder.
               </p>
             </div>
@@ -179,60 +180,60 @@ export default function ContractTemplate() {
       <div className="flex items-center gap-0 overflow-x-auto pb-1">
         {flowStages.map((stage, i) => (
           <div key={stage.label} className="flex items-center shrink-0">
-            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium border transition-all
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
               ${stage.active
-                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
+                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm'
                 : stage.done
-                ? 'bg-green-50 text-green-700 border-green-200'
-                : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                : 'bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'}`}>
               {stage.done && !stage.active && <CheckCircle size={10} />}
               {stage.label}
             </div>
-            {i < flowStages.length - 1 && <ChevronRight size={13} className="mx-1 text-slate-300 shrink-0" />}
+            {i < flowStages.length - 1 && <ChevronRight size={13} className="mx-1.5 text-slate-300 dark:text-slate-600 shrink-0" />}
           </div>
         ))}
       </div>
 
       {/* ── Evaluator scores summary (read-only, informational) ── */}
-      <Card className="overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+      <Card className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
           <BarChart3 size={14} className="text-[var(--color-primary)]" />
-          <h3 className="text-sm font-semibold text-slate-800">Evaluation Summary</h3>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Evaluation Summary</h3>
           <Badge variant="success"><CheckCircle size={10} /> Management Approved</Badge>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs min-w-[480px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Bidder</th>
-                <th className="text-center px-3 py-3 font-semibold text-blue-500">Technical<br/><span className="font-normal text-slate-400">/100</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-violet-500">Commercial<br/><span className="font-normal text-slate-400">recommendation</span></th>
-                <th className="text-center px-3 py-3 font-semibold text-slate-600">Status</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                <th className="text-left px-4 py-3 font-semibold">Bidder</th>
+                <th className="text-center px-3 py-3 font-semibold text-blue-600 dark:text-blue-400">Technical<br/><span className="font-normal text-slate-400 dark:text-slate-500">/100</span></th>
+                <th className="text-center px-3 py-3 font-semibold text-violet-600 dark:text-violet-400">Commercial<br/><span className="font-normal text-slate-400 dark:text-slate-500">recommendation</span></th>
+                <th className="text-center px-3 py-3 font-semibold">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {ranked.map((b) => {
                 const isAwarded  = b.id === awardedBidder?.id
                 const isCommRec  = b.id === commRecId
                 return (
-                  <tr key={b.id} className={isAwarded ? 'bg-[var(--color-primary)]/5' : 'hover:bg-slate-50/40'}>
+                  <tr key={b.id} className={isAwarded ? 'bg-blue-50/40 dark:bg-blue-950/20' : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center shrink-0
-                          ${isAwarded ? 'bg-[var(--color-primary)] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          ${isAwarded ? 'bg-[var(--color-primary)] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                           {b.name?.[0]}
                         </div>
                         <div>
-                          <p className={`font-semibold ${isAwarded ? 'text-[var(--color-primary)]' : 'text-slate-700'}`}>{b.name}</p>
-                          {isAwarded && <p className="text-[10px] text-[var(--color-primary)]/70">★ Awarded</p>}
+                          <p className={`font-semibold ${isAwarded ? 'text-[var(--color-primary)]' : 'text-slate-700 dark:text-slate-200'}`}>{b.name}</p>
+                          {isAwarded && <p className="text-[10px] text-blue-600 dark:text-blue-400">★ Awarded</p>}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-center font-semibold text-blue-600">{b.techScore ?? 75}</td>
+                    <td className="px-3 py-3 text-center font-semibold text-blue-600 dark:text-blue-400">{b.techScore ?? 75}</td>
                     <td className="px-3 py-3 text-center">
                       {isCommRec
-                        ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">Recommended</span>
-                        : <span className="text-slate-400">—</span>}
+                        ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 px-2 py-0.5 rounded-full">Recommended</span>
+                        : <span className="text-slate-400 dark:text-slate-600">—</span>}
                     </td>
                     <td className="px-3 py-3 text-center">
                       {isAwarded
@@ -246,9 +247,9 @@ export default function ContractTemplate() {
           </table>
         </div>
         {tender.mgmtRemarks && (
-          <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
-            <p className="text-[11px] text-slate-500">
-              <span className="font-semibold text-slate-600">Management Remarks: </span>{tender.mgmtRemarks}
+          <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Management Remarks: </span>{tender.mgmtRemarks}
             </p>
           </div>
         )}
@@ -256,43 +257,43 @@ export default function ContractTemplate() {
 
       {/* ── Winner profile ── */}
       {awardedBidder && (
-        <Card className="p-5">
+        <Card className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Award size={16} className="text-[var(--color-primary)]" />
-            <h3 className="font-semibold text-slate-800 text-sm">Award Winner — Contract Party</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Award Winner — Contract Party</h3>
             <Badge variant="award"><Star size={10} /> Awarded</Badge>
           </div>
           <div className="flex items-start gap-4 mb-5">
-            <div className="w-14 h-14 rounded-2xl bg-[var(--color-primary)]/10 flex items-center justify-center shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
               <span className="text-xl font-bold text-[var(--color-primary)]">{awardedBidder.name?.[0]}</span>
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-bold text-slate-800">{awardedBidder.name}</h2>
-              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{awardedBidder.name}</h2>
+              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                 {awardedBidder.country && (
                   <span className="flex items-center gap-1"><Globe size={11} /> {awardedBidder.country}</span>
                 )}
                 {awardedBidder.totalBid && (
-                  <span>Contract value: <strong className="text-slate-700">{awardedBidder.totalBid}</strong></span>
+                  <span>Contract value: <strong className="text-slate-700 dark:text-slate-200">{awardedBidder.totalBid}</strong></span>
                 )}
               </div>
             </div>
           </div>
           {/* ── ITT section reference ── */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <label className="text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 p-4">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
               <FileText size={13} className="text-[var(--color-primary)]" /> ITT Section
             </label>
             <select
               value={section?.id || ''}
               onChange={e => setSectionId(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+              className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
             >
               {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
-            <p className="text-[11px] text-slate-500 mt-2">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
               {ittSection
-                ? <>The contract will be drafted with reference to <strong className="text-slate-700">{ittSection}</strong> from the ITT.</>
+                ? <>The contract will be drafted with reference to <strong className="text-slate-700 dark:text-slate-200">{ittSection}</strong> from the ITT.</>
                 : 'Choose the ITT section this contract should be drafted against.'}
             </p>
           </div>
@@ -301,25 +302,25 @@ export default function ContractTemplate() {
 
       {/* ── ITT template review & approval (Contract Engineer only) ── */}
       {awardedBidder && (
-        <Card className="p-5">
+        <Card className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <FileText size={16} className="text-[var(--color-primary)]" />
-            <h3 className="font-semibold text-slate-800 text-sm">ITT Template — Review &amp; Approve</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">ITT Template — Review &amp; Approve</h3>
             {ittApproved
               ? <Badge variant="success"><CheckCircle size={10} /> Approved</Badge>
               : <Badge variant="non_compliant">Pending review</Badge>}
           </div>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
             The <strong>Contract Engineer</strong> reviews the ITT template{ittSection ? <> ({ittSection})</> : ''} and approves it before the contract is drafted.
           </p>
 
           {ittApproved ? (
-            <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <CheckCircle size={16} className="text-emerald-500 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-emerald-800">ITT template reviewed &amp; approved</p>
-                  <p className="text-[11px] text-emerald-700">By {approver} · {approverRole} · {approvedDate}</p>
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">ITT template reviewed &amp; approved</p>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400">By {approver} · {approverRole} · {approvedDate}</p>
                 </div>
               </div>
               <Button variant="secondary" size="sm" onClick={() => setIttApproved(false)}>
@@ -334,7 +335,7 @@ export default function ContractTemplate() {
               <Button size="sm" onClick={() => setIttApproved(true)}>
                 <CheckCircle size={13} /> Approve ITT Template
               </Button>
-              <span className="text-[11px] text-slate-400">Approval unlocks contract drafting.</span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">Approval unlocks contract drafting.</span>
             </div>
           )}
         </Card>
@@ -342,16 +343,16 @@ export default function ContractTemplate() {
 
       {/* ── AI Drafting ── */}
       {awardedBidder && (
-        <Card className="p-4">
+        <Card className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="p-2.5 rounded-xl bg-blue-50 shrink-0">
-              <Bot size={18} className="text-blue-600" />
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-[var(--color-primary)] shrink-0">
+              <Bot size={18} />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-slate-800 text-sm mb-1">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-1">
                 Draft Contract for {awardedBidder.name}
               </h3>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                 The contract will be drafted from {ittSection ? <strong>{ittSection}</strong> : 'the ITT'} and
                 populated with the tender scope, {awardedBidder.name}'s agreed terms
                 {awardedBidder.totalBid ? ` (${awardedBidder.totalBid})` : ''}, and all legal clauses.
@@ -362,18 +363,18 @@ export default function ContractTemplate() {
                     <Send size={14} /> Draft Contract with AI <ChevronRight size={14} />
                   </Button>
                   {!ittApproved && (
-                    <p className="text-[11px] text-amber-600 mt-2 flex items-center gap-1">
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
                       <CheckCircle size={11} /> Review &amp; approve the ITT template above to enable drafting.
                     </p>
                   )}
                 </>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">
+                  <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-2.5">
                     <CheckCircle size={15} />
                     Contract drafted for {awardedBidder.name}.
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Draft the contract for the winner and review the regret letters below, then submit the draft to Supply Chain. Nothing is issued until the SCM approves — on approval the winner’s contract and every regret letter are released together, and the letters are sent from Contract Management.
                   </p>
                   <Button onClick={() => { updateTender(tender.id, { status: 'scm_gate3', stage: 'SCM Review — Contract Draft', contractDraftReady: true }); navigate('/tenders') }}>
@@ -390,23 +391,23 @@ export default function ContractTemplate() {
            Read-only by design: nothing may be issued before SCM gate 3. Sending
            lives in Contract Management, next to the issued documents. */}
       {sent && awardedBidder && failedBidders.length > 0 && (
-        <Card className="p-5">
+        <Card className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <FileText size={16} className="text-[var(--color-primary)]" />
-            <h3 className="font-semibold text-slate-800 text-sm">Regret Letters — Preview</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Regret Letters — Preview</h3>
             <Badge variant="non_compliant">{failedBidders.length} not selected</Badge>
           </div>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
             Check each letter before submitting the draft. Nothing is sent from this screen — the letters are released with the contract once Supply Chain approves.
           </p>
           <div className="space-y-2">
             {failedBidders.map(b => (
-              <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-2.5 flex-wrap">
+              <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 px-4 py-2.5 flex-wrap">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 font-bold text-sm flex items-center justify-center shrink-0">{b.name?.[0]}</div>
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold text-sm flex items-center justify-center shrink-0">{b.name?.[0]}</div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-700 truncate">{b.name}</p>
-                    <p className="text-[11px] text-slate-400">Technical {b.techScore ?? 75}/100 · Not selected</p>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{b.name}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">Technical {b.techScore ?? 75}/100 · Not selected</p>
                   </div>
                 </div>
                 <Button variant="secondary" size="sm" className="shrink-0" onClick={() => openRejectionLetter(b)}>
@@ -415,7 +416,7 @@ export default function ContractTemplate() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-slate-400 mt-4">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-4">
             Each letter carries the tender outcome and a courteous regret message.
           </p>
         </Card>

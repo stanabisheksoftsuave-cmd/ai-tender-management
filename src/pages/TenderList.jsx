@@ -236,10 +236,23 @@ export default function TenderList() {
     return tabFilter && searchFilter
   })
 
-  // Contract Holder: one page of rows at a time.
-  const chTotalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const chPage = Math.min(page, chTotalPages)
-  const rows = isContractHolder ? filtered.slice((chPage - 1) * pageSize, chPage * pageSize) : filtered
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  const formatDeadline = (value) => {
+    if (!value) return '—'
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    const date = dateOnly
+      ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+      : new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date)
+  }
 
   const runChAction = (td, key) => {
     if (key === 'export_tender') { exportTenderPDF(td); return }
@@ -253,19 +266,19 @@ export default function TenderList() {
       {/* Contract Engineer: Reassign Stage Modal */}
       {reassignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="font-bold text-slate-800 text-base">Reassign Stage</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{tenderRef(reassignModal)} — {reassignModal.title}</p>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">Reassign Stage</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{tenderRef(reassignModal)} — {reassignModal.title}</p>
               </div>
               <button onClick={() => setReassignModal(null)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <X size={15} className="text-slate-400" />
               </button>
             </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Current stage: <span className="font-semibold text-slate-700">{statusLabels[reassignModal.status] || reassignModal.stage}</span>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              Current stage: <span className="font-semibold text-slate-700 dark:text-slate-200">{statusLabels[reassignModal.status] || reassignModal.stage}</span>
             </p>
             <div className="space-y-2">
               {REASSIGN_OPTIONS.map(opt => (
@@ -279,18 +292,18 @@ export default function TenderList() {
                   }}
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
                     opt.status === reassignModal.status
-                      ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'bg-white border-slate-200 text-slate-700 hover:border-[var(--color-primary)] hover:bg-blue-50 hover:text-[var(--color-primary)] cursor-pointer'
+                      ? 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                      : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-[var(--color-primary)] hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-[var(--color-primary)] cursor-pointer'
                   }`}>
                   <span>{opt.label}</span>
                   {opt.status === reassignModal.status
-                    ? <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">Current</span>
+                    ? <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">Current</span>
                     : <RefreshCw size={13} />
                   }
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-4">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-4">
               Reassigning will reset evaluation progress to "not started" for the selected stage.
             </p>
           </div>
@@ -307,22 +320,22 @@ export default function TenderList() {
           : allEvaluators
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="font-bold text-slate-800 text-base">Reassign Evaluator</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{tenderRef(evalModal)} — {evalModal.title}</p>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">Reassign Evaluator</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{tenderRef(evalModal)} — {evalModal.title}</p>
                 </div>
                 <button onClick={() => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                   <X size={15} className="text-slate-400" />
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mb-4">
-                Stage: <span className="font-semibold text-slate-700">{statusLabels[evalModal.status] || evalModal.stage}</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                Stage: <span className="font-semibold text-slate-700 dark:text-slate-200">{statusLabels[evalModal.status] || evalModal.stage}</span>
               </p>
               {allEvaluators.length === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center">No available evaluators for this stage.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 py-4 text-center">No available evaluators for this stage.</p>
               ) : (
                 <div className="space-y-2">
                   <div className="relative">
@@ -332,11 +345,11 @@ export default function TenderList() {
                       onChange={e => setEvalSearch(e.target.value)}
                       placeholder={lang === 'ar' ? 'البحث عن مقيّم...' : 'Search evaluators...'}
                       aria-label={lang === 'ar' ? 'البحث عن مقيّم' : 'Search evaluators'}
-                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
                     />
                   </div>
                   {evaluators.length === 0 && (
-                    <p className="text-sm text-slate-400 py-4 text-center">No matching evaluators.</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500 py-4 text-center">No matching evaluators.</p>
                   )}
                   <div className="space-y-2 max-h-72 overflow-y-auto">
                   {evaluators.map(u => (
@@ -344,8 +357,8 @@ export default function TenderList() {
                       onClick={() => setSelectedEvaluator(String(u.id))}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
                         selectedEvaluator === String(u.id)
-                          ? 'border-[var(--color-primary)] bg-blue-50 text-[var(--color-primary)]'
-                          : 'border-slate-200 text-slate-700 hover:border-[var(--color-primary)] hover:bg-blue-50'
+                          ? 'border-[var(--color-primary)] bg-blue-50 dark:bg-blue-950/40 text-[var(--color-primary)]'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-[var(--color-primary)] hover:bg-blue-50 dark:hover:bg-slate-800'
                       }`}>
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
                         style={{ background: 'var(--color-primary)' }}>
@@ -353,7 +366,7 @@ export default function TenderList() {
                       </div>
                       <div className="text-left">
                         <p className="font-semibold text-sm">{u.name}</p>
-                        <p className="text-[11px] text-slate-400">{u.email || u.username}</p>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{u.email || u.username}</p>
                       </div>
                     </button>
                   ))}
@@ -362,7 +375,7 @@ export default function TenderList() {
               )}
               <div className="flex gap-2 mt-5">
                 <button onClick={() => { setEvalModal(null); setSelectedEvaluator(''); setEvalSearch('') }}
-                  className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                   Cancel
                 </button>
                 <button onClick={doReassignEvaluator}
@@ -378,38 +391,41 @@ export default function TenderList() {
       })()}
 
       {/* Controls */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); setExpanded(null) }}
-            placeholder={lang === 'ar' ? 'البحث بالرقم أو العنوان...' : 'Search by ID or title...'}
-            aria-label={lang === 'ar' ? 'البحث بالرقم أو العنوان' : 'Search by ID or title'}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-          />
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          <div className="relative min-w-[12rem] max-w-sm flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); setExpanded(null) }}
+              placeholder={lang === 'ar' ? 'البحث بالرقم أو العنوان...' : 'Search by ID or title...'}
+              aria-label={lang === 'ar' ? 'البحث بالرقم أو العنوان' : 'Search by ID or title'}
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+            />
+          </div>
+          {/* Stage filter dropdown */}
+          <div className="w-full shrink-0 sm:w-56">
+            <SearchableSelect
+              value={activeFilter}
+              onChange={key => { setActiveFilter(key); setPage(1); setExpanded(null) }}
+              options={tabs}
+              getValue={tab => tab.key}
+              getLabel={tab => `${tab.label} (${nonDraftTenders.filter(tab.fn).length})`}
+              searchable={false}
+              ariaLabel={lang === 'ar' ? 'تصفية حسب المرحلة' : 'Filter by stage'}
+            />
+          </div>
         </div>
-        <div className="flex gap-2">
-          {/* The Filter button never did anything — the main app dropped it;
-              the Contract Holder's list follows it. */}
-          {!isContractHolder && (
-            <Button variant="secondary" size="sm">
-              <Filter size={13} /> {t('common.filter')}
-            </Button>
-          )}
+
+        <div className="flex flex-wrap gap-2">
           {isContractHolder && (
             <Button onClick={() => navigate('/contract-strategy/new')} size="sm">
               <Plus size={13} /> New CIF
             </Button>
           )}
-          {isContractHolder && (
-            <Button variant="secondary" onClick={() => navigate('/create-itt?new=1')} size="sm"
-              className="border border-slate-200 bg-white">
-              <Plus size={13} /> New ITT
-            </Button>
-          )}
-          {isPof && (
-            <Button variant="secondary" onClick={() => navigate('/create-itt')} size="sm">
+          {(isContractHolder || isPof) && (
+            <Button variant="secondary" onClick={() => navigate('/create-itt')} size="sm"
+              className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <Plus size={13} /> New ITT
             </Button>
           )}
@@ -421,220 +437,166 @@ export default function TenderList() {
         </div>
       </div>
 
-      {/* Stage filter */}
-      <div className="w-full max-w-xs">
-        <SearchableSelect
-          value={activeFilter}
-          onChange={key => { setActiveFilter(key); setPage(1); setExpanded(null) }}
-          options={tabs}
-          getValue={tab => tab.key}
-          getLabel={tab => `${tab.label} (${nonDraftTenders.filter(tab.fn).length})`}
-          searchable={false}
-          ariaLabel={lang === 'ar' ? 'تصفية حسب المرحلة' : 'Filter by stage'}
-        />
-      </div>
-
-      {/* Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className={isContractHolder ? 'w-full min-w-[56rem] table-fixed' : 'w-full'}>
-            {isContractHolder ? (
-            // Main app column set: ID · Title · Deadline · Bidders · Budget · Stage · Actions.
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-100">
-                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.id')}</th>
-                <th className="w-[24%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.title')}</th>
-                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.deadline')}</th>
-                <th className="w-[8%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.bidders')}</th>
-                <th className="w-[14%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.budget')}</th>
-                <th className="w-[20%] text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.stage')}</th>
-                <th className="w-[8%] px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.actions')}</th>
+      {/* Table Card */}
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[56rem] table-fixed">
+            <thead className="sticky top-0 z-[1] bg-slate-50 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700">
+              <tr>
+                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.id')}</th>
+                <th className="w-[24%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.title')}</th>
+                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.deadline')}</th>
+                <th className="w-[8%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.bidders')}</th>
+                <th className="w-[14%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.budget')}</th>
+                <th className="w-[20%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.stage')}</th>
+                <th className="w-[8%] px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.actions')}</th>
               </tr>
             </thead>
-            ) : (
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.id')}</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.title')}</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.stage')}</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.budget')}</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.deadline')}</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('list.bidders')}</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            )}
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500">
                     {search.trim() || activeFilter !== 'all' ? 'No tenders match.' : 'No tenders to show.'}
                   </td>
                 </tr>
               )}
               {rows.map(td => (
                 <Fragment key={td.id}>
-                  {isContractHolder ? (
                   <tr
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                     onClick={() => setExpanded(expanded === td.id ? null : td.id)}
                   >
-                    <td className="px-4 py-1.5"><CostCodeChip value={tenderRef(td)} /></td>
-                    <td className="px-4 py-1.5">
-                      <p className="text-sm font-medium text-slate-800 truncate" title={td.title}>{td.title}</p>
-                      <p className="text-xs text-slate-400 truncate">{td.department}</p>
+                    <td className="px-4 py-2"><CostCodeChip value={tenderRef(td)} /></td>
+                    <td className="px-4 py-2">
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate" title={td.title}>{td.title}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{td.department}</p>
                     </td>
-                    <td className="px-4 py-1.5 text-sm text-slate-500">{td.deadline ? formatDate(td.deadline) : '—'}</td>
-                    <td className="px-4 py-1.5 text-sm text-slate-600">{td.bidders || '—'}</td>
-                    <td className="px-4 py-1.5 text-sm"><BudgetAmount value={td.budget} fallback="—" /></td>
-                    <td className="px-4 py-1.5">
-                      <Badge variant="info">{statusLabels[td.status] || td.stage}</Badge>
+                    <td className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400">{formatDeadline(td.deadline)}</td>
+                    <td className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300">{td.bidders ?? 0}</td>
+                    <td className="px-4 py-2 text-sm"><BudgetAmount value={td.budget} fallback="—" /></td>
+                    <td className="px-4 py-2">
+                      <Badge variant={statusVariant[td.status] || 'info'}>{statusLabels[td.status] || td.stage}</Badge>
                     </td>
-                    <td className="px-4 py-1.5 text-right">
+                    <td className="px-4 py-2 text-right">
                       <button
                         type="button"
                         aria-expanded={expanded === td.id}
                         aria-label={`${expanded === td.id ? 'Hide' : 'Show'} actions for ${tenderRef(td)}`}
                         onClick={e => { e.stopPropagation(); setExpanded(expanded === td.id ? null : td.id) }}
-                        className="ml-auto flex w-7 h-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-slate-100"
+                        className="ml-auto flex w-7 h-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
                       >
                         <ChevronRight size={14} aria-hidden="true"
                           className={`text-slate-400 transition-transform ${expanded === td.id ? 'rotate-90' : ''}`} />
                       </button>
                     </td>
                   </tr>
-                  ) : (
-                  <tr
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
-                    onClick={() => setExpanded(expanded === td.id ? null : td.id)}
-                  >
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(td)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-slate-800">{td.title}</p>
-                      <p className="text-xs text-slate-400">{td.department}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant[td.status] || 'info'}>
-                        {statusLabels[td.status] || td.stage}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-700">{td.budget}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500">{td.deadline}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{td.bidders || '—'}</td>
-                    <td className="px-4 py-3">
-                      <ChevronRight size={14} className={`text-slate-400 transition-transform ${expanded === td.id ? 'rotate-90' : ''}`} />
-                    </td>
-                  </tr>
-                  )}
                   {expanded === td.id && (
-                    <tr className="bg-slate-50/50">
+                    <tr className="bg-slate-50/60 dark:bg-slate-800/40">
                       <td colSpan={7} className="px-4 py-4">
                         <div className="space-y-3">
                           <div className="w-0 min-w-full overflow-x-auto">
                             <StageTimeline currentStage={getTimelineStage(td)} isComplete={td.status === 'closed'} />
                           </div>
-                          {/* Contract Holder: the main app's row actions. An action
-                              whose screen this role cannot open is shown disabled
-                              with the reason, rather than bouncing them home. */}
-                          {isContractHolder && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {chRowActions(td).map(key => {
-                                const config = CH_ROW_ACTIONS[key]
-                                const Icon = config.icon
-                                const href = config.route ? config.route(td) : null
-                                const hasScreen = config.route === null
-                                  || (href && href !== '/tenders' && can(href))
-                                return (
-                                  <span key={key} title={hasScreen ? undefined : NO_SCREEN_REASON}>
-                                    <Button size="sm" variant={config.variant || 'primary'}
-                                      className={config.variant === 'secondary' ? 'border border-slate-300 bg-white' : ''}
-                                      disabled={!hasScreen}
-                                      onClick={e => { e.stopPropagation(); runChAction(td, key) }}>
-                                      {Icon ? <Icon size={13} /> : null} {config.label}
-                                    </Button>
-                                  </span>
-                                )
-                              })}
-                            </div>
-                          )}
-                          {!isContractHolder && (
+                          {/* Row actions */}
                           <div className="flex items-center gap-2 flex-wrap">
                             <Button variant="secondary" size="sm" onClick={() => navigate(getTenderRoute(td))}>
                               <Eye size={13} /> View Detail
                             </Button>
-                            {isPof && td.status === 'legal_review' && (
-                              <Button size="sm" onClick={() => navigate(`/legal-review/${td.id}`)}>
-                                View Legal Review
-                              </Button>
-                            )}
-                            {isPof && td.status === 'contract_execution' && (
-                              <Button size="sm" onClick={() => navigate(`/contract-execution/${td.id}`)}>
-                                Sign Contract
-                              </Button>
-                            )}
-                            {isPof && td.status === 'active' && (
-                              <Button size="sm" onClick={() => navigate(`/contract-management/${td.id}`)}>
-                                Manage Contract
-                              </Button>
-                            )}
-                            {isPof && td.status === 'contract_closure' && (
-                              <Button size="sm" onClick={() => navigate(`/contract-closure/${td.id}`)}>
-                                Close Contract
-                              </Button>
-                            )}
-                            {isPof && td.status === 'draft' && (
-                              <Button size="sm" onClick={() => navigate(`/create-itt/${td.id}`)}>
-                                <FileText size={13} /> Continue Review
-                              </Button>
-                            )}
-                            {isPof && td.status === 'upload' && (
-                              <Button variant="secondary" size="sm" onClick={() => exportTenderPDF(td)}>
-                                <Download size={13} /> Export Tender
-                              </Button>
-                            )}
-                            {isPof && td.status === 'upload' && (
-                              <Button size="sm" onClick={() => navigate(`/upload/${td.id}`)}>
-                                <Upload size={13} /> Ingestion
-                              </Button>
-                            )}
-                            {isPof && td.status === 'comm_eval' && (
-                              <Button size="sm" onClick={() => navigate(`/commercial-eval/${td.id}`)}>
-                                <FileText size={13} /> Commercial Evaluation
-                              </Button>
-                            )}
-                            {roleId === 'scm' && ['scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
-                              <Button size="sm" onClick={() => navigate(getTenderRoute(td))}>
-                                {statusLabels[td.status]}
-                              </Button>
-                            )}
-                            {isPof && td.status === 'award' && (
-                              <Button size="sm" onClick={() => navigate(`/contract/${td.id}`)}>
-                                <Briefcase size={13} /> Create Contract
-                              </Button>
-                            )}
-                            {/* Contract Engineer: Reassign Stage */}
-                            {isPof && ['upload','tech_eval','comm_eval','scm_gate1','scm_gate2'].includes(td.status) && (
-                              <Button size="sm" variant="secondary"
-                                onClick={e => { e.stopPropagation(); setReassignModal(td) }}>
-                                <RefreshCw size={13} /> Reassign Stage
-                              </Button>
-                            )}
-                            {/* Business Admin: Reassign Evaluator */}
-                            {isBizAdmin && ['tech_eval','comm_eval','scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
-                              <Button size="sm" variant="secondary"
-                                onClick={e => { e.stopPropagation(); setEvalModal(td); setSelectedEvaluator(''); setEvalSearch('') }}>
-                                <RefreshCw size={13} /> Reassign
-                              </Button>
-                            )}
-                            {td.aiScore && (
-                              <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-full">
-                                AI Score: {td.aiScore}%
-                              </span>
+                            {isContractHolder && chRowActions(td).filter(k => k !== 'view_detail').map(key => {
+                              const config = CH_ROW_ACTIONS[key]
+                              const Icon = config.icon
+                              const href = config.route ? config.route(td) : null
+                              const hasScreen = config.route === null
+                                || (href && href !== '/tenders' && can(href))
+                              return (
+                                <span key={key} title={hasScreen ? undefined : NO_SCREEN_REASON}>
+                                  <Button size="sm" variant={config.variant || 'primary'}
+                                    disabled={!hasScreen}
+                                    onClick={e => { e.stopPropagation(); runChAction(td, key) }}>
+                                    {Icon ? <Icon size={13} /> : null} {config.label}
+                                  </Button>
+                                </span>
+                              )
+                            })}
+                            {!isContractHolder && (
+                              <>
+                                {isPof && td.status === 'draft' && (
+                                  <Button size="sm" onClick={() => navigate(`/create-itt/${td.id}`)}>
+                                    <FileText size={13} /> Continue Review
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'upload' && (
+                                  <Button variant="secondary" size="sm" onClick={() => exportTenderPDF(td)}>
+                                    <Download size={13} /> Export Tender
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'upload' && (
+                                  <Button size="sm" onClick={() => navigate(`/upload/${td.id}`)}>
+                                    <Upload size={13} /> Ingestion
+                                  </Button>
+                                )}
+                                {isPof && (td.status === 'tech_eval' || td.status === 'parallel_eval') && (
+                                  <Button size="sm" onClick={() => navigate(`/technical-eval/${td.id}`)}>
+                                    <FileText size={13} /> Technical Evaluation
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'comm_eval' && (
+                                  <Button size="sm" onClick={() => navigate(`/commercial-eval/${td.id}`)}>
+                                    <FileText size={13} /> Commercial Evaluation
+                                  </Button>
+                                )}
+                                {roleId === 'scm' && ['scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
+                                  <Button size="sm" onClick={() => navigate(getTenderRoute(td))}>
+                                    {statusLabels[td.status]}
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'award' && (
+                                  <Button size="sm" onClick={() => navigate(`/contract/${td.id}`)}>
+                                    <Briefcase size={13} /> Create Contract
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'legal_review' && (
+                                  <Button size="sm" onClick={() => navigate(`/legal-review/${td.id}`)}>
+                                    View Legal Review
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'contract_execution' && (
+                                  <Button size="sm" onClick={() => navigate(`/contract-execution/${td.id}`)}>
+                                    Sign Contract
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'active' && (
+                                  <Button size="sm" onClick={() => navigate(`/contract-management/${td.id}`)}>
+                                    Manage Contract
+                                  </Button>
+                                )}
+                                {isPof && td.status === 'contract_closure' && (
+                                  <Button size="sm" onClick={() => navigate(`/contract-closure/${td.id}`)}>
+                                    Close Contract
+                                  </Button>
+                                )}
+                                {/* Contract Engineer: Reassign Stage */}
+                                {isPof && ['upload','tech_eval','comm_eval','scm_gate1','scm_gate2'].includes(td.status) && (
+                                  <Button size="sm" variant="secondary"
+                                    onClick={e => { e.stopPropagation(); setReassignModal(td) }}>
+                                    <RefreshCw size={13} /> Reassign Stage
+                                  </Button>
+                                )}
+                                {/* Business Admin: Reassign Evaluator */}
+                                {isBizAdmin && ['tech_eval','comm_eval','scm_gate1','scm_gate2','scm_gate3'].includes(td.status) && (
+                                  <Button size="sm" variant="secondary"
+                                    onClick={e => { e.stopPropagation(); setEvalModal(td); setSelectedEvaluator(''); setEvalSearch('') }}>
+                                    <RefreshCw size={13} /> Reassign
+                                  </Button>
+                                )}
+                                {td.aiScore && (
+                                  <span className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-full">
+                                    AI Score: {td.aiScore}%
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -644,17 +606,17 @@ export default function TenderList() {
             </tbody>
           </table>
         </div>
-        {isContractHolder && (
-          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--color-border)' }}>
-            <ListPagination
-              page={chPage}
-              pageSize={pageSize}
-              total={filtered.length}
-              onPageChange={p => { setPage(p); setExpanded(null) }}
-              onPageSizeChange={size => { setPageSize(size); setPage(1); setExpanded(null) }}
-            />
-          </div>
-        )}
+
+        {/* Pagination Footer */}
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+          <ListPagination
+            page={safePage}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={p => { setPage(p); setExpanded(null) }}
+            onPageSizeChange={size => { setPageSize(size); setPage(1); setExpanded(null) }}
+          />
+        </div>
       </Card>
     </div>
   )

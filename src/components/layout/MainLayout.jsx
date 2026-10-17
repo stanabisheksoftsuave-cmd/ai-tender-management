@@ -71,6 +71,9 @@ export default function MainLayout({ children }) {
   if (basePath === '/create-itt' && ITT_REVIEWER_ROLES.includes(user?.role?.id)) {
     meta = { titleKey: 'page.ittReviewApprove', subKey: 'page.ittReviewApprove.sub' }
   }
+  if (basePath === '/pre-qualification' && user?.role?.id === 'pof') {
+    meta = { titleKey: 'page.pqqFinancial', subKey: 'page.pqqFinancial.sub' }
+  }
   let titleOverride = null
   if (user?.role?.id === 'contract_holder' && CONTRACT_HOLDER_META[basePath]) {
     meta = CONTRACT_HOLDER_META[basePath]

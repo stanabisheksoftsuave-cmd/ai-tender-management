@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import Card from '../ui/Card'
 import Badge from '../ui/Badge'
+import ListPagination from '../shell/ListPagination'
 import { useAuth } from '../../context/AuthContext'
 import { useTenders } from '../../context/TenderContext'
 import { canEvaluate, isUnassignedSide } from '../../utils/evalAssignment'
@@ -13,7 +14,6 @@ import { isOpenForTech, scmReturnFor } from './model'
 
 const LIST_TITLE = 'Technical Evaluation'
 const LIST_DESCRIPTION = 'Select a tender to begin compliance evaluation'
-const PAGE_SIZE = 10
 
 const matches = (query, ...fields) => {
   const q = query.trim().toLowerCase()
@@ -34,15 +34,16 @@ export function TechEvalWorklist() {
   const { tenders } = useTenders()
   const [searchInput, setSearchInput] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Supply Chain returns land a tender back on tech_eval (or parallel_eval with
   // the technical side re-opened), so `isOpenForTech` already covers them; the
   // return itself is read off `scmDecisions` for the chip.
   const board = tenders.filter(t => canEvaluate(t, 'tech', user) && isOpenForTech(t))
   const filtered = board.filter(t => matches(searchInput, t.title, t.costCode, t.department))
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, totalPages)
-  const pageItems = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const pageItems = filtered.slice((current - 1) * pageSize, current * pageSize)
 
   return (
     <Card className="overflow-hidden">
@@ -151,19 +152,15 @@ export function TechEvalWorklist() {
         )}
       </div>
 
-      {filtered.length > PAGE_SIZE && (
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
-          <span>Page {current} of {totalPages} · {filtered.length} tenders</span>
-          <div className="flex items-center gap-1">
-            <button type="button" aria-label="Previous page" disabled={current <= 1} onClick={() => setPage(current - 1)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-40">
-              <ChevronLeft size={14} />
-            </button>
-            <button type="button" aria-label="Next page" disabled={current >= totalPages} onClick={() => setPage(current + 1)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-40">
-              <ChevronRight size={14} />
-            </button>
-          </div>
+      {filtered.length > 0 && (
+        <div className="shrink-0 border-t border-slate-100 px-4 py-3">
+          <ListPagination
+            page={current}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+          />
         </div>
       )}
     </Card>

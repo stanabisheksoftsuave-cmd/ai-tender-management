@@ -70,6 +70,7 @@
    Primary: #0089cf  |  Ocean Blue: #1b4c6f  |  Bg: #ecf4fc
 ═══════════════════════════════════════════════════════════════════════ */
 [data-theme='olng'] {
+  color-scheme:          light;
   --color-primary:       #0089cf;
   --color-primary-dark:  #1b4c6f;
   --color-primary-light: #afd9f4;
@@ -102,6 +103,7 @@
    THEME: TenderIQ Dark Navy
 ═══════════════════════════════════════════════════════════════════════ */
 [data-theme='tenderiq'] {
+  color-scheme:          dark;
   --color-primary:       #2563EB;
   --color-primary-dark:  #1D4ED8;
   --color-primary-light: #3B82F6;

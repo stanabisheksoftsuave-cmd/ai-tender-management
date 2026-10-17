@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Ban, ChevronRight, FileText, ShieldOff } from 'lucide-react'
+import { ArrowRight, Ban, ChevronRight, FileText, ShieldOff, Undo2, Users, Wallet } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -106,17 +106,104 @@ export default function PreQualification() {
   )
 
   if (!tenderId) {
-    const list = tenders.filter(t =>
-      PREQUAL_STATUSES.includes(t.status) && (!isCE || STAGE_OWNER[t.status] === 'pof'))
+    if (isCE) {
+      const assignments = tenders.filter(t =>
+        t.status === 'prequal_stage4' || (PREQUAL_STATUSES.includes(t.status) && STAGE_OWNER[t.status] === 'pof'))
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Card Header */}
+          <div className="p-4 sm:p-5 flex items-start justify-between gap-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                <Wallet size={18} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 leading-tight">Financial Assessment</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Pre-qualification runs awaiting your financial assessment</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium tabular-nums">
+              {assignments.length} {assignments.length === 1 ? 'assignment' : 'assignments'}
+            </span>
+          </div>
+
+          {/* List or Empty State */}
+          <div className="p-4 sm:p-5">
+            {assignments.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 p-6 text-center sm:p-10">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                  <Wallet size={18} aria-hidden="true" />
+                </span>
+                <p className="text-sm font-semibold text-slate-800">No pre-qualifications awaiting your financial assessment</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {assignments.map(item => {
+                  const bidderCount = item.bidderCount ?? (item.prequalBidders?.length ?? 0)
+                  const assessedCount = item.assessedCount ?? (item.prequalBidders?.filter(b => b.stage4?.result).length ?? 0)
+                  const isReturned = Boolean(item.returnedToHolder || item.financialReturnedToHolderAt)
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => navigate(`/pre-qualification/${item.id}`)}
+                      className="group block rounded-xl border border-slate-200 bg-white p-3.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.03] transition-all cursor-pointer shadow-none"
+                    >
+                      <div className="flex items-center justify-between gap-3 sm:gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-semibold text-slate-900 truncate">{item.title}</h3>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 uppercase tracking-wide animate-pulse">
+                              SUBMITTED
+                            </span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                            <span className="flex items-center gap-1.5">
+                              <Users className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
+                              {assessedCount} of {bidderCount} bidder{bidderCount === 1 ? '' : 's'} assessed
+                            </span>
+                            {isReturned && (
+                              <span className="flex items-center gap-1.5 text-slate-500">
+                                <Undo2 className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
+                                Returned to the Contract Holder - no further action needed unless it comes back.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4 shrink-0 text-slate-300 transition-colors group-hover:text-[#0089cf]" aria-hidden="true" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer with Rows per page */}
+          {assignments.length > 0 && (
+            <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span>Rows per page</span>
+                <select className="border border-slate-200 rounded px-2 py-0.5 bg-white text-slate-700 font-medium text-xs">
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    const list = tenders.filter(t => PREQUAL_STATUSES.includes(t.status))
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-700">{isCE ? 'Financial Assessment' : 'Pre-Qualification'}</h2>
+            <h2 className="text-sm font-semibold text-slate-700">Pre-Qualification</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isCE
-                ? 'Pre-qualification documents awaiting your financial assessment'
-                : 'Select a tender to continue pre-qualification'}
+              Select a tender to continue pre-qualification
             </p>
           </div>
           <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{list.length} tender{list.length !== 1 ? 's' : ''}</span>
@@ -124,9 +211,7 @@ export default function PreQualification() {
         {list.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
             <FileText size={32} />
-            <p className="text-sm font-medium">
-              {isCE ? 'No pre-qualifications awaiting financial assessment' : 'No tenders in pre-qualification'}
-            </p>
+            <p className="text-sm font-medium">No tenders in pre-qualification</p>
           </div>
         ) : (
           <div className="space-y-3">

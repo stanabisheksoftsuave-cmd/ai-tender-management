@@ -284,7 +284,7 @@ export default function CifFormPage({ tenderId, autoGenerate = false }) {
   return (
     <div className="pb-6 w-full">
       {/* Header Card */}
-      <Card branded className="p-4 sm:p-5 mb-5 olng-slide-up">
+      <Card className="p-4 sm:p-5 mb-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-slide-up">
         <div className="flex items-center gap-2.5 mb-1">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
             <Target size={16} style={{ color: '#0089cf' }} aria-hidden="true" />
@@ -301,7 +301,7 @@ export default function CifFormPage({ tenderId, autoGenerate = false }) {
       <DuplicateWarningAlert warning={duplicateWarning} onDismiss={() => setDuplicateWarning(null)} className="mb-5" />
 
       {/* Contract Initiating Form */}
-      <Card branded className="p-4 sm:p-6 space-y-5 olng-slide-up" style={{ animationDelay: '60ms' }}>
+      <Card className="p-4 sm:p-6 space-y-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-slide-up" style={{ animationDelay: '60ms' }}>
         <div className="flex items-center gap-2.5">
           <span className="w-8 h-8 shrink-0 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }} aria-hidden="true">
             <FileText size={16} style={{ color: '#0089cf' }} />

@@ -114,7 +114,7 @@ export default function B1CategoryChooser({ selected, onConfirm, onBack }) {
   }
 
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="font-semibold" style={{ color: '#1e293b' }}>Section B1 — General Conditions of Contract</h3>

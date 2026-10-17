@@ -58,14 +58,12 @@ const navByRole = {
     { to: '/tenders',   icon: '/icons/tenders.svg',   labelKey: 'nav.tenderTrack' },
   ],
   pof: [
-    { to: '/pre-qualification',  icon: '/icons/bulb.svg',        labelKey: 'nav.pqqFinancial' },
-    { to: '/create-itt',         icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'    },
-    { to: '/upload',             icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'   },
-    { to: '/commercial-eval-profile', icon: '/icons/bulb.svg',   labelKey: 'nav.commEvalProfile' },
-    { to: '/commercial-eval',    icon: '/icons/comm-eval.svg',   labelKey: 'nav.ittCommercial' },
-    { to: '/contract',           icon: '/icons/contract.svg',    labelKey: 'nav.contract'    },
-    { to: '/contract-management',icon: '/icons/mgmt-review.svg', labelKey: 'nav.contractManagement' },
-    { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
+    { to: '/pre-qualification', icon: '/icons/bulb.svg',       labelKey: 'nav.pqqFinancial' },
+    { to: '/create-itt',        icon: '/icons/create-itt.svg', labelKey: 'nav.ittDraft'    },
+    { to: '/upload',            icon: '/icons/ingestion.svg',  labelKey: 'nav.ingestion'   },
+    { to: '/commercial-eval',   icon: '/icons/comm-eval.svg',  labelKey: 'nav.commEval'    },
+    { to: '/contract',          icon: '/icons/contract.svg',   labelKey: 'nav.contract'    },
+    { to: '/tenders',           icon: '/icons/tenders.svg',    labelKey: 'nav.tenderTrack' },
   ],
   // Main app order: Dashboard · Contract Strategy (→ the strategy hub, with its
   // sub-navigation) · Create ITT · ITT Technical Evaluation · Tender Tracking.
@@ -263,8 +261,8 @@ export default function Sidebar() {
   const userName   = '#ffffff'
   const userRole   = 'rgba(255,255,255,0.55)'
   const navLabel   = 'rgba(255,255,255,0.30)'
-  const activeNavBg      = 'rgba(255,255,255,0.12)'
-  const activeNavBorder  = `2px solid ${accent}`
+  const activeNavBg      = 'rgba(255,255,255,0.10)'
+  const activeNavBorder  = 'none'
   const inactiveColor    = 'rgba(255,255,255,0.55)'
   const hoverBg          = 'rgba(255,255,255,0.06)'
   const logoutColor      = 'rgba(255,255,255,0.40)'
@@ -449,7 +447,6 @@ export default function Sidebar() {
                   className="w-full flex items-center justify-between rounded-xl text-xs font-medium cursor-pointer transition-all px-3 py-2.5 text-left"
                   style={{
                     background: isParentActive ? activeNavBg : 'transparent',
-                    borderLeft: isParentActive ? activeNavBorder : '2px solid transparent',
                     color: isParentActive ? '#ffffff' : inactiveColor,
                   }}
                   onMouseOver={e => { if (!isParentActive) e.currentTarget.style.background = hoverBg }}
@@ -489,18 +486,46 @@ export default function Sidebar() {
           }
 
           // ── Regular nav item ──
+          const isItemActive = (() => {
+            if (item.to === '/commercial-eval') {
+              return pathname === '/commercial-eval' ||
+                     pathname.startsWith('/commercial-eval/') ||
+                     pathname.startsWith('/commercial-eval-profile')
+            }
+            if (item.to === '/create-itt') {
+              return pathname === '/create-itt' || pathname.startsWith('/create-itt/')
+            }
+            if (item.to === '/pre-qualification') {
+              return pathname === '/pre-qualification' || pathname.startsWith('/pre-qualification/')
+            }
+            if (item.to === '/upload') {
+              return pathname === '/upload' || pathname.startsWith('/upload/')
+            }
+            if (item.to === '/technical-eval') {
+              return pathname === '/technical-eval' || pathname.startsWith('/technical-eval/')
+            }
+            if (item.to === '/contract') {
+              return pathname === '/contract' || pathname.startsWith('/contract/') || pathname.startsWith('/contract-creation')
+            }
+            if (item.to === '/tenders') {
+              return pathname === '/tenders' || pathname.startsWith('/tenders/')
+            }
+            return pathname === item.to || pathname.startsWith(`${item.to}/`)
+          })()
+
           return (
             <NavLink key={item.to} to={item.to} className="block">
-              {({ isActive }) => (
+              {() => (
                 <div
                   className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
                   style={{
-                    background:  isActive ? activeNavBg : 'transparent',
-                    borderLeft:  isActive ? activeNavBorder : '2px solid transparent',
-                    color: isActive ? '#ffffff' : inactiveColor,
+                    background:  isItemActive ? activeNavBg : 'transparent',
+                    color: isItemActive ? '#ffffff' : inactiveColor,
+                    borderLeft: isRtl ? 'none' : (isItemActive ? `3px solid ${accent}` : '3px solid transparent'),
+                    borderRight: isRtl ? (isItemActive ? `3px solid ${accent}` : '3px solid transparent') : 'none',
                   }}
-                  onMouseOver={e => { if (!isActive) e.currentTarget.style.background = hoverBg }}
-                  onMouseOut={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                  onMouseOver={e => { if (!isItemActive) e.currentTarget.style.background = hoverBg }}
+                  onMouseOut={e => { if (!isItemActive) e.currentTarget.style.background = 'transparent' }}
                 >
                   <span className="flex items-center gap-2.5">
                     <img
@@ -509,14 +534,14 @@ export default function Sidebar() {
                       width={15}
                       height={15}
                       style={{
-                        filter: isActive
+                        filter: isItemActive
                           ? 'brightness(0) invert(1)'
                           : 'brightness(0) invert(0.55)',
                       }}
                     />
                     {t(item.labelKey)}
                   </span>
-                  {isActive && (
+                  {isItemActive && (
                     <span className="w-1.5 h-1.5 rounded-full shrink-0"
                       style={{ background: accent, boxShadow: `0 0 6px ${accent}` }} />
                   )}

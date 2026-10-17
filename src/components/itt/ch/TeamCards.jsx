@@ -25,7 +25,7 @@ function Label({ children }) {
 /* "Assign Team — all three required": editable single selects. */
 export function SectionAssignmentsCard({ form, errors, setField, optionsByGroup, readOnly = false }) {
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <UserCheck size={16} style={{ color: '#0089cf' }} aria-hidden="true" />
         <h2 className="text-base font-bold" style={{ color: '#1e293b' }}>Assign Team</h2>
@@ -65,7 +65,7 @@ export function SectionAssignmentsCard({ form, errors, setField, optionsByGroup,
 /* "Assigned Team — set at the Contract Initiating Form": read-only. */
 export function AssignedTeamSelectCard({ namesByGroup, sourceNote = '- set at the Contract Initiating Form' }) {
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <UserCheck size={16} style={{ color: '#0089cf' }} aria-hidden="true" />
         <h3 className="text-base font-bold" style={{ color: '#1e293b' }}>Assigned Team</h3>

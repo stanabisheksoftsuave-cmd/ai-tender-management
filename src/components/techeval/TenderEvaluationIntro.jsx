@@ -25,7 +25,12 @@ export function TenderEvaluationIntro({ tender, invited, ready, mustCount, wantC
   ]
 
   return (
-    <Card branded className="relative overflow-hidden px-4 py-8 sm:px-10 sm:py-10">
+    <section className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-8 shadow-sm shadow-black/[0.03] sm:px-10 sm:py-10">
+      <div
+        className="pointer-events-none absolute -top-28 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[var(--color-primary)]/10 blur-3xl"
+        aria-hidden="true"
+      />
+
       <div className="relative mx-auto flex max-w-2xl flex-col items-center gap-7 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0089cf] to-[#1b4c6f] text-white shadow-lg shadow-[#0089cf]/30">
           <ScanSearch size={32} />
@@ -94,6 +99,6 @@ export function TenderEvaluationIntro({ tender, invited, ready, mustCount, wantC
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={() => { setIsConfirmOpen(false); onStart() }}
       />
-    </Card>
+    </section>
   )
 }

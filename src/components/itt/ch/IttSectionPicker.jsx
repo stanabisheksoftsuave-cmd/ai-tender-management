@@ -71,7 +71,7 @@ export default function IttSectionPicker({ rows, currentIdx, onChange }) {
   }
 
   return (
-    <Card branded className="p-4 relative z-20" style={{ overflow: 'visible' }}>
+    <Card className="p-4 relative z-20" style={{ overflow: 'visible' }}>
       <p className="mb-2 text-xs font-semibold" style={{ color: '#1e293b' }}>Select Section</p>
       <div ref={rootRef} className="relative">
         <button

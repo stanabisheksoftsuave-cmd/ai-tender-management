@@ -267,7 +267,7 @@ export default function SowDocumentPage({ tenderId, initialDuplicateWarning = nu
       <DuplicateWarningAlert warning={duplicateWarning} onDismiss={() => setDuplicateWarning(null)} className="mb-5" />
 
       {/* Header card */}
-      <Card branded className="mb-6 flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 olng-slide-up">
+      <Card className="mb-6 flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-slide-up">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 rounded-lg shrink-0" style={{ background: 'rgba(0,137,207,0.1)', color: '#0089cf' }}>
             <FileText size={18} aria-hidden="true" />

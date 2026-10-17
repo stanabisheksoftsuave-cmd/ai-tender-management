@@ -10,8 +10,8 @@ import { useAiLock } from '../../context/aiLockStore'
 const roleColors = {
   it_admin:    '#7C3AED',
   biz_admin:   '#0F766E',
-  pof:         '#1B4F8A',
-  contract_holder: '#0891B2',
+  pof:         '#0089cf',
+  contract_holder: '#0089cf',
   tech_eval:   '#059669',
   comm_eval:   '#D97706',
   scm:         '#0F766E',
@@ -29,6 +29,7 @@ export default function Header({ title, subtitle }) {
   const isRtl = lang === 'ar'
   // The dashboard is where Back would land anyway — no control for it there.
   const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/')
+  const isBareCreateItt = pathname === '/create-itt' && user?.role?.id !== 'contract_holder'
 
 
   const bg     = isDark ? 'rgba(10,15,30,0.92)' : '#ffffff'
@@ -76,7 +77,7 @@ export default function Header({ title, subtitle }) {
 
       {/* Back + page title */}
       <div className="flex items-center gap-3 min-w-0" inert={isGenerating}>
-        {!isDashboard && <BackButton />}
+        {!isDashboard && !isBareCreateItt && <BackButton />}
         <div className="min-w-0">
           <h1 className="font-bold text-[15px] leading-tight tracking-tight truncate" style={{ color: title_ }}>{title}</h1>
           {subtitle && <p className="text-[11px] mt-0.5 truncate" style={{ color: sub_ }}>{subtitle}</p>}
@@ -158,10 +159,10 @@ export default function Header({ title, subtitle }) {
 
         {/* User avatar */}
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 cursor-pointer"
+          className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-xs shrink-0 cursor-pointer select-none"
           style={{
-            background: `linear-gradient(135deg, ${avatarBg}, ${avatarBg}cc)`,
-            boxShadow: `0 2px 8px ${avatarBg}40`,
+            background: '#afd9f4',
+            color: '#0089cf',
           }}
           title={user?.name}
         >

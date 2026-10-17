@@ -115,6 +115,8 @@ function ProtectedRoutes() {
           <Route path="/scm-contract-review/:tenderId" element={<ScmGateReview gate="scm_gate3" />} />
           <Route path="/contract" element={<ContractTemplate />} />
           <Route path="/contract/:tenderId" element={<ContractTemplate />} />
+          <Route path="/contract-creation" element={<ContractTemplate />} />
+          <Route path="/contract-creation/:tenderId" element={<ContractTemplate />} />
           <Route path="/legal-review" element={<LegalReview />} />
           <Route path="/legal-review/:tenderId" element={<LegalReview />} />
           <Route path="/contract-execution" element={<ContractExecution />} />

@@ -213,7 +213,7 @@ export default function PsfStrategy() {
 
   return (
     <div className="space-y-5">
-      <Card branded className="relative">
+      <Card className="relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         {/* ── Header ── */}
         <header className="px-4 py-5 sm:px-6">
           <div className="min-w-0">

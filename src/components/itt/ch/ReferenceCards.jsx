@@ -18,7 +18,7 @@ const rowStyle = { background: 'rgba(0,137,207,0.04)', border: '1px solid rgba(0
 
 export function QualifiedBiddersCard({ bidders }) {
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <h3 className="mb-4 flex items-center gap-2.5 font-semibold" style={{ color: '#1e293b', fontSize: '15px' }}>
         {headingIcon(User)}
         Qualified Bidders - From Pre-Qualification
@@ -43,7 +43,7 @@ const DOC_LABELS = { icv: 'LC Plan', companyEstimate: 'Company Estimate', riskAs
 
 export function InternalReferenceDocumentsCard({ documents, onDownload }) {
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <h2 className="mb-4 flex items-center gap-2.5 font-semibold" style={{ color: '#1e293b', fontSize: '15px' }}>
         {headingIcon(Paperclip)}
         Internal Reference Documents
@@ -84,7 +84,7 @@ const excelStyle = { color: '#10b981', border: '1px solid rgba(16,185,129,0.25)'
 /* The PSF-sourced ITT's completed strategy templates (+ the PQQ summary). */
 export function GeneratedTemplatesCard({ templates, preQual, onExportTemplate, onExportPreQual }) {
   return (
-    <Card branded accent className="p-6">
+    <Card accent className="p-6">
       <h3 className="font-semibold mb-4 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
         {headingIcon(FileSpreadsheet)}
         Generated Templates

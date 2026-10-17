@@ -17,7 +17,7 @@ import { PSF_TEAM_ROLES } from '../../data/psfTemplate'
  */
 export function PsfAssignTeamCard({ rosters, selected, onChange }) {
   return (
-    <Card branded className="p-4 sm:p-6">
+    <Card className="p-4 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <UserCheck size={16} style={{ color: '#0089cf' }} />
         <h3 className="text-base font-bold text-slate-800">Assign Team</h3>

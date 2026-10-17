@@ -31,7 +31,7 @@ function PickerEmptyState({ icon, title, children }) {
       <div className="w-10 h-10 rounded-xl mx-auto flex items-center justify-center shrink-0" style={{ background: 'rgba(0,137,207,0.1)', color: '#0089cf' }}>
         {icon}
       </div>
-      <p className="text-sm font-semibold mt-1" style={{ color: '#1e293b' }}>{title}</p>
+      <p className="text-sm font-semibold mt-1 text-slate-800 dark:text-slate-100">{title}</p>
       {children ? <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">{children}</p> : null}
     </div>
   )
@@ -61,6 +61,12 @@ function TenderPickerCard({ tender, onSelect }) {
             </span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            {(tender.costCode || tender.reference || tender.id) ? (
+              <span className="inline-flex items-center gap-1 font-mono">
+                <Hash size={12} className="shrink-0" />
+                <span>{tender.costCode || tender.reference || tender.id}</span>
+              </span>
+            ) : null}
             {tender.deadline ? (
               <span className="inline-flex items-center gap-1">
                 <CalendarClock size={12} className="shrink-0" />
@@ -73,12 +79,6 @@ function TenderPickerCard({ tender, onSelect }) {
                 <span>{tender.department}</span>
               </span>
             ) : null}
-            {!tender.department && (tender.costCode || tender.id) && !tender.deadline ? (
-              <span className="inline-flex items-center gap-1">
-                <Hash size={12} className="shrink-0" />
-                <span>{tender.costCode || tender.id}</span>
-              </span>
-            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -89,7 +89,13 @@ function TenderPickerCard({ tender, onSelect }) {
   )
 }
 
-export default function CreateIttPicker({ tenders, onSelect, onStartNew }) {
+export default function CreateIttPicker({
+  tenders = [],
+  onSelect,
+  onStartNew,
+  title = 'Create ITT',
+  description,
+}) {
   const [search, setSearch] = useState('')
   const [requestedTab, setRequestedTab] = useState(null)
   const [pageSize, setPageSize] = useState(10)
@@ -98,12 +104,13 @@ export default function CreateIttPicker({ tenders, onSelect, onStartNew }) {
   const hasAny = tenders.length > 0
   const isSearching = search.trim() !== ''
   const matching = tenders.filter(t => matches(search, t.title, t.costCode, t.id, t.department))
-  const afterPsf = matching.filter(t => !t.psfSkipped)
-  const direct = matching.filter(t => t.psfSkipped)
+  const isAfterPsf = t => Boolean(t.psfCompleted) && !t.psfSkipped
+  const afterPsf = matching.filter(isAfterPsf)
+  const direct = matching.filter(t => !isAfterPsf(t))
   const activeTab = requestedTab ?? (afterPsf.length === 0 && direct.length > 0 ? 'direct' : 'psf')
   const list = activeTab === 'psf' ? afterPsf : direct
   const totalPages = Math.max(1, Math.ceil(list.length / pageSize))
-  const page = Math.min(pages[activeTab], totalPages)
+  const page = Math.min(pages[activeTab] || 1, totalPages)
   const pageItems = list.slice((page - 1) * pageSize, page * pageSize)
   const setPage = (p) => setPages(prev => ({ ...prev, [activeTab]: p }))
 
@@ -123,9 +130,13 @@ export default function CreateIttPicker({ tenders, onSelect, onStartNew }) {
             <Inbox size={20} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Create ITT</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.
+              {description ? description : (
+                <>
+                  Select a tender that has completed <strong>PSF Strategy</strong> to continue its ITT, or start a brand-new one from scratch.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -143,8 +154,9 @@ export default function CreateIttPicker({ tenders, onSelect, onStartNew }) {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => setRequestedTab(tab)}
-                    className="relative inline-flex items-center gap-2 py-3 text-sm font-semibold whitespace-nowrap transition-colors"
-                    style={{ color: isActive ? '#0089cf' : '#64748b' }}
+                    className={`relative inline-flex items-center gap-2 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                      isActive ? 'text-[#0089cf]' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                    }`}
                   >
                     {tab === 'psf' ? 'From PSF Strategy' : 'Direct ITT (No PSF)'}
                     <span className="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 font-sans text-xs text-slate-500 dark:text-slate-400 tabular-nums">
@@ -248,17 +260,19 @@ export default function CreateIttPicker({ tenders, onSelect, onStartNew }) {
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onStartNew}
-          title="Start New ITT"
-          aria-label="Start New ITT"
-          className="flex h-10 items-center gap-2 rounded-lg px-5 text-sm font-semibold text-white shadow-md transition-all hover:opacity-95 cursor-pointer max-sm:w-full max-sm:justify-center"
-          style={{ background: 'linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%)' }}
-        >
-          <Plus size={16} aria-hidden="true" className="shrink-0" />
-          New ITT
-        </button>
+        {onStartNew ? (
+          <button
+            type="button"
+            onClick={onStartNew}
+            title="Start New ITT"
+            aria-label="Start New ITT"
+            className="flex h-10 items-center gap-2 rounded-lg px-5 text-sm font-semibold text-white shadow-md transition-all hover:opacity-95 cursor-pointer max-sm:w-full max-sm:justify-center"
+            style={{ background: 'linear-gradient(135deg, #1b4c6f 0%, #0089cf 100%)' }}
+          >
+            <Plus size={16} aria-hidden="true" className="shrink-0" />
+            New ITT
+          </button>
+        ) : null}
       </div>
     </Card>
   )

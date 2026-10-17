@@ -218,7 +218,7 @@ export default function ProjectInformationCard({
   const setMonths = (v) => { setField('durationMonths', v); if (form.durationYears === '') setField('durationYears', '0') }
 
   return (
-    <Card branded className="p-6">
+    <Card className="p-6">
       <h2 className="font-semibold mb-5 flex items-center gap-2.5" style={{ color: '#1e293b', fontSize: '15px' }}>
         <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}>
           <FileText size={16} style={{ color: '#0089cf' }} />

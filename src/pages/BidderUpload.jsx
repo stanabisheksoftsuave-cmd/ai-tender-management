@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft, ChevronRight, Users, Calendar, Building2, Lock, Activity, UserPlus, Save, Phone, Bell, FileText, AlertTriangle, Send, UploadCloud, Ban, RotateCcw, Wrench, Wallet, GitBranch, ArrowRightLeft } from 'lucide-react'
+import {
+  Upload, FileArchive, CheckCircle, Clock, Bot, X, AlertCircle, ArrowLeft,
+  ChevronRight, ChevronDown, Users, Calendar, Building2, Lock, Activity, UserPlus,
+  Save, Phone, Bell, FileText, AlertTriangle, Send, UploadCloud, Ban, RotateCcw,
+  Wrench, Wallet, GitBranch, ArrowRightLeft, Network, Search, Hash, CalendarClock, ArrowRight
+} from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -36,7 +41,7 @@ export default function BidderUpload() {
   const { tenderId } = useParams()
   const navigate = useNavigate()
   const { tenders, advanceTender, updateTender, uploadParallelReport } = useTenders()
-  const { lang, t, } = useLanguage()
+  const { lang, t } = useLanguage()
   const uploadTenders = tenders.filter(t => t.status === 'upload')
 
   const paramTender = tenderId ? tenders.find(t => t.id === tenderId) : null
@@ -45,6 +50,38 @@ export default function BidderUpload() {
   const [extracting, setExtracting] = useState(false)
   const [showTracker, setShowTracker] = useState(false)
   const [logEntries, setLogEntries] = useState([])
+  const [search, setSearch] = useState('')
+  const [showNotParticipating, setShowNotParticipating] = useState(false)
+
+  // Keep selectedTender in sync with URL or tenders context
+  useEffect(() => {
+    if (tenderId) {
+      const match = tenders.find(t => t.id === tenderId)
+      if (match) setSelectedTender(match)
+    }
+  }, [tenderId, tenders])
+
+  const currentTenderIdRef = useRef(selectedTender?.id)
+  useEffect(() => {
+    if (selectedTender?.id !== currentTenderIdRef.current) {
+      currentTenderIdRef.current = selectedTender?.id
+      if (selectedTender?.bidderList && Array.isArray(selectedTender.bidderList) && selectedTender.bidderList.length > 0) {
+        setBidders(selectedTender.bidderList.map((b, idx) => ({
+          id: b.id || idx + 1,
+          company: b.name || b.company || 'Unknown Bidder',
+          contact: b.contact || 'Mohamed Al-Balushi',
+          phone: b.phone || '+968 2483 5100',
+          techDoc: b.techDoc || null,
+          commDoc: b.commDoc || null,
+          status: b.status || (b.techDoc ? 'queued' : 'no_document'),
+          extracted: b.extracted || 0,
+          _max: b._max || 120,
+        })))
+      } else {
+        setBidders([])
+      }
+    }
+  }, [selectedTender?.id, selectedTender?.bidderList])
 
   // Ingestion document-collection mode:
   //   linear   → only the Technical document is collected now; the Commercial
@@ -252,6 +289,7 @@ export default function BidderUpload() {
   }
 
   const activeBidders = bidders.filter(b => b.status !== 'not_participating')
+  const notParticipatingBidders = bidders.filter(b => b.status === 'not_participating')
   const uploadedBidders = bidders.filter(b => ['queued', 'processing', 'completed'].includes(b.status))
   const allExtracted = activeBidders.length > 0 &&
     activeBidders.every(b => b.status === 'completed') &&
@@ -571,191 +609,272 @@ export default function BidderUpload() {
     )
   }
 
-  // ── Tender selection screen ──
+  // ── Tender selection screen (Ingestion Worklist) ──
   if (!selectedTender) {
+    const isSearching = search.trim() !== ''
+    const filteredIngestionList = ingestionList.filter(({ tender }) => {
+      if (!isSearching) return true
+      const q = search.trim().toLowerCase()
+      return (
+        (tender.title || '').toLowerCase().includes(q) ||
+        (tender.costCode || '').toLowerCase().includes(q) ||
+        (tender.id || '').toLowerCase().includes(q) ||
+        (tender.department || '').toLowerCase().includes(q)
+      )
+    })
+
     return (
       <div className="space-y-5">
-
-        {/* ── Evaluation Report Uploads (Tech & Comm) ── */}
+        {/* ── Evaluation Report Uploads (Tech & Comm) if any ── */}
         {pendingReports.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <UploadCloud size={14} className="text-orange-500" />
-              <h3 className="text-sm font-semibold text-slate-700">Evaluation Report Uploads</h3>
+              <UploadCloud size={16} className="text-orange-500" />
+              <h3 className="text-sm font-semibold text-slate-800">Evaluation Report Uploads</h3>
               <span className="text-[10px] font-semibold text-orange-700 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full animate-pulse">
                 {pendingReports.length} pending
               </span>
             </div>
-            <p className="text-xs text-slate-400 -mt-1">
+            <p className="text-xs text-slate-500 -mt-1">
               Upload the signed evaluation report from the evaluator to advance each tender to its next stage.
             </p>
-            {pendingReports.map(({ tender, side, mode }) => {
-              const isTech  = side === 'tech'
-              const key = `${tender.id}-${side}`
-              const uploaded = evalUploaded[key]
-              const dragging = evalDragging[key]
-              const reportLabel = isTech ? 'Technical' : 'Commercial'
-              const otherSideDone = mode === 'parallel' &&
-                (isTech ? tender.commSide === 'done' : tender.techSide === 'done')
-              const nextStage = mode === 'parallel'
-                ? (otherSideDone ? 'Management Review' : 'Awaiting the other evaluation')
-                : (isTech ? 'Commercial Evaluation' : 'Management Review')
-              const doUpload = () => {
-                if (mode === 'parallel') uploadParallelReport(tender.id, side)
-                else advanceTender(tender.id)
-                setEvalUploaded(prev => ({ ...prev, [key]: true }))
-              }
+            <div className="space-y-3">
+              {pendingReports.map(({ tender, side, mode }) => {
+                const isTech = side === 'tech'
+                const key = `${tender.id}-${side}`
+                const uploaded = evalUploaded[key]
+                const dragging = evalDragging[key]
+                const reportLabel = isTech ? 'Technical' : 'Commercial'
+                const otherSideDone = mode === 'parallel' &&
+                  (isTech ? tender.commSide === 'done' : tender.techSide === 'done')
+                const nextStage = mode === 'parallel'
+                  ? (otherSideDone ? 'Management Review' : 'Awaiting the other evaluation')
+                  : (isTech ? 'Commercial Evaluation' : 'Management Review')
+                const doUpload = () => {
+                  if (mode === 'parallel') uploadParallelReport(tender.id, side)
+                  else advanceTender(tender.id)
+                  setEvalUploaded(prev => ({ ...prev, [key]: true }))
+                }
 
-              return (
-                <Card key={key} className={`overflow-hidden border-2 transition-all ${uploaded ? 'border-emerald-300' : 'border-orange-200'}`}>
-                  {/* Tender header */}
-                  <div className={`px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${uploaded ? 'bg-emerald-50' : 'bg-orange-50'}`}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono text-slate-400 bg-white/70 px-2 py-0.5 rounded shrink-0">{tenderRef(tender)}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isTech ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
-                        {reportLabel} Eval Report
-                      </span>
-                      {mode === 'parallel' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-indigo-100 text-indigo-700">Parallel</span>
+                return (
+                  <div key={key} className={`overflow-hidden rounded-xl border transition-all bg-white ${uploaded ? 'border-emerald-300' : 'border-slate-200'}`}>
+                    <div className={`px-4 py-3 flex items-center justify-between gap-3 flex-wrap border-b ${uploaded ? 'bg-emerald-50/50 border-emerald-100' : 'bg-slate-50/70 border-slate-100'}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-mono text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded shrink-0">{tenderRef(tender)}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isTech ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                          {reportLabel} Eval Report
+                        </span>
+                        {mode === 'parallel' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-indigo-100 text-indigo-700">Parallel</span>
+                        )}
+                        <p className="text-xs font-semibold text-slate-800 truncate">{tender.title}</p>
+                      </div>
+                      {uploaded ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                          <CheckCircle size={10} /> Uploaded · {nextStage}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-full shrink-0">
+                          <Clock size={10} /> Awaiting Upload
+                        </span>
                       )}
-                      <p className="text-xs font-semibold text-slate-700 truncate">{tender.title}</p>
                     </div>
-                    {uploaded ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
-                        <CheckCircle size={10} /> Uploaded · {nextStage}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-white border border-orange-200 px-2.5 py-1 rounded-full shrink-0">
-                        <Clock size={10} /> Awaiting Upload
-                      </span>
-                    )}
-                  </div>
 
-                  <div className="px-4 py-4">
-                    {uploaded ? (
-                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                        <CheckCircle size={16} className="text-emerald-500 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-emerald-800">{reportLabel} report uploaded successfully</p>
-                          <p className="text-[11px] text-emerald-600 mt-0.5">
-                            {mode === 'parallel' && !otherSideDone
-                              ? <>Waiting for the {isTech ? 'Commercial' : 'Technical'} report before Management Review.</>
-                              : <>Tender advanced to <strong>{nextStage}</strong>.</>}
-                          </p>
+                    <div className="p-4">
+                      {uploaded ? (
+                        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                          <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-emerald-800">{reportLabel} report uploaded successfully</p>
+                            <p className="text-[11px] text-emerald-600 mt-0.5">
+                              {mode === 'parallel' && !otherSideDone
+                                ? <>Waiting for the {isTech ? 'Commercial' : 'Technical'} report before Management Review.</>
+                                : <>Tender advanced to <strong>{nextStage}</strong>.</>}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div
-                        onDragOver={e => { e.preventDefault(); setEvalDragging(prev => ({ ...prev, [key]: true })) }}
-                        onDragLeave={() => setEvalDragging(prev => ({ ...prev, [key]: false }))}
-                        onDrop={e => {
-                          e.preventDefault()
-                          setEvalDragging(prev => ({ ...prev, [key]: false }))
-                          if (e.dataTransfer.files?.length) doUpload()
-                        }}
-                        className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2.5 py-8 transition-all cursor-pointer
-                          ${dragging ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/40'}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${dragging ? 'bg-[var(--color-primary)]/10' : 'bg-slate-100'}`}>
-                          <UploadCloud size={20} className={dragging ? 'text-[var(--color-primary)]' : 'text-slate-400'} />
+                      ) : (
+                        <div
+                          onDragOver={e => { e.preventDefault(); setEvalDragging(prev => ({ ...prev, [key]: true })) }}
+                          onDragLeave={() => setEvalDragging(prev => ({ ...prev, [key]: false }))}
+                          onDrop={e => {
+                            e.preventDefault()
+                            setEvalDragging(prev => ({ ...prev, [key]: false }))
+                            if (e.dataTransfer.files?.length) doUpload()
+                          }}
+                          className={`rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 py-6 transition-all cursor-pointer
+                            ${dragging ? 'border-[#0089cf] bg-[#0089cf]/5' : 'border-slate-200 hover:border-[#0089cf]/40 hover:bg-slate-50/60'}`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${dragging ? 'bg-[#0089cf]/10 text-[#0089cf]' : 'bg-slate-100 text-slate-400'}`}>
+                            <UploadCloud size={20} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs font-semibold text-slate-800">
+                              Upload <span className={isTech ? 'text-[#0089cf]' : 'text-violet-600'}>{reportLabel} Evaluation Report</span>
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Drag & drop or</p>
+                          </div>
+                          <label className="cursor-pointer">
+                            <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0089cf] text-white hover:bg-[#1b4c6f] transition-colors shadow-sm">
+                              Browse File
+                            </span>
+                            <input type="file" accept=".pdf,.docx,.xlsx" className="hidden" onChange={e => {
+                              if (e.target.files?.length) { doUpload(); e.target.value = '' }
+                            }} />
+                          </label>
+                          <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-xs font-semibold text-slate-700">
-                            Upload <span className={isTech ? 'text-blue-600' : 'text-violet-600'}>{reportLabel} Evaluation Report</span>
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Drag & drop or</p>
-                        </div>
-                        <label className="cursor-pointer">
-                          <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity">
-                            Browse File
-                          </span>
-                          <input type="file" accept=".pdf,.docx,.xlsx" className="hidden" onChange={e => {
-                            if (e.target.files?.length) { doUpload(); e.target.value = '' }
-                          }} />
-                        </label>
-                        <p className="text-[10px] text-slate-400">PDF · DOCX · XLSX</p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </Card>
-              )
-            })}
-            <div className="border-t border-slate-100 pt-1" />
+                )
+              })}
+            </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-700">{t('ing.selectTitle')}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{t('ing.selectSub')}</p>
-          </div>
-          <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{ingestionList.length} {t('ing.ready')}</span>
-        </div>
-        {ingestionList.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-            <Lock size={32} />
-            <p className="text-sm font-medium">{t('ing.noTenders')}</p>
-            <p className="text-xs">{t('ing.noTendersSub')}</p>
-          </div>
-        )}
-        {/* One unified list — a tender the Technical Evaluator sent back for
-            re-upload sits alongside every other tender awaiting ingestion,
-            just flagged with its own badge, rather than routing to a separate
-            screen before you can even see it. */}
-        <div className="space-y-3">
-          {ingestionList.map(({ tender, isCorrection }) => {
-            const pending = isCorrection ? tender.correctionRequests.filter(r => !r.resolved) : []
-            return (
-              <Card key={tender.id}
-                className={`p-4 cursor-pointer hover:shadow-md transition-all group ${isCorrection ? 'border-amber-200 bg-amber-50/40 hover:border-amber-300' : 'hover:border-[var(--color-primary)]/30'}`}
-                onClick={() => {
-                  if (isCorrection) {
-                    setCorrectionTender(tender)
-                    setCorrectionUploads({}); setCorrectionSubmitted({}); setCorrectionExtracting({})
-                    setCorrectionExtracted({}); setCorrectionExtractPct({}); setCorrectionGeneral({})
-                  } else {
-                    setSelectedTender(tender)
-                  }
-                }}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-                      {isCorrection ? (
-                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
-                          <Bell size={10} /> Needs re-upload
-                        </span>
-                      ) : (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor[tender.status] || 'bg-slate-100 text-slate-600'}`}>{stageLabel[tender.status] || tender.stage}</span>
-                      )}
-                    </div>
-                    <h3 className="text-sm font-semibold text-slate-800 truncate">{tender.title}</h3>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="flex items-center gap-1 text-xs text-slate-400"><Building2 size={11} /> {tender.department}</span>
-                      {isCorrection ? (
-                        <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                          <AlertTriangle size={11} /> {pending.length} bidder{pending.length !== 1 ? 's' : ''} need re-upload
-                        </span>
-                      ) : (
-                        <>
-                          <span className="flex items-center gap-1 text-xs text-slate-400"><Calendar size={11} /> Deadline {tender.deadline}</span>
-                          <span className="flex items-center gap-1 text-xs text-slate-400"><Users size={11} /> {tender.bidders} bidder{tender.bidders !== 1 ? 's' : ''}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {!isCorrection && (
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-slate-800">{tender.budget}</p>
-                        <p className="text-[10px] text-slate-400">Budget</p>
-                      </div>
-                    )}
-                    <ChevronRight size={16} className={`transition-colors ${isCorrection ? 'text-amber-300 group-hover:text-amber-500' : 'text-slate-300 group-hover:text-[var(--color-primary)]'}`} />
-                  </div>
+        {/* ── Worklist Panel Container ── */}
+        <div className="olng-slide-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className="flex size-10 shrink-0 items-center justify-center rounded-xl text-[#0089cf]"
+                  style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}
+                >
+                  <Upload size={20} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Ingestion
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Only tenders in the Bid Ingestion stage can receive document uploads.
+                  </p>
                 </div>
-              </Card>
-            )
-          })}
+              </div>
+              <div className="flex w-full items-center gap-3 sm:w-auto">
+                <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search ingestion tenders"
+                    aria-label="Search ingestion tenders"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs placeholder:text-slate-400 focus:border-[#0089cf] focus:outline-none focus:ring-2 focus:ring-[#0089cf]/20"
+                  />
+                </div>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500 tabular-nums">
+                  {filteredIngestionList.length} tender{filteredIngestionList.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 p-4 sm:p-5">
+            {filteredIngestionList.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 p-8 text-center sm:p-12">
+                <span
+                  className="flex size-10 items-center justify-center rounded-xl text-[#0089cf] mb-1"
+                  style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}
+                >
+                  {isSearching ? <Search size={20} /> : <Lock size={20} />}
+                </span>
+                <p className="text-sm font-semibold text-slate-800">
+                  {isSearching ? 'No tenders match your search' : 'No tenders awaiting ingestion'}
+                </p>
+                <p className="max-w-md font-sans text-xs text-slate-500">
+                  {isSearching
+                    ? 'Try a different cost code, title or department.'
+                    : 'Tenders move here after the ITT has been exported and finalised. Check back once an ITT is ready for bidder upload.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredIngestionList.map(({ tender, isCorrection }) => {
+                  const pending = isCorrection ? (tender.correctionRequests?.filter(r => !r.resolved) || []) : []
+                  const hasClarification = isCorrection || pending.length > 0
+                  return (
+                    <div
+                      key={tender.id}
+                      onClick={() => {
+                        if (isCorrection) {
+                          setCorrectionTender(tender)
+                          setCorrectionUploads({})
+                          setCorrectionSubmitted({})
+                          setCorrectionExtracting({})
+                          setCorrectionExtracted({})
+                          setCorrectionExtractPct({})
+                          setCorrectionGeneral({})
+                        } else {
+                          setSelectedTender(tender)
+                        }
+                      }}
+                      className="group block rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0089cf]/30"
+                    >
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-none transition-all duration-200 hover:-translate-y-0.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.02]">
+                        <div className="flex items-center justify-between gap-3 sm:gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                              <h3 className="max-w-full truncate text-sm font-semibold text-slate-800">
+                                {tender.title}
+                              </h3>
+                              {hasClarification ? (
+                                <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                                  Technical Clarification ({pending.length || 1})
+                                </span>
+                              ) : (
+                                <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase bg-[#afd9f4]/40 text-[#0089cf] ring-1 ring-[#0089cf]/20 animate-pulse">
+                                  Awaiting Upload
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                              {(tender.costCode || tender.id) && (
+                                <span className="flex min-w-0 items-center gap-1 font-mono">
+                                  <Hash size={12} className="shrink-0" />
+                                  Cost Code: {tender.costCode || tender.id}
+                                </span>
+                              )}
+                              {tender.deadline && (
+                                <span className="flex items-center gap-1">
+                                  <CalendarClock size={12} className="shrink-0" />
+                                  Deadline: {tender.deadline}
+                                </span>
+                              )}
+                              {tender.department && (
+                                <span className="flex items-center gap-1">
+                                  <Building2 size={12} className="shrink-0" />
+                                  {tender.department}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Users size={12} className="shrink-0" />
+                                {tender.bidders || 0} bidder{(tender.bidders || 0) === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3">
+                            {tender.budget && (
+                              <div className="text-right">
+                                <p className="font-sans text-[11px] text-slate-400">Budget</p>
+                                <p className="text-sm font-semibold text-slate-800">{tender.budget}</p>
+                              </div>
+                            )}
+                            <ChevronRight
+                              size={16}
+                              className="shrink-0 text-slate-400 transition-colors group-hover:text-[#0089cf]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -764,7 +883,7 @@ export default function BidderUpload() {
   if (selectedTender && selectedTender.status !== 'upload') {
     return (
       <div className="space-y-5">
-        <button onClick={exitTenderDetail} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+        <button onClick={exitTenderDetail} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer">
           <ArrowLeft size={14} /> Back
         </button>
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
@@ -779,246 +898,447 @@ export default function BidderUpload() {
     )
   }
 
-  // Where Proceed to Evaluation will route this tender — the Contract Engineer
-  // assigned at the Contract Initiating Form / Create ITT, or "any Contract
-  // Engineer" if this tender never went through either (falls back by role).
-  const routedCe = Array.isArray(selectedTender?.assignedContractEngineers) && selectedTender.assignedContractEngineers.length > 0
-    ? selectedTender.assignedContractEngineers[0]
-    : selectedTender?.assignedContractEngineer || null
-
-  // ── Main ingestion screen ──
+  // ── Main ingestion screen (Detail Screen) ──
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={exitTenderDetail} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
-          <ArrowLeft size={14} /> {tenderId ? t('common.backToList') : t('common.backToList2')}
+        <button
+          onClick={exitTenderDetail}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+        >
+          <ArrowLeft size={14} /> {tenderId ? t('common.backToList') : 'Back to Ingestion'}
         </button>
         <span className="text-slate-200">|</span>
-        <span className="text-xs text-slate-400">{tenderRef(selectedTender)}</span>
+        <span className="text-xs text-slate-400 font-mono">{tenderRef(selectedTender)}</span>
       </div>
 
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(selectedTender)}</span>
-              <Badge variant="upload">Ingestion</Badge>
+      <div className="olng-slide-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* Header Section */}
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-4 py-4 sm:px-5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="min-w-0 text-lg font-bold break-words text-slate-900">
+                {selectedTender.title}
+              </h2>
+              <span className="rounded-full uppercase tracking-wide px-2.5 py-0.5 text-[10px] font-bold bg-[#afd9f4]/40 text-[#0089cf] ring-1 ring-[#0089cf]/20">
+                INGESTION
+              </span>
             </div>
-            <h3 className="font-semibold text-slate-800">{selectedTender.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{t('ing.registerSub')}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Register bidders, attach their proposal bundles, and run AI extraction
+            </p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-[var(--color-primary)]">{bidders.length}</p>
-            <p className="text-xs text-slate-400">{t('ing.bidderCount')}</p>
+          <div className="flex max-w-full flex-wrap items-center gap-3">
+            <div className="relative inline-flex gap-0.5 rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+              {[
+                { value: 'linear', label: 'Linear', Icon: GitBranch },
+                { value: 'parallel', label: 'Parallel', Icon: Network },
+              ].map(({ value, label, Icon }) => {
+                const active = evalMode === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => changeEvalMode(value)}
+                    className={`relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-white font-semibold text-[#0089cf] shadow-sm'
+                        : 'font-medium text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Icon className="size-3.5" aria-hidden="true" />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
-      </Card>
 
-      {/* ── Document collection flow (linear / parallel) ── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <GitBranch size={14} className="text-[var(--color-primary)] shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Evaluation Flow</p>
-              <p className="text-[11px] text-slate-400">
-                {evalMode === 'parallel'
-                  ? 'Parallel — Technical and Commercial evaluated together. Upload both documents now.'
-                  : 'Linear — Technical first. Upload the Technical document now; the Commercial document is uploaded after technical evaluation.'}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-1 p-0.5 rounded-lg bg-slate-100 shrink-0">
-            {[
-              { key: 'linear',   Icon: GitBranch,      label: 'Linear' },
-              { key: 'parallel', Icon: ArrowRightLeft, label: 'Parallel' },
-            ].map(({ key, Icon, label }) => (
-              <button key={key} type="button" onClick={() => changeEvalMode(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
-                  ${evalMode === key ? 'bg-white text-[var(--color-primary)] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Icon size={12} /> {label}
+        {/* Registered Bidders Sub-Header Bar */}
+        <div className="border-t border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              Registered Bidders
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#afd9f4]/50 text-[11px] font-semibold text-[#0089cf]">
+                {activeBidders.length}
+              </span>
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setBidderForm({ company: '', contact: '', phone: '' })
+                  setBidderErrors({})
+                  setShowAddBidder(true)
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+              >
+                <UserPlus className="size-3.5" aria-hidden="true" />
+                Add Bidder
               </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-          <Users size={12} className="text-slate-400 shrink-0" />
-          Proceeding routes this to <strong className="text-slate-700 font-semibold">Technical → Contract Holder</strong>
-          <span className="text-slate-300">·</span>
-          <strong className="text-slate-700 font-semibold">Commercial → {routedCe?.name || 'any Contract Engineer'}</strong>
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-5">
-        {/* Bidder list — documents are attached per bidder, in each bidder's own
-            Technical / Commercial slot below. */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-700">{t('ing.bidderCount')} ({bidders.length})</h3>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => { setBidderForm({ company: '', contact: '', phone: '' }); setBidderErrors({}); setShowAddBidder(true) }}>
-                <UserPlus size={13} /> {t('ing.addBidder')}
-              </Button>
-              {!extracting && hasQueued && (
-                <Button size="sm" onClick={() => { setExtracting(true); setShowTracker(true); setLogEntries([]) }}>
-                  <Bot size={13} /> {t('ing.runExtract')}
-                </Button>
-              )}
-              {extracting && (
-                <Button size="sm" variant="secondary" onClick={() => { setShowTracker(true); setLogEntries([]) }}>
-                  <Activity size={13} /> {t('ing.trackExtract')}
-                </Button>
-              )}
-              <Button size="sm" variant="secondary" disabled={!allExtracted} onClick={proceedToEvaluation}>
-                <Bot size={13} /> {t('ing.startEval')}
-              </Button>
+              {extracting ? (
+                <button
+                  type="button"
+                  onClick={() => { setShowTracker(true); setLogEntries([]) }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+                >
+                  <Bot className="size-3.5" aria-hidden="true" />
+                  Track Extraction
+                </button>
+              ) : hasQueued && !extracting ? (
+                <button
+                  type="button"
+                  onClick={() => { setExtracting(true); setShowTracker(true); setLogEntries([]) }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#0089cf] text-white hover:bg-[#1b4c6f] shadow-sm transition-colors cursor-pointer"
+                >
+                  <Bot className="size-3.5" aria-hidden="true" />
+                  Run AI Extraction
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={!allExtracted}
+                onClick={proceedToEvaluation}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  allExtracted
+                    ? 'bg-[#0089cf] text-white hover:bg-[#1b4c6f] shadow-sm cursor-pointer'
+                    : 'bg-[#0089cf] text-white opacity-50 cursor-not-allowed'
+                }`}
+              >
+                {!allExtracted && <Lock className="size-3.5" aria-hidden="true" />}
+                Begin Evaluation
+                {allExtracted && <ArrowRight className="size-3.5" aria-hidden="true" />}
+              </button>
             </div>
           </div>
+          {!allExtracted && (
+            <p className="px-4 pb-3 sm:px-5 text-xs text-slate-400 sm:text-right">
+              {activeBidders.length === 0
+                ? 'Add a bidder to begin evaluation.'
+                : 'Requires all documents uploaded and extracted.'}
+            </p>
+          )}
+        </div>
 
-          {bidders.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-              <Users size={28} />
-              <p className="text-sm font-medium text-slate-600">{t('ing.noBidders')}</p>
-              <p className="text-xs text-center">{t('ing.noBiddersSub')}</p>
-              <Button size="sm" onClick={() => setShowAddBidder(true)}><UserPlus size={13} /> {t('ing.addFirst')}</Button>
+        {/* Bidders Content Area */}
+        <div className="border-t border-slate-200 p-4 sm:p-5 space-y-4">
+          {activeBidders.length === 0 ? (
+            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 text-center sm:p-12">
+              <div className="flex flex-col items-center justify-center gap-2">
+                <span
+                  className="flex size-10 items-center justify-center rounded-xl text-[#0089cf] mb-1"
+                  style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.12), rgba(27,76,111,0.08))' }}
+                >
+                  <Users size={20} aria-hidden="true" />
+                </span>
+                <p className="text-sm font-semibold text-slate-800">No bidders registered yet</p>
+                <p className="max-w-md text-xs text-slate-500 mb-2">
+                  Add bidders first, then attach their proposal documents
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBidderForm({ company: '', contact: '', phone: '' })
+                    setBidderErrors({})
+                    setShowAddBidder(true)
+                  }}
+                  className="rounded-full px-4 h-9 text-[13px] font-semibold bg-[#0089cf] text-white hover:bg-[#1b4c6f] inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <UserPlus size={14} /> Add First Bidder
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeBidders.map(b => {
+                const isExtracted = b.status === 'completed'
+                const isProcessing = b.status === 'processing'
+                const isQueued = b.status === 'queued'
+                const isNoDoc = b.status === 'no_document'
+
+                const statusBadgeConfig = {
+                  completed: { cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', label: 'Extracted' },
+                  processing: { cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', label: 'Processing' },
+                  queued: { cls: 'bg-blue-50 text-[#0089cf] ring-1 ring-[#0089cf]/20', label: 'Queued' },
+                  no_document: { cls: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200', label: 'Awaiting Document' },
+                }
+                const currentBadge = statusBadgeConfig[b.status] || statusBadgeConfig.no_document
+
+                return (
+                  <div
+                    key={b.id}
+                    className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span
+                          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                            isExtracted ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {isNoDoc ? (
+                            <Users className="size-4" aria-hidden="true" />
+                          ) : (
+                            <FileArchive
+                              className={`size-4 ${isExtracted ? 'text-emerald-600' : 'text-[#0089cf]'}`}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </span>
+
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="min-w-0 text-sm font-semibold break-words text-slate-900">
+                              {b.company}
+                            </span>
+                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${currentBadge.cls}`}>
+                              {currentBadge.label}
+                            </span>
+                          </div>
+
+                          {(b.contact || b.phone) && (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                              {b.contact && <span>Contact Person · {b.contact}</span>}
+                              {b.phone && (
+                                <span className="flex items-center gap-1 text-slate-400">
+                                  <Phone className="size-3" aria-hidden="true" />
+                                  {b.phone}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => markNotParticipating(b.id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer shadow-sm"
+                        >
+                          <Ban className="size-3.5" aria-hidden="true" />
+                          Mark as Not Participating
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBidders(prev => prev.filter(x => x.id !== b.id))}
+                          className="p-1 hover:bg-red-50 rounded text-slate-300 hover:text-red-500 transition-colors cursor-pointer"
+                          title="Remove bidder"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Documents slots */}
+                    <div className={`grid grid-cols-1 ${evalMode === 'parallel' ? 'sm:grid-cols-2' : ''} gap-3`}>
+                      {/* Technical Document */}
+                      {b.techDoc ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-[#afd9f4]/40 text-[#0089cf]">
+                              <Wrench className="size-3.5" aria-hidden="true" />
+                            </span>
+                            <span className="truncate text-xs font-medium text-slate-800">
+                              {b.techDoc.name}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                              <CheckCircle size={10} /> {isExtracted ? 'Extracted' : 'Uploaded'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeDoc(b.id, 'technical')}
+                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                            title="Remove file"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex min-h-36 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#0089cf]/25 bg-[#0089cf]/[0.03] px-4 py-5 text-center transition-all cursor-pointer hover:border-solid hover:border-[#0089cf]/50">
+                          <span className="mb-1 flex size-10 items-center justify-center rounded-full bg-white text-[#0089cf] shadow-sm">
+                            <Wrench className="size-5" aria-hidden="true" />
+                          </span>
+                          <span className="text-sm font-semibold text-slate-800">
+                            Technical Bundle <span className="text-red-500">*</span>
+                          </span>
+                          <span className="text-xs font-semibold text-[#0089cf]">
+                            Upload technical
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Drag and drop or click to browse · .pdf, .docx, .xlsx, .zip · up to 10 files
+                          </span>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+                            className="sr-only"
+                            onChange={e => { attachDocToBidder(b.id, 'technical', e.target.files); e.target.value = '' }}
+                          />
+                        </label>
+                      )}
+
+                      {/* Commercial Document in Parallel Mode */}
+                      {evalMode === 'parallel' && (
+                        b.commDoc ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-violet-100 text-violet-600">
+                                <Wallet className="size-3.5" aria-hidden="true" />
+                              </span>
+                              <span className="truncate text-xs font-medium text-slate-800">
+                                {b.commDoc.name}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                                <CheckCircle size={10} /> {isExtracted ? 'Extracted' : 'Uploaded'}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeDoc(b.id, 'commercial')}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Remove file"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex min-h-36 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-violet-300/40 bg-violet-50/20 px-4 py-5 text-center transition-all cursor-pointer hover:border-solid hover:border-violet-400">
+                            <span className="mb-1 flex size-10 items-center justify-center rounded-full bg-white text-violet-600 shadow-sm">
+                              <Wallet className="size-5" aria-hidden="true" />
+                            </span>
+                            <span className="text-sm font-semibold text-slate-800">
+                              Commercial Bundle <span className="text-red-500">*</span>
+                            </span>
+                            <span className="text-xs font-semibold text-violet-600">
+                              Upload commercial
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              Drag and drop or click to browse · .pdf, .docx, .xlsx, .zip · up to 10 files
+                            </span>
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+                              className="sr-only"
+                              onChange={e => { attachDocToBidder(b.id, 'commercial', e.target.files); e.target.value = '' }}
+                            />
+                          </label>
+                        )
+                      )}
+                    </div>
+
+                    {evalMode === 'linear' && (
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                        <Wallet size={12} className="text-violet-400 shrink-0" />
+                        Commercial document is uploaded after technical evaluation, at the commercial evaluation stage.
+                      </p>
+                    )}
+
+                    {/* Processing progress */}
+                    {isProcessing && (
+                      <div className="rounded-lg bg-amber-50/60 border border-amber-200/60 p-3">
+                        <div className="flex justify-between text-xs text-amber-800 mb-1 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <Bot size={13} className="text-amber-600" /> Extracting data with AI...
+                          </span>
+                          <span>{Math.round((b.extracted / (b._max || 142)) * 100)}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-amber-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                            style={{ width: `${Math.round((b.extracted / (b._max || 142)) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Extracted summary */}
+                    {isExtracted && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle size={11} /> {b.extracted} events extracted
+                        </span>
+                        <span className="text-[11px] font-medium text-[#0089cf] bg-blue-50 ring-1 ring-[#0089cf]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Bot size={11} /> AI mapped &amp; indexed
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
-          {bidders.map(b => {
-            const isOut = b.status === 'not_participating'
-            const editable = !['processing', 'completed'].includes(b.status)
-            return (
-            <Card key={b.id} className={`p-4 ${isOut ? 'opacity-75' : ''}`}>
-              <div className="flex items-start gap-3">
-                {/* Status icon */}
-                <div className={`p-2.5 rounded-xl shrink-0
-                  ${b.status === 'completed' ? 'bg-green-50' : b.status === 'processing' ? 'bg-amber-50' : b.status === 'not_participating' ? 'bg-slate-100' : b.status === 'no_document' ? 'bg-slate-50' : 'bg-blue-50'}`}>
-                  {b.status === 'not_participating'
-                    ? <Ban size={18} className="text-slate-400" />
-                    : b.status === 'no_document'
-                    ? <Users size={18} className="text-slate-400" />
-                    : <FileArchive size={18} className={b.status === 'completed' ? 'text-green-500' : b.status === 'processing' ? 'text-amber-500' : 'text-blue-400'} />}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  {/* Company + status + remove */}
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-sm font-semibold truncate ${isOut ? 'text-slate-500' : 'text-slate-800'}`}>{b.company}</span>
-                      {statusBadge[b.status]}
-                    </div>
-                    <button onClick={() => setBidders(prev => prev.filter(x => x.id !== b.id))} className="p-1 hover:bg-red-50 rounded text-slate-300 hover:text-red-500 shrink-0">
-                      <X size={13} />
-                    </button>
-                  </div>
-
-                  {/* Contact person + phone */}
-                  <div className="flex items-center gap-3 mb-1">
-                    <p className="text-xs text-slate-500">{t('ing.contact')} · {b.contact}</p>
-                    {b.phone && (
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <Phone size={10} /> {b.phone}
-                      </span>
-                    )}
-                  </div>
-
-                  {isOut ? (
-                    <div className="mt-2 flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-xs text-slate-500"><Ban size={12} /> Excluded from evaluation</span>
-                      <button onClick={() => restoreBidder(b.id)}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)] hover:underline">
-                        <RotateCcw size={11} /> Restore
+          {/* Not Participating Section */}
+          {notParticipatingBidders.length > 0 && (
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNotParticipating(prev => !prev)}
+                  className="flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md text-sm font-semibold text-slate-800 transition-colors hover:text-[#0089cf]"
+                >
+                  <ChevronDown
+                    className={`size-4 transition-transform ${!showNotParticipating ? '-rotate-90' : ''}`}
+                    aria-hidden="true"
+                  />
+                  Not Participating
+                  <span className="inline-flex size-5 items-center justify-center rounded-full bg-[#afd9f4]/50 text-[11px] font-semibold text-[#0089cf]">
+                    {notParticipatingBidders.length}
+                  </span>
+                </button>
+                <span className="text-xs text-slate-400">
+                  {showNotParticipating
+                    ? 'Excluded bidders are skipped by extraction and evaluation.'
+                    : 'Click to view or restore excluded bidders.'}
+                </span>
+              </div>
+              {showNotParticipating && (
+                <div className="mt-3 space-y-3">
+                  {notParticipatingBidders.map(b => (
+                    <div
+                      key={b.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex size-9 items-center justify-center rounded-xl bg-slate-200/60 text-slate-400">
+                          <Ban size={16} />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-600 line-through">{b.company}</p>
+                          <p className="text-xs text-slate-400">Excluded from evaluation</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => restoreBidder(b.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                      >
+                        <RotateCcw size={13} /> Restore
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      {/* Document slots — both in parallel; Technical only in linear (Commercial comes after tech eval) */}
-                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {[
-                          { type: 'technical',  doc: b.techDoc, Icon: Wrench, label: 'Technical',  color: 'text-blue-500',   bg: 'bg-blue-50' },
-                          ...(evalMode === 'parallel'
-                            ? [{ type: 'commercial', doc: b.commDoc, Icon: Wallet, label: 'Commercial', color: 'text-violet-500', bg: 'bg-violet-50' }]
-                            : []),
-                        ].map(({ type, doc, Icon, label, color, bg }) => (
-                          <div key={type} className={`rounded-lg border px-2.5 py-2 ${doc ? 'border-emerald-200 bg-emerald-50/50' : 'border-dashed border-slate-200 bg-slate-50/60'}`}>
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <span className={`w-5 h-5 rounded flex items-center justify-center ${bg}`}><Icon size={11} className={color} /></span>
-                              <span className="text-[11px] font-semibold text-slate-600">{label}</span>
-                              <span className="font-secondary text-red-400 text-[11px]">*</span>
-                            </div>
-                            {doc ? (
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="flex items-center gap-1 text-[11px] text-emerald-700 min-w-0">
-                                  <CheckCircle size={11} className="shrink-0" />
-                                  <span className="truncate">{doc.name}</span>
-                                </span>
-                                {editable && (
-                                  <button onClick={() => removeDoc(b.id, type)} className="text-slate-300 hover:text-red-400 shrink-0"><X size={11} /></button>
-                                )}
-                              </div>
-                            ) : (
-                              <label className="cursor-pointer inline-flex items-center gap-1 text-[11px] text-[var(--color-primary)] hover:underline">
-                                <Upload size={10} /> Upload {label.toLowerCase()}
-                                <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" className="hidden"
-                                  onChange={e => { attachDocToBidder(b.id, type, e.target.files); e.target.value = '' }} />
-                              </label>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {evalMode === 'linear' && (
-                        <p className="mt-1.5 text-[10px] text-slate-400 flex items-center gap-1">
-                          <Wallet size={10} className="text-violet-400 shrink-0" />
-                          Commercial document is uploaded after technical evaluation, at the commercial evaluation stage.
-                        </p>
-                      )}
-
-                      {/* Processing progress */}
-                      {b.status === 'processing' && (
-                        <div className="mt-2">
-                          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                            <span>Extracting data...</span>
-                            <span>{Math.round((b.extracted / (b._max || 142)) * 100)}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${Math.round((b.extracted / (b._max || 142)) * 100)}%` }} />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Extracted summary */}
-                      {b.status === 'completed' && (
-                        <div className="mt-2 flex items-center gap-3">
-                          <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{b.extracted} events extracted</span>
-                          <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">AI mapped &amp; indexed</span>
-                        </div>
-                      )}
-
-                      {/* Not participating action */}
-                      {editable && (
-                        <button onClick={() => markNotParticipating(b.id)}
-                          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors">
-                          <Ban size={11} /> Mark as Not Participating
-                        </button>
-                      )}
-                    </>
-                  )}
+                  ))}
                 </div>
-              </div>
-            </Card>
-            )
-          })}
+              )}
+            </div>
+          )}
 
           {allExtracted && (
-            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle size={16} className="text-green-500" />
-                <span className="text-sm font-medium text-green-700">{t('ing.allExtracted')}</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                <span className="text-sm font-medium text-emerald-800">
+                  All documents extracted. Ready to begin evaluation.
+                </span>
               </div>
-              <Button size="sm" onClick={proceedToEvaluation}>
-                {t('ing.beginEval')}
-              </Button>
+              <button
+                type="button"
+                onClick={proceedToEvaluation}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-[#0089cf] text-white hover:bg-[#1b4c6f] shadow-sm transition-colors cursor-pointer"
+              >
+                Begin Evaluation <ArrowRight size={14} />
+              </button>
             </div>
           )}
         </div>
@@ -1079,8 +1399,20 @@ export default function BidderUpload() {
               </div>
             </div>
             <div className="flex gap-2 px-5 pb-5">
-              <Button variant="secondary" className="flex-1 justify-center" onClick={() => setShowAddBidder(false)}>{t('common.cancel')}</Button>
-              <Button className="flex-1 justify-center" onClick={submitAddBidder}><Save size={13} /> {t('ing.register')}</Button>
+              <button
+                type="button"
+                className="flex-1 justify-center inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                onClick={() => setShowAddBidder(false)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="flex-1 justify-center inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-[#0089cf] text-white hover:bg-[#1b4c6f] transition-colors shadow-sm cursor-pointer"
+                onClick={submitAddBidder}
+              >
+                <Save size={13} /> {t('ing.register')}
+              </button>
             </div>
           </Card>
         </div>
@@ -1173,9 +1505,13 @@ export default function BidderUpload() {
                 <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                   <CheckCircle size={12} /> {uploadedBidders.length} {t('ing.bundles')}
                 </div>
-                <Button className="w-full justify-center" onClick={() => { setShowTracker(false); setExtracting(false); proceedToEvaluation() }}>
+                <button
+                  type="button"
+                  className="w-full justify-center inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl bg-[#0089cf] text-white hover:bg-[#1b4c6f] transition-colors shadow-sm cursor-pointer"
+                  onClick={() => { setShowTracker(false); setExtracting(false); proceedToEvaluation() }}
+                >
                   <Bot size={13} /> {t('ing.proceed')}
-                </Button>
+                </button>
               </div>
             )}
           </Card>

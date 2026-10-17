@@ -57,7 +57,7 @@ export default function StrategyTemplatesDashboard() {
 
   if (!tender) {
     return (
-      <Card branded className="p-6 text-center">
+      <Card className="p-6 text-center">
         <p className="text-sm font-semibold text-slate-800">Strategies</p>
         <p className="text-xs text-slate-500 mt-1">
           This tender could not be found. Open a Contract Initiating Form draft to continue its strategy.

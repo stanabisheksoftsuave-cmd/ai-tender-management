@@ -73,7 +73,7 @@ export default function StrategyTemplatesCard({ uploads, onUpload, onClear, show
   const pct = total ? (uploadedCount / total) * 100 : 0
 
   return (
-    <Card branded className="overflow-hidden">
+    <Card className="overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}

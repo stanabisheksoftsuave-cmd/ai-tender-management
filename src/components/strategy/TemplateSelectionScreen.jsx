@@ -22,7 +22,7 @@ export default function TemplateSelectionScreen({ costCode, included, onBack, on
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] w-full olng-fade-in">
-      <Card branded className="w-full max-w-lg p-5 sm:p-7 olng-scale-in">
+      <Card className="w-full max-w-lg p-5 sm:p-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-scale-in">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#e8f3fb] text-[#0089cf]">
             <LayoutGrid size={18} aria-hidden="true" />

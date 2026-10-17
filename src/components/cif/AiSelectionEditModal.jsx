@@ -84,7 +84,7 @@ export default function AiSelectionEditModal({
             className="w-full max-w-md olng-scale-in"
             onClick={e => e.stopPropagation()}
           >
-            <Card branded className="p-0 overflow-hidden">
+            <Card className="p-0 overflow-hidden">
               <div
                 className="flex items-center justify-between px-4 py-3"
                 style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.08), rgba(27,76,111,0.04))', borderBottom: '1px solid rgba(0,137,207,0.12)' }}

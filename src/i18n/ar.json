@@ -56,6 +56,8 @@
   "page.cif":                  "نموذج بدء العقد",
   "page.ittTechEval":          "التقييم الفني لدعوة العطاء",
   "page.pqqDocument":          "وثيقة التأهيل المسبق",
+  "page.pqqFinancial":         "التقييم المالي للتأهيل المسبق",
+  "page.pqqFinancial.sub":     "المتقدمون للتأهيل المسبق بانتظار التقييم المالي",
   "page.contractStrategy":      "استراتيجية العقد",
   "page.contractStrategy.sub":  "تحديد أهداف المناقصة والميزانية والنطاق ومصفوفة التقييم",
   "page.strategyTemplates":     "قوالب الاستراتيجية",

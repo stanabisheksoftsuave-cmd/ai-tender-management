@@ -38,6 +38,12 @@ const Download      = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0
 const Upload        = p => <Svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Svg>
 const Paperclip     = p => <Svg {...p}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></Svg>
 const Trash2        = p => <Svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Svg>
+const Search        = p => <Svg {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Svg>
+const Building2     = p => <Svg {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></Svg>
+const Calendar      = p => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Svg>
+const Users         = p => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>
+const Check         = p => <Svg {...p}><polyline points="20 6 9 17 4 12"/></Svg>
+const ShieldCheck   = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -116,6 +122,7 @@ export default function CommercialEvaluation() {
 
   // The nine steps run in order. `runs` holds each step's AI progress exactly
   // like the old two-step flow did, just keyed by step id.
+  const [worklistSearch, setWorklistSearch] = useState('')
   const [step, setStep]       = useState('extraction')
   const [runs, setRuns]       = useState({})   // { [stepId]: { running, step, done } }
   // Linear-flow upload gate — one staged file per bidder, keyed by bidder id,
@@ -658,25 +665,135 @@ export default function CommercialEvaluation() {
   }
 
   if (!tenderId) {
-    // canEvaluate, not a bare id match: an unassigned commercial side falls back
-    // to the Contract Engineer so a returned tender can never be invisible. The
-    // guard below uses the same call, so listed and openable stay in step.
     const assignedTenders = tenders.filter(
       t => canEvaluate(t, 'comm', user) && (
         t.status === 'comm_eval' ||
         (t.status === 'parallel_eval' && t.commSide === 'evaluating')
       )
     )
+
+    const q = worklistSearch.trim().toLowerCase()
+    const filteredTenders = q
+      ? assignedTenders.filter(t =>
+          (t.title && t.title.toLowerCase().includes(q)) ||
+          (t.costCode && t.costCode.toLowerCase().includes(q)) ||
+          (t.department && t.department.toLowerCase().includes(q)) ||
+          (t.id && t.id.toLowerCase().includes(q))
+        )
+      : assignedTenders
+
     return (
-      <TenderSelectList
-        tenders={assignedTenders}
-        status={['comm_eval', 'parallel_eval']}
-        basePath="/commercial-eval"
-        title="Commercial Evaluation"
-        description="Select a tender to begin or continue commercial evaluation"
-        emptyText="No tenders assigned to you for commercial evaluation"
-        isUnassigned={t => isUnassignedSide(t, 'comm')}
-      />
+      <div className="space-y-4">
+        {/* Worklist Panel Header matching reference app */}
+        <Card className="p-5 overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center shrink-0 mt-0.5">
+                <Scale size={20} />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Commercial Evaluation</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+                  Only tenders open for Commercial Evaluation are listed. A tender whose commercial readiness cannot be confirmed from this screen is marked rather than hidden.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by tender title..."
+                  value={worklistSearch}
+                  onChange={e => setWorklistSearch(e.target.value)}
+                  className="pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 w-48 sm:w-64 transition-all"
+                />
+              </div>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full">
+                {assignedTenders.length} tender{assignedTenders.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Tenders List matching reference app */}
+        {filteredTenders.length === 0 ? (
+          <Card className="p-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400 mb-3">
+              {q ? <Search size={22} /> : <Lock size={22} />}
+            </div>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {q ? 'No tenders match your search' : 'No tenders awaiting commercial evaluation'}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {q ? 'Try a different cost code, title or department.' : 'Tenders appear here once their ITT has been issued and technical evaluation is complete.'}
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredTenders.map(t => {
+              const bidderCount = Array.isArray(t.bidderList) && t.bidderList.length ? t.bidderList.length : (t.bidders || 0)
+              const eligibleCount = t.commercialEvaluationCompleted ? bidderCount : Math.max(0, bidderCount - 1)
+              const status = t.commEvalSubmittedAt
+                ? { label: 'SUBMITTED', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' }
+                : t.evalProgress === 'ranking_ready'
+                ? { label: 'RANKING READY', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' }
+                : t.evalProgress === 'in_progress'
+                ? { label: 'IN PROGRESS', cls: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800' }
+                : { label: 'NOT STARTED', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' }
+
+              return (
+                <Card
+                  key={t.id}
+                  className="p-4 cursor-pointer hover:shadow-md hover:border-[var(--color-primary)]/40 transition-all rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900 group"
+                  onClick={() => navigate(`/commercial-eval/${t.id}`)}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-[var(--color-primary)] transition-colors truncate">
+                          {t.title}
+                        </h3>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${status.cls}`}>
+                          {status.label}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                          Readiness Not Confirmed
+                        </span>
+                        {isUnassignedSide(t, 'comm') && (
+                          <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200 dark:border-violet-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            Unassigned
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1.5 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+                        <span className="flex items-center gap-1.5">
+                          <Building2 size={12} className="text-slate-400 shrink-0" /> {t.department}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Users size={12} className="text-slate-400 shrink-0" /> {bidderCount} bidder{bidderCount !== 1 ? 's' : ''} · {eligibleCount} eligible
+                        </span>
+                        {t.deadline && (
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={12} className="text-slate-400 shrink-0" /> {t.deadline}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">Budget</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{t.budget}</p>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-300 dark:text-slate-600 group-hover:text-[var(--color-primary)] group-hover:translate-x-0.5 transition-all" />
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -841,67 +958,106 @@ export default function CommercialEvaluation() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <button onClick={goBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+      {/* Unified Card matching tender-management-frontend CommercialEvaluationFlow */}
+      <Card className="overflow-hidden">
+        {/* Header */}
+        <div className="p-4 sm:p-5 flex items-start justify-between flex-wrap gap-4">
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <button onClick={goBack} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                 <ArrowLeft size={12} /> Back
               </button>
-              <span className="text-slate-300">/</span>
-              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tenderRef(tender)}</span>
-              <Badge variant="evaluation">Commercial Evaluation</Badge>
+              <span className="text-slate-300 dark:text-slate-700">/</span>
+              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded">
+                {tenderRef(tender)}
+              </span>
+              <span className="rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5">
+                Commercial Evaluation
+              </span>
               <EvaluationTypeBadge meta={typeMeta} />
-              {isParallel && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Parallel</span>}
-              <button onClick={() => navigate(`/commercial-eval-profile/${tenderId}`)}
-                className="text-[10px] font-semibold text-slate-400 hover:text-[var(--color-primary)] underline decoration-dotted underline-offset-2 transition-colors">
-                {evalProfile ? 'Evaluation Profile (locked)' : 'Evaluation Profile'}
-              </button>
+              {isParallel && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">Parallel</span>}
             </div>
-            <h3 className="font-semibold text-slate-800">{tender.title}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {tender.department} · Deadline: {tender.deadline}
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 wrap-anywhere">{tender.title}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {tender.department} · {rows.length} bidders · Closes {tender.deadline}
               {scenario && <> · {scenario.tenderRef} · {scenario.currency} · {scenario.duration}</>}
             </p>
-            <p className="text-xs text-slate-500 mt-0.5">{stepDef.purpose}</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shrink-0">
             <BarChart3 size={13} className="text-slate-400" /> Step {stepDef.no} of {steps.length}
           </div>
         </div>
-      </Card>
 
-      {/* Step indicator — the nine steps share the row, so it never scrolls */}
-      <div className="flex items-center gap-1">
-        {steps.map((s, i) => {
-          const active = step === s.id
-          const wasSkipped = isSkipped(s.id)
-          const done = !wasSkipped && i < stepIdx
-          return (
-            <Fragment key={s.id}>
-              <span title={wasSkipped ? `${s.name} — skipped, not applied to this tender` : `${s.no} · ${s.name}`}
-                className={`flex-auto min-w-0 flex items-center justify-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border transition-colors
-                  ${active ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                    : wasSkipped ? 'bg-slate-50 text-slate-300 border-slate-200'
-                    : done ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-white text-slate-400 border-slate-200'}`}>
-                <span className={`shrink-0 rounded-full flex items-center justify-center text-[9px] font-bold
-                  ${active ? 'bg-white/25 text-white'
-                    : done ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-slate-100 text-slate-400'}`}
-                  style={{ width: 18, height: 18 }}>
-                  {done ? <CheckCircle size={11} /> : wasSkipped ? <MinusCircle size={11} /> : s.no}
-                </span>
-                <span className={`text-[11px] font-semibold truncate ${wasSkipped ? 'line-through' : ''}`}>{s.short}</span>
+        {/* CommercialEvaluationTabs */}
+        <div className="flex items-center gap-6 border-t border-slate-200 dark:border-slate-800 px-4 sm:px-6 bg-slate-50/50 dark:bg-slate-900/50 overflow-x-auto">
+          <button
+            onClick={() => navigate(`/commercial-eval-profile/${tenderId}`)}
+            className="relative inline-flex items-center gap-2 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors shrink-0 cursor-pointer"
+          >
+            <span>Tender Evaluation Profile</span>
+            {evalProfile || tender.commercialEvalProfileLocked ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-semibold">
+                <ShieldCheck size={11} /> Profile locked
               </span>
-              {i < steps.length - 1 && (
-                <span className={`shrink-0 w-1.5 h-px ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-              )}
-            </Fragment>
-          )
-        })}
-      </div>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-[10px] font-semibold">
+                Draft
+              </span>
+            )}
+          </button>
+          <div className="relative inline-flex items-center gap-2 py-3 text-xs font-bold text-[var(--color-primary)] shrink-0">
+            <span>Commercial Evaluation</span>
+            <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--color-primary)] shadow-sm" />
+          </div>
+        </div>
+
+        {/* Stepper Process Flow */}
+        <div className="border-t border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-1.5 gap-y-2 bg-white dark:bg-slate-900">
+          {steps.map((s, i) => {
+            const active = step === s.id
+            const wasSkipped = isSkipped(s.id)
+            const done = !wasSkipped && i < stepIdx
+            return (
+              <Fragment key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => setStep(s.id)}
+                  title={wasSkipped ? `${s.name} — skipped` : `${s.no} · ${s.name}`}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-all cursor-pointer
+                    ${active
+                      ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm'
+                      : wasSkipped
+                      ? 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 line-through'
+                      : done
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
+                      : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0
+                      ${active
+                        ? 'bg-white/20 text-white'
+                        : done
+                        ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
+                  >
+                    {done ? <Check size={10} /> : wasSkipped ? <MinusCircle size={10} /> : s.no}
+                  </span>
+                  <span className="truncate">{s.short}</span>
+                </button>
+                {i < steps.length - 1 && (
+                  <span className={`w-2 h-px shrink-0 ${done ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                )}
+              </Fragment>
+            )
+          })}
+        </div>
+
+        {/* Step Purpose line */}
+        <div className="border-t border-slate-100 dark:border-slate-800/80 px-4 sm:px-6 py-2 bg-slate-50/40 dark:bg-slate-900/40 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <Info size={13} className="text-slate-400 shrink-0" />
+          <span>{stepDef.purpose}</span>
+        </div>
+      </Card>
 
       {/* ── Supply Chain sent this back — the comment is the whole brief ── */}
       {scmReturn && (
@@ -1057,49 +1213,49 @@ export default function CommercialEvaluation() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100">
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 min-w-60">Commercial Data Point</th>
+                          <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-700">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 min-w-60">Commercial Data Point</th>
                             {rows.map(r => (
-                              <th key={r.id} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 min-w-44">
+                              <th key={r.id} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 min-w-44">
                                 {r.short}
-                                <span className="block text-[10px] font-normal text-slate-400">{r.country} · {r.p.currency}</span>
+                                <span className="block text-[10px] font-normal text-slate-400 dark:text-slate-500">{r.country} · {r.p.currency}</span>
                               </th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
                           {commercialExtractionFields.map(f => {
                             const open = openField === f.id
                             return (
                               <Fragment key={f.id}>
-                                <tr className="hover:bg-slate-50/60 cursor-pointer" onClick={() => setOpenField(open ? null : f.id)}>
-                                  <td className="px-4 py-3 text-slate-700 font-medium">
+                                <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => setOpenField(open ? null : f.id)}>
+                                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">
                                     <span className="flex items-center gap-1.5">
                                       {open ? <ChevronDown size={13} className="text-slate-400 shrink-0" /> : <ChevronRight size={13} className="text-slate-400 shrink-0" />}
                                       {f.label}
                                     </span>
                                   </td>
                                   {rows.map(r => (
-                                    <td key={r.id} className="px-3 py-3 text-slate-700 text-[12px] align-top">{extractionOf(r.id)[f.id]}</td>
+                                    <td key={r.id} className="px-3 py-3 text-slate-700 dark:text-slate-300 text-[12px] align-top">{extractionOf(r.id)[f.id]}</td>
                                   ))}
                                 </tr>
                                 {open && (
-                                  <tr className="bg-slate-50/70">
+                                  <tr className="bg-slate-50/70 dark:bg-slate-800/60">
                                     <td className="px-4 py-3 align-top">
-                                      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 flex items-center gap-1"><Quote size={11} /> Evidence</span>
+                                      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1"><Quote size={11} /> Evidence</span>
                                     </td>
                                     {rows.map(r => {
                                       const e = r.p.evidence[f.id]
                                       return (
                                         <td key={r.id} className="px-3 py-3 align-top">
                                           {e ? (
-                                            <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                                              <p className="text-[10px] font-semibold text-slate-600 flex items-center gap-1">
+                                            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5">
+                                              <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1">
                                                 <FileText size={10} className="text-slate-400 shrink-0" />{e.doc} · p.{e.page}
                                               </p>
-                                              <p className="text-[11px] text-slate-500 italic mt-1.5 leading-relaxed">“{e.quote}”</p>
+                                              <p className="text-[11px] text-slate-500 dark:text-slate-400 italic mt-1.5 leading-relaxed">“{e.quote}”</p>
                                             </div>
-                                          ) : <span className="text-[11px] text-slate-300">No reference</span>}
+                                          ) : <span className="text-[11px] text-slate-300 dark:text-slate-600">No reference</span>}
                                         </td>
                                       )
                                     })}
@@ -1118,9 +1274,9 @@ export default function CommercialEvaluation() {
                       const withEv = commercialExtractionFields.filter(f => r.p.evidence[f.id]).length
                       return (
                         <Card key={r.id} className="p-4">
-                          <p className="text-xs font-semibold text-slate-600">{r.short}</p>
-                          <p className="text-xl font-bold text-slate-800 mt-1">{withEv}<span className="text-sm text-slate-400">/{commercialExtractionFields.length}</span></p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">data points extracted with evidence</p>
+                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">{r.short}</p>
+                          <p className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">{withEv}<span className="text-sm text-slate-400 dark:text-slate-500">/{commercialExtractionFields.length}</span></p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">data points extracted with evidence</p>
                         </Card>
                       )
                     })}
@@ -2510,50 +2666,50 @@ Evaluated Price        =  Bid Price - Adjustment Value`}</pre>
 
 function AiStrip({ children }) {
   return (
-    <div className="flex items-start gap-2.5 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
-      <Bot size={14} className="text-blue-600 shrink-0 mt-0.5" />
-      <span className="text-xs text-blue-800 leading-relaxed">{children}</span>
+    <div className="flex items-start gap-2.5 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl">
+      <Bot size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+      <span className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">{children}</span>
     </div>
   )
 }
 
 function PanelHead({ icon: Icon, title, hint, action }) {
   return (
-    <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 flex-wrap">
+    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 flex-wrap">
       {Icon && <Icon size={15} className="text-[var(--color-primary)]" />}
-      <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
-      {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+      <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{title}</h3>
+      {hint && <span className="text-[10px] text-slate-400 dark:text-slate-500">{hint}</span>}
       {action && <div className="ml-auto">{action}</div>}
     </div>
   )
 }
 
 function Chip({ tone, children }) {
-  const cls = tone === 'red' ? 'bg-red-50 text-red-600 border-red-200'
-    : tone === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  const cls = tone === 'red' ? 'bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800'
+    : tone === 'amber' ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
   return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{children}</span>
 }
 
 function Register({ title, entries, empty, tone, prefix }) {
-  const headTone = tone === 'red' ? 'text-red-500' : 'text-amber-500'
+  const headTone = tone === 'red' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400'
   return (
     <Card className="overflow-hidden">
       <PanelHead icon={tone === 'red' ? XCircle : AlertTriangle} title={title} hint={`${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`} />
       {entries.length === 0 ? (
-        <p className="px-4 py-6 text-xs text-slate-400 text-center">{empty}</p>
+        <p className="px-4 py-6 text-xs text-slate-400 dark:text-slate-500 text-center">{empty}</p>
       ) : (
-        <div className="divide-y divide-slate-50">
+        <div className="divide-y divide-slate-50 dark:divide-slate-800">
           {entries.map((e, i) => (
             <div key={`${e.row.id}-${e.item.id}`} className="px-4 py-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-[10px] font-mono font-bold ${headTone}`}>{prefix}-{String(i + 1).padStart(2, '0')}</span>
-                <span className="text-xs font-semibold text-slate-700">{e.row.short}</span>
-                <span className="text-slate-300">·</span>
-                <span className="text-xs text-slate-600">{e.item.name}</span>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{e.row.short}</span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span className="text-xs text-slate-600 dark:text-slate-300">{e.item.name}</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{e.note || 'Departs from the ITT commercial condition.'}</p>
-              <p className="text-[10px] text-slate-400 mt-1">ITT requirement: {e.item.requirement}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{e.note || 'Departs from the ITT commercial condition.'}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">ITT requirement: {e.item.requirement}</p>
             </div>
           ))}
         </div>
@@ -2571,20 +2727,20 @@ function StepFooter({
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">
           {block
-            ? <p className="text-xs text-amber-700 flex items-center gap-1.5"><AlertTriangle size={12} /> {block}</p>
-            : hint && <p className="text-xs text-slate-400">{hint}</p>}
+            ? <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5"><AlertTriangle size={12} /> {block}</p>
+            : hint && <p className="text-xs text-slate-400 dark:text-slate-500">{hint}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {onBack && <Button variant="secondary" size="sm" onClick={onBack}><ArrowLeft size={13} /> {backLabel}</Button>}
           {onSkip && (
             <button onClick={onSkip}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors cursor-pointer">
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer">
               <MinusCircle size={13} /> {skipLabel}
             </button>
           )}
           {onInclude && (
             <button onClick={onInclude}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors cursor-pointer">
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer">
               <RotateCcw size={13} /> {includeLabel}
             </button>
           )}

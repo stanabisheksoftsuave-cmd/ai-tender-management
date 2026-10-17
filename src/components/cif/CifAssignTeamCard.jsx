@@ -42,7 +42,7 @@ export default function CifAssignTeamCard({ assignments, onChange, rosters, show
   const incomplete = !isTeamComplete(assignments, rosters)
 
   return (
-    <Card branded className="p-4 sm:p-6 mt-5 olng-slide-up" style={{ animationDelay: '90ms' }}>
+    <Card className="p-4 sm:p-6 mt-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm olng-slide-up" style={{ animationDelay: '90ms' }}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <UserCheck size={16} style={{ color: '#0089cf' }} aria-hidden="true" />
         <h3 className="text-base font-bold" style={{ color: '#1e293b' }}>Assign Team</h3>
@@ -53,7 +53,7 @@ export default function CifAssignTeamCard({ assignments, onChange, rosters, show
         {ROLES.map(role => (
           <div key={role.key} className="min-w-0">
             <label className="text-xs font-semibold mb-2 flex items-center gap-1" style={{ color: '#1e293b' }}>
-              {role.label} <span className="font-secondary" style={{ color: '#0089cf' }}>*</span>
+              {role.label} <span className="font-secondary text-red-500">*</span>
             </label>
             <SearchableSelect
               ariaLabel={role.label}

@@ -29,7 +29,7 @@ export default function CifConfirmDialog({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div role="alertdialog" aria-modal="true" aria-labelledby="cif-confirm-title" className="w-full max-w-sm olng-scale-in" onClick={e => e.stopPropagation()}>
-        <Card branded className="p-5">
+        <Card className="p-5">
           <div className="flex items-start gap-3">
             <span
               className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center"
