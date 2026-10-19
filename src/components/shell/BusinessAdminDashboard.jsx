@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Layers,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { useTenders } from '../../context/TenderContext'
 import { CostCodeChip, BudgetAmount } from './TableBits'
+import ListPagination from './ListPagination'
 import {
   deadlineInDays,
   daysOverdue,
@@ -94,13 +95,24 @@ export default function BusinessAdminDashboard() {
     },
   ]
 
-  // Recent Tenders to display
-  const recentTenders = useMemo(() => {
-    return pipelineTenders.slice(0, 10)
-  }, [pipelineTenders])
+  // Recent tenders — every pipeline tender, paged like the main app's table.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const totalPages = Math.max(1, Math.ceil(pipelineTenders.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const recentTenders = useMemo(
+    () => pipelineTenders.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [pipelineTenders, currentPage, pageSize]
+  )
 
   return (
-    <div className="space-y-4 pb-12">
+    // One white container for the whole dashboard, as in the main app, fixed
+    // to the viewport (below the 4rem header and the page's p-6). Its top part
+    // — greeting and KPI tiles — stays put; only the part below it (pipeline
+    // and recent tenders) scrolls, inside the container.
+    <div className="flex h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl border border-[#cce6f8] bg-white shadow-[0_1px_4px_rgba(27,76,111,0.06),0_4px_16px_rgba(27,76,111,0.06)] dark:border-slate-800 dark:bg-slate-900">
+    {/* ── Fixed part ── */}
+    <div className="shrink-0 space-y-5 px-4 pt-4 sm:px-5 sm:pt-5">
       {/* ── Greeting Header ── */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
@@ -186,6 +198,10 @@ export default function BusinessAdminDashboard() {
         </div>
       </div>
 
+    </div>
+
+    {/* ── Scrolling part ── */}
+    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
       {/* ── Workflow Pipeline Card ── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
         <div className="flex items-center justify-between">
@@ -214,7 +230,7 @@ export default function BusinessAdminDashboard() {
                 key={stage.key}
                 onClick={() => navigate('/tenders')}
                 title={`${stage.label} — ${stage.count} tender${stage.count !== 1 ? 's' : ''} (${share}% of pipeline)`}
-                className="group relative rounded-xl border p-3 bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 cursor-pointer shadow-[0_3px_12px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.25)] transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[0_20px_36px_-6px_rgba(0,137,207,0.28),0_8px_16px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/40 hover:bg-[#f3f9fd] dark:hover:bg-slate-800/90 active:translate-y-0 active:shadow-md"
+                className="group relative rounded-xl border p-3 bg-[#e6f3fb] dark:bg-slate-800/60 border-[#b9dcf2] dark:border-slate-700 cursor-pointer shadow-[0_3px_12px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.25)] transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[0_20px_36px_-6px_rgba(0,137,207,0.28),0_8px_16px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/40 hover:bg-[#d9edf9] dark:hover:bg-slate-800/90 active:translate-y-0 active:shadow-md"
               >
                 <div className="flex items-center justify-between gap-1">
                   <p className="text-xs font-bold text-[#0089cf] dark:text-sky-400 group-hover:text-[#0077b5] transition-colors truncate">
@@ -225,7 +241,7 @@ export default function BusinessAdminDashboard() {
                 <p className="mt-1.5 text-xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">
                   {stage.count}
                 </p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white dark:bg-slate-700">
                   <div
                     style={{ width: `${share}%` }}
                     className="h-full rounded-full transition-all bg-[#0089cf]"
@@ -240,9 +256,11 @@ export default function BusinessAdminDashboard() {
         </div>
       </div>
 
-      {/* ── Recent Tenders Card ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+      {/* ── Recent Tenders Card ── — exactly as tall as the scrolling part, so
+          once scrolled into view it fills it: header on top, rows scrolling
+          in the middle, pagination pinned at the bottom. */}
+      <div className="flex h-full min-h-[22rem] flex-col bg-white dark:bg-slate-900 border border-[#cce6f8] dark:border-slate-800 rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
           <div>
             <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">Recent tenders</h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -258,10 +276,10 @@ export default function BusinessAdminDashboard() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+            <thead className="sticky top-0 z-[1]">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                 <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[14%]">
                   Cost code
                 </th>
@@ -351,7 +369,20 @@ export default function BusinessAdminDashboard() {
             </tbody>
           </table>
         </div>
+
+        {pipelineTenders.length > 0 && (
+          <div className="shrink-0 border-t border-slate-200 px-4 py-2.5 dark:border-slate-800">
+            <ListPagination
+              page={currentPage}
+              pageSize={pageSize}
+              total={pipelineTenders.length}
+              onPageChange={setPage}
+              onPageSizeChange={size => { setPageSize(size); setPage(1) }}
+            />
+          </div>
+        )}
       </div>
+    </div>
     </div>
   )
 }
