@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Layers,
   ClipboardCheck,
@@ -21,6 +21,7 @@ import {
 } from './chFlow'
 
 export default function BusinessAdminDashboard() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { tenders } = useTenders()
 
@@ -110,16 +111,16 @@ export default function BusinessAdminDashboard() {
         </p>
       </div>
 
-      {/* ── 4 KPI Summary Cards (Compact Box Size) ── */}
+      {/* ── 4 KPI Summary Cards (Compact Box Size + Light Blue bg with Dark Blue icon + Elevation) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* TOTAL TENDERS */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+        <div className="group bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-[0_16px_32px_-4px_rgba(0,137,207,0.22),0_4px_12px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/30 cursor-pointer">
           <div className="flex items-start justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total tenders
             </span>
-            <div className="w-7 h-7 rounded-lg bg-sky-100/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-              <Layers size={15} />
+            <div className="w-8 h-8 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 text-[#0089cf] dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200">
+              <Layers size={16} />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
@@ -131,13 +132,13 @@ export default function BusinessAdminDashboard() {
         </div>
 
         {/* IN EVALUATION */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+        <div className="group bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-[0_16px_32px_-4px_rgba(0,137,207,0.22),0_4px_12px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/30 cursor-pointer">
           <div className="flex items-start justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               In evaluation
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-100/70 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <ClipboardCheck size={15} />
+            <div className="w-8 h-8 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 text-[#0089cf] dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200">
+              <ClipboardCheck size={16} />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
@@ -149,13 +150,13 @@ export default function BusinessAdminDashboard() {
         </div>
 
         {/* AT SCM GATES */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+        <div className="group bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-[0_16px_32px_-4px_rgba(0,137,207,0.22),0_4px_12px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/30 cursor-pointer">
           <div className="flex items-start justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               At SCM gates
             </span>
-            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
-              <Hourglass size={15} />
+            <div className="w-8 h-8 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 text-[#0089cf] dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200">
+              <Hourglass size={16} />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
@@ -167,13 +168,13 @@ export default function BusinessAdminDashboard() {
         </div>
 
         {/* AWARDED */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+        <div className="group bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-[0_16px_32px_-4px_rgba(0,137,207,0.22),0_4px_12px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/30 cursor-pointer">
           <div className="flex items-start justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Awarded
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <Award size={15} />
+            <div className="w-8 h-8 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 text-[#0089cf] dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200">
+              <Award size={16} />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
@@ -185,12 +186,12 @@ export default function BusinessAdminDashboard() {
         </div>
       </div>
 
-      {/* ── Workflow Pipeline Card (Compact Box Size + All Blue Headings) ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+      {/* ── Workflow Pipeline Card ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-sky-100/80 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-              <Activity size={14} />
+            <span className="w-8 h-8 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 text-[#0089cf] dark:text-sky-400 flex items-center justify-center shrink-0 shadow-sm">
+              <Activity size={16} />
             </span>
             <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Workflow pipeline</h3>
           </div>
@@ -204,27 +205,33 @@ export default function BusinessAdminDashboard() {
           </div>
         </div>
 
+        {/* 6 Stage Boxes — with rich resting shadow and elevated hover animation like Contract Holder */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mt-3">
           {PIPELINE_CARDS.map(stage => {
             const share = totalCount > 0 ? Math.round((stage.count / totalCount) * 100) : 0
             return (
               <div
                 key={stage.key}
-                className="rounded-lg border p-2.5 bg-sky-50/40 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900/40"
+                onClick={() => navigate('/tenders')}
+                title={`${stage.label} — ${stage.count} tender${stage.count !== 1 ? 's' : ''} (${share}% of pipeline)`}
+                className="group relative rounded-xl border p-3 bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 cursor-pointer shadow-[0_3px_12px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03)] dark:shadow-[0_3px_12px_rgba(0,0,0,0.25)] transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[0_20px_36px_-6px_rgba(0,137,207,0.28),0_8px_16px_rgba(0,0,0,0.06)] hover:border-[#0089cf] hover:ring-1 hover:ring-[#0089cf]/40 hover:bg-[#f3f9fd] dark:hover:bg-slate-800/90 active:translate-y-0 active:shadow-md"
               >
-                <p className="text-xs font-semibold text-sky-600 dark:text-sky-400">
-                  {stage.label}
-                </p>
-                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold text-[#0089cf] dark:text-sky-400 group-hover:text-[#0077b5] transition-colors truncate">
+                    {stage.label}
+                  </p>
+                  <ArrowRight size={11} className="text-[#0089cf] opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 shrink-0" />
+                </div>
+                <p className="mt-1.5 text-xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">
                   {stage.count}
                 </p>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/60">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
                     style={{ width: `${share}%` }}
-                    className="h-full rounded-full transition-all bg-sky-500"
+                    className="h-full rounded-full transition-all bg-[#0089cf]"
                   />
                 </div>
-                <p className="mt-1 text-[10px] text-slate-400 tabular-nums">
+                <p className="mt-1.5 text-[10px] font-medium text-slate-400 group-hover:text-slate-500 dark:group-hover:text-slate-300 tabular-nums transition-colors">
                   {share}% of pipeline
                 </p>
               </div>
@@ -234,7 +241,7 @@ export default function BusinessAdminDashboard() {
       </div>
 
       {/* ── Recent Tenders Card ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)] overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
           <div>
             <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">Recent tenders</h3>
