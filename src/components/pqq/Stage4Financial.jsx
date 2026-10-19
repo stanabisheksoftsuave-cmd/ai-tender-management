@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowRight, Award, Bot, CheckCircle, ChevronRight, Download, FileText, RotateCcw, UploadCloud, UserCheck, XCircle } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ArrowRight, Award, Bot, CheckCircle, ChevronRight, Download, FileText, RefreshCw, RotateCcw, Trash2, UploadCloud, UserCheck, XCircle } from 'lucide-react'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import SearchableSelect from '../ui/SearchableSelect'
@@ -36,6 +36,211 @@ function AssignedTeamCard({ assignedCes }) {
           Not assigned on the CIF
         </span>
       )}
+    </div>
+  )
+}
+
+// Main app's upload limits (§7.1): per batch, per file, and the batch total.
+const MAX_FILES_PER_UPLOAD = 20
+const MAX_FILE_BYTES = 512 * 1024 * 1024
+const MAX_BATCH_BYTES = 1024 * 1024 * 1024
+
+const formatFileSize = (bytes) => {
+  if (bytes == null) return null
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** Statements already on file for a bidder — the list, or the single file older uploads stored. */
+const financialFilesOf = (bidder) =>
+  Array.isArray(bidder?.financialFiles) ? bidder.financialFiles
+    : bidder?.financialFileName ? [{ id: 'legacy', name: bidder.financialFileName }]
+    : []
+
+/*
+ * Bidder picker + financial statement upload — the main app's
+ * BidderFinancialUploadCard. Files are staged in "Ready to upload" and only
+ * sent on Submit; "Uploaded so far" lists the selected bidder's statements,
+ * each replaceable on its own.
+ */
+function BidderFinancialUploadCard({ bidders, bidderId, onSelectBidder, busy, processingPhase, onSubmit, onReplace }) {
+  const [pendingFiles, setPendingFiles] = useState([])
+  const [validationError, setValidationError] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const inputRef = useRef(null)
+
+  const bidder = bidders.find(b => String(b.id) === String(bidderId))
+  const uploaded = financialFilesOf(bidder)
+
+  const stageFiles = (list) => {
+    const files = Array.from(list || [])
+    if (files.length === 0) return
+    const next = [...pendingFiles, ...files]
+    const skipped = Math.max(0, next.length - MAX_FILES_PER_UPLOAD)
+    setPendingFiles(next.slice(0, MAX_FILES_PER_UPLOAD))
+    setValidationError(skipped > 0
+      ? `Only ${MAX_FILES_PER_UPLOAD} files can be uploaded at once — ${skipped} file${skipped === 1 ? ' was' : 's were'} left out.`
+      : null)
+  }
+
+  const submit = () => {
+    if (busy || pendingFiles.length === 0) return
+    const oversized = pendingFiles.find(f => f.size > MAX_FILE_BYTES)
+    if (oversized) { setValidationError(`File ${oversized.name} exceeds the 512 MB limit.`); return }
+    if (pendingFiles.reduce((sum, f) => sum + f.size, 0) > MAX_BATCH_BYTES) {
+      setValidationError('Total upload size exceeds the 1 GB limit.')
+      return
+    }
+    setValidationError(null)
+    onSubmit(bidderId, pendingFiles)
+    setPendingFiles([])
+  }
+
+  const onDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (!busy) stageFiles(e.dataTransfer?.files)
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex w-9 h-9 shrink-0 items-center justify-center rounded-lg bg-[#afd9f4] text-[#0089cf]" aria-hidden="true">
+          <UploadCloud size={18} />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-slate-800">Upload Financial Statements</h3>
+          <p className="text-xs text-slate-500">Choose a bidder, then add their financial statements.</p>
+        </div>
+      </div>
+
+      <div className="mb-1 text-xs font-semibold text-slate-800">Bidder</div>
+      <SearchableSelect
+        value={bidderId ?? ''}
+        onChange={v => { onSelectBidder(String(v)); setPendingFiles([]); setValidationError(null) }}
+        options={bidders}
+        getValue={b => String(b.id)}
+        getLabel={b => `${b.name}${b.financialReuploadRequested ? ' (Awaiting Re-upload)' : ''}`}
+        getSubLabel={b => [b.country, b.category].filter(Boolean).join(' · ')}
+        disabled={busy}
+        placeholder="Select bidder…"
+        searchPlaceholder="Search bidders…"
+        emptyText="No matching bidders"
+        ariaLabel="Select bidder"
+      />
+      <p className="mt-2 mb-4 text-xs text-slate-500">
+        Up to 20 files per upload, 512 MB each, 1 GB total. Figures are extracted by AI, then confirmed here.
+      </p>
+
+      {/* Drop zone — drag files in, or click anywhere on it to browse */}
+      <label
+        onDragOver={e => { e.preventDefault(); if (!busy) setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors',
+          dragOver ? 'border-[#0089cf] bg-[#0089cf]/5' : 'border-slate-300 bg-white hover:border-[#0089cf]/60',
+          busy && 'pointer-events-none opacity-50',
+        )}
+      >
+        <span className="flex w-10 h-10 items-center justify-center rounded-full bg-[#afd9f4] text-[#0089cf]" aria-hidden="true">
+          <UploadCloud size={18} />
+        </span>
+        <span className="text-sm font-semibold text-slate-800">Drag and drop the bidder&apos;s financial statements here</span>
+        <span className="text-xs text-slate-500">or <span className="font-semibold text-[#0089cf]">click to browse</span></span>
+        <input ref={inputRef} type="file" multiple className="hidden" disabled={busy}
+          aria-label="Upload Statement"
+          onChange={e => { stageFiles(e.target.files); e.target.value = '' }} />
+      </label>
+
+      {busy && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          <Bot size={12} className="animate-pulse" />
+          {processingPhase === 'upload' ? 'Uploading financial statements…' : 'AI assessing financial criteria…'}
+        </div>
+      )}
+
+      {pendingFiles.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ready to upload</h3>
+            <span className="rounded-full bg-[#afd9f4] px-2 py-0.5 text-[11px] font-semibold text-[#0089cf]">{pendingFiles.length}</span>
+          </div>
+          <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200">
+            {pendingFiles.map((file, index) => (
+              <li key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex w-8 h-8 shrink-0 items-center justify-center rounded-md bg-[#afd9f4] text-[#0089cf]" aria-hidden="true">
+                    <FileText size={16} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-slate-800">{file.name}</span>
+                    <span className="block text-xs text-slate-500">{formatFileSize(file.size)}</span>
+                  </span>
+                </span>
+                <button type="button" aria-label={`Delete ${file.name}`} disabled={busy}
+                  onClick={() => { setPendingFiles(p => p.filter((_, i) => i !== index)); setValidationError(null) }}
+                  className="flex w-8 h-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 disabled:opacity-40">
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex justify-end">
+            <Button size="sm" disabled={busy} onClick={submit}>Submit</Button>
+          </div>
+        </div>
+      )}
+
+      {validationError && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{validationError}</div>
+      )}
+
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <div className="mb-2 flex items-center gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Uploaded so far</h3>
+          {uploaded.length > 0 && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{uploaded.length}</span>
+          )}
+        </div>
+        {uploaded.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
+            No financial statements uploaded yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200">
+            {uploaded.map(doc => (
+              <li key={doc.id} className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-slate-50/60">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex w-8 h-8 shrink-0 items-center justify-center rounded-md bg-[#afd9f4] text-[#0089cf]" aria-hidden="true">
+                    <FileText size={16} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-slate-800">{doc.name}</span>
+                    {doc.size != null && <span className="block text-xs text-slate-500">{formatFileSize(doc.size)}</span>}
+                  </span>
+                </span>
+                <label className={cn(
+                  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50',
+                  busy && 'pointer-events-none opacity-50',
+                )}>
+                  <RefreshCw size={12} aria-hidden="true" /> Replace
+                  <input type="file" className="hidden" disabled={busy} aria-label={`Replace ${doc.name}`}
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (!file) return
+                      if (file.size > MAX_FILE_BYTES) { setValidationError(`File ${file.name} exceeds the 512 MB limit.`); return }
+                      setValidationError(null)
+                      onReplace(bidderId, doc.id, file)
+                    }} />
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -170,34 +375,69 @@ export function Stage4Financial({ tender, patch, isCE, assignedCes, isComplete, 
 
   const all = tender.prequalBidders || []
   const active = all.filter(b => !b.droppedAt)
-  const pending = active.filter(b => !b.financialUploaded && String(b.id) !== String(processingId))
-  const selectedId = pending.some(b => String(b.id) === String(selectedIdRaw)) ? String(selectedIdRaw) : (pending[0] ? String(pending[0].id) : null)
+  // The picker lists every bidder (uploaded ones stay reachable for more
+  // statements or a Replace); it opens on the first one still waiting.
+  const firstWaiting = active.find(b => !b.financialUploaded)
+  const selectedId = active.some(b => String(b.id) === String(selectedIdRaw))
+    ? String(selectedIdRaw)
+    : (firstWaiting ?? active[0]) ? String((firstWaiting ?? active[0]).id) : null
   const assessed = active.filter(b => b.financialUploaded)
   const allAssessed = active.length > 0 && active.every(b => b.financialUploaded && stage4Overall(b))
   const passers = active.filter(b => stage4Overall(b) === 'pass')
 
   const patchBidder = (bidderId, fn) => patch(t => ({ prequalBidders: patchBidderIn(t.prequalBidders, bidderId, fn) }))
 
-  const handleFile = (bidderId, file) => {
-    if (!file || bidderId == null) return
+  const toRecord = (file) => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: file.name,
+    size: file.size,
+  })
+
+  // Simulated upload → AI pass. Only a bidder's first upload (or the one after
+  // a re-upload request) runs the AI marks; adding statements later never
+  // wipes marks the Contract Engineer has already confirmed or overridden.
+  const handleFiles = (bidderId, files) => {
+    if (!files?.length || bidderId == null) return
     setProcessingId(bidderId)
     setProcessingPhase('upload')
     setTimeout(() => {
       setProcessingPhase('ai')
       setTimeout(() => {
-        const ai = generateAiStage4()
-        patchBidder(bidderId, {
-          financialUploaded: true,
-          financialFileName: file.name,
-          stage4Marks: ai.marks,
-          stage4Ai: ai.marks,
-          stage4Reasons: ai.reasons,
-          stage4AiReasons: ai.reasons,
-          financialReuploadRequested: false,
+        const records = files.map(toRecord)
+        patchBidder(bidderId, b => {
+          const filesNow = [...financialFilesOf(b), ...records]
+          if (b.financialUploaded) return { financialFiles: filesNow }
+          const ai = generateAiStage4()
+          return {
+            financialUploaded: true,
+            financialFiles: filesNow,
+            financialFileName: filesNow[0]?.name,
+            stage4Marks: ai.marks,
+            stage4Ai: ai.marks,
+            stage4Reasons: ai.reasons,
+            stage4AiReasons: ai.reasons,
+            financialReuploadRequested: false,
+          }
         })
         setProcessingId(null)
         setProcessingPhase(null)
+        // Move the picker on to whoever is still outstanding.
+        const next = active.find(b => !b.financialUploaded && String(b.id) !== String(bidderId))
+        if (next) setSelectedIdRaw(String(next.id))
       }, 1100)
+    }, 700)
+  }
+
+  const replaceFile = (bidderId, fileId, file) => {
+    setProcessingId(bidderId)
+    setProcessingPhase('upload')
+    setTimeout(() => {
+      patchBidder(bidderId, b => {
+        const filesNow = financialFilesOf(b).map(f => (f.id === fileId ? toRecord(file) : f))
+        return { financialFiles: filesNow, financialFileName: filesNow[0]?.name }
+      })
+      setProcessingId(null)
+      setProcessingPhase(null)
     }, 700)
   }
 
@@ -269,48 +509,20 @@ export function Stage4Financial({ tender, patch, isCE, assignedCes, isComplete, 
           </>
         ) : (
           <>
-            <PqqAlert tone="info" title="Financial assessment assigned to you">
-              Assess each qualified bidder, then return the pre-qualification document to the Contract Holder.
-            </PqqAlert>
-
-            {pending.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <UploadCloud size={14} className="text-[var(--color-primary)]" />
-                  <h3 className="text-sm font-semibold text-slate-800">Upload Financial Statement</h3>
-                </div>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="min-w-48 flex-1">
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Bidder</label>
-                    <SearchableSelect
-                      value={selectedId ?? ''}
-                      onChange={v => setSelectedIdRaw(String(v))}
-                      options={pending}
-                      getValue={b => String(b.id)}
-                      getLabel={b => `${b.name}${b.financialReuploadRequested ? ' (Awaiting Re-upload)' : ''}`}
-                      getSubLabel={b => [b.country, b.category].filter(Boolean).join(' · ')}
-                      disabled={processingId != null}
-                      placeholder="Select bidder…"
-                      searchPlaceholder="Search bidders…"
-                      emptyText="No matching bidders"
-                      ariaLabel="Bidder"
-                    />
-                  </div>
-                  <label
-                    className={cn('flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition-opacity', (processingId != null || selectedId == null) && 'pointer-events-none opacity-50')}
-                    style={{ background: 'var(--color-primary)' }}
-                  >
-                    <UploadCloud size={13} /> Upload Statement
-                    <input type="file" className="hidden" onChange={e => { handleFile(selectedId, e.target.files?.[0]); e.target.value = '' }} />
-                  </label>
-                </div>
-                {processingId != null && (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                    <Bot size={12} className="animate-pulse" />
-                    {processingPhase === 'upload' ? 'Uploading financial statement…' : 'AI assessing financial criteria…'}
-                  </div>
-                )}
-              </div>
+            {active.length > 0 ? (
+              <BidderFinancialUploadCard
+                bidders={active}
+                bidderId={selectedId}
+                onSelectBidder={setSelectedIdRaw}
+                busy={processingId != null}
+                processingPhase={processingPhase}
+                onSubmit={handleFiles}
+                onReplace={replaceFile}
+              />
+            ) : (
+              <PqqAlert tone="info" title="No shortlisted bidders">
+                The confirmed shortlist from Stage 3 has no bidders to assess.
+              </PqqAlert>
             )}
 
             {assessed.length > 0 && (

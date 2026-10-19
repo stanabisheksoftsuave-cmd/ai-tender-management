@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Ban, ChevronRight, FileText, ShieldOff, Undo2, Users, Wallet } from 'lucide-react'
+import { ArrowRight, Ban, ChevronRight, FileText, ShieldOff } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -17,9 +17,10 @@ import { Stage2Questionnaire } from '../components/pqq/Stage2Questionnaire'
 import { Stage3ResponseReview } from '../components/pqq/Stage3ResponseReview'
 import { Stage4Financial } from '../components/pqq/Stage4Financial'
 import { FinalReviewStage } from '../components/pqq/FinalReviewStage'
+import FinancialAssessmentWorklist from '../components/pqq/FinancialAssessmentWorklist'
 import { useTenderPatcher } from '../components/pqq/useTenderPatcher'
 import {
-  PREQUAL_STATUSES, STAGE_LABEL, STAGE_ORDER, STAGE_OWNER, bidderRowFromMatch, stage3Overall,
+  PREQUAL_STATUSES, STAGE_LABEL, STAGE_ORDER, bidderRowFromMatch, stage3Overall,
   stage4Overall, today,
 } from '../components/pqq/pqqModel'
 
@@ -106,95 +107,8 @@ export default function PreQualification() {
   )
 
   if (!tenderId) {
-    if (isCE) {
-      const assignments = tenders.filter(t =>
-        t.status === 'prequal_stage4' || (PREQUAL_STATUSES.includes(t.status) && STAGE_OWNER[t.status] === 'pof'))
-      return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Card Header */}
-          <div className="p-4 sm:p-5 flex items-start justify-between gap-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                <Wallet size={18} aria-hidden="true" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900 leading-tight">Financial Assessment</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Pre-qualification runs awaiting your financial assessment</p>
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium tabular-nums">
-              {assignments.length} {assignments.length === 1 ? 'assignment' : 'assignments'}
-            </span>
-          </div>
-
-          {/* List or Empty State */}
-          <div className="p-4 sm:p-5">
-            {assignments.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-200 p-6 text-center sm:p-10">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-                  <Wallet size={18} aria-hidden="true" />
-                </span>
-                <p className="text-sm font-semibold text-slate-800">No pre-qualifications awaiting your financial assessment</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {assignments.map(item => {
-                  const bidderCount = item.bidderCount ?? (item.prequalBidders?.length ?? 0)
-                  const assessedCount = item.assessedCount ?? (item.prequalBidders?.filter(b => b.stage4?.result).length ?? 0)
-                  const isReturned = Boolean(item.returnedToHolder || item.financialReturnedToHolderAt)
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => navigate(`/pre-qualification/${item.id}`)}
-                      className="group block rounded-xl border border-slate-200 bg-white p-3.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.03] transition-all cursor-pointer shadow-none"
-                    >
-                      <div className="flex items-center justify-between gap-3 sm:gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-semibold text-slate-900 truncate">{item.title}</h3>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 uppercase tracking-wide animate-pulse">
-                              SUBMITTED
-                            </span>
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                            <span className="flex items-center gap-1.5">
-                              <Users className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
-                              {assessedCount} of {bidderCount} bidder{bidderCount === 1 ? '' : 's'} assessed
-                            </span>
-                            {isReturned && (
-                              <span className="flex items-center gap-1.5 text-slate-500">
-                                <Undo2 className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
-                                Returned to the Contract Holder - no further action needed unless it comes back.
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight className="size-4 shrink-0 text-slate-300 transition-colors group-hover:text-[#0089cf]" aria-hidden="true" />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Footer with Rows per page */}
-          {assignments.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <div className="flex items-center gap-2">
-                <span>Rows per page</span>
-                <select className="border border-slate-200 rounded px-2 py-0.5 bg-white text-slate-700 font-medium text-xs">
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value="50">50</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      )
-    }
+    // The Contract Engineer gets the main app's Financial Assessment worklist.
+    if (isCE) return <FinancialAssessmentWorklist tenders={tenders} />
 
     const list = tenders.filter(t => PREQUAL_STATUSES.includes(t.status))
     return (
@@ -473,6 +387,28 @@ export default function PreQualification() {
           <PqqButton variant="primary" onClick={backToTemplates}>Back to Strategy Templates</PqqButton>
         </ShellFooter>
       </>
+    )
+  }
+
+  // The Contract Engineer's Stage 4 is its own screen in the main app: one
+  // card titled for the task, with the stage bands below — no tender
+  // breadcrumb, which belongs to the Contract Holder's pre-qualification flow.
+  if (isCE && displayed === 'prequal_stage4') {
+    return (
+      <div className="pb-12">
+        <section
+          className="relative overflow-hidden rounded-2xl border"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: '0 1px 4px rgba(27,76,111,0.08), 0 4px 16px rgba(27,76,111,0.12)' }}
+        >
+          <header className="border-b px-4 py-5 sm:px-6" style={{ borderColor: 'var(--color-border)' }}>
+            <h2 className="text-base font-semibold break-words text-slate-800">Financial Assessment</h2>
+            <p className="mt-0.5 text-xs break-words text-slate-500">
+              Pre-qualification Stage 4 - review and assess bidder financial statements.
+            </p>
+          </header>
+          {content}
+        </section>
+      </div>
     )
   }
 
