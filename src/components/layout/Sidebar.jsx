@@ -46,7 +46,7 @@ const PSF_EMPTY_STATE_MESSAGE =
 
 // Menu per role. Every entry is still run through canAccess() below, so an item
 // can never appear for a role the route itself would turn away — the Dashboard,
-// for instance, belongs to the Contract Holder and the two admin roles only.
+// for instance, belongs to the Contract Holder, Supply Chain and the two admin roles only.
 const navByRole = {
   it_admin: [
     { to: '/dashboard', icon: '/icons/dashboard.svg', labelKey: 'nav.dashboard' },
@@ -76,8 +76,10 @@ const navByRole = {
     { to: '/tenders',            icon: '/icons/tenders.svg',     labelKey: 'nav.tenderTrack' },
   ],
   scm: [
-    { to: '/scm-tech-review',     icon: '/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview' },
-    { to: '/scm-review',          icon: '/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview' },
+    { to: '/dashboard',           icon: '/icons/dashboard.svg',   labelKey: 'nav.dashboard' },
+    { to: '/scm-tech-review',    icon: '/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview' },
+    { to: '/scm-award-review',    icon: '/icons/scale.svg',       labelKey: 'nav.scmAwardReview' },
+    { to: '/scm-review',          icon: '/icons/award.svg',       labelKey: 'nav.scmAwardDecision' },
     { to: '/scm-contract-review', icon: '/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
     { to: '/tenders',             icon: '/icons/tenders.svg',     labelKey: 'nav.tenders'   },
   ],
@@ -111,10 +113,11 @@ const MODULE_NAV = {
   ingestion:         [{ to: '/upload',          icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'  }],
   tech_eval:         [{ to: '/technical-eval',  icon: '/icons/tech-eval.svg',   labelKey: 'nav.techEval'   }],
   comm_eval:         [{ to: '/commercial-eval', icon: '/icons/comm-eval.svg',   labelKey: 'nav.commEval'   }],
-  // One grant covers all three SCM gates, so all three get an entry.
+  // One grant covers all three SCM gates, so every gate screen gets an entry.
   scm_review: [
     { to: '/scm-tech-review',     icon: '/icons/tech-eval.svg',   labelKey: 'nav.scmTechReview'     },
-    { to: '/scm-review',          icon: '/icons/mgmt-review.svg', labelKey: 'nav.scmAwardReview'    },
+    { to: '/scm-award-review',    icon: '/icons/scale.svg',       labelKey: 'nav.scmAwardReview'    },
+    { to: '/scm-review',          icon: '/icons/award.svg',       labelKey: 'nav.scmAwardDecision'  },
     { to: '/scm-contract-review', icon: '/icons/contract.svg',    labelKey: 'nav.scmContractReview' },
   ],
   contract_creation: [{ to: '/contract',        icon: '/icons/contract.svg',    labelKey: 'nav.contract'   }],

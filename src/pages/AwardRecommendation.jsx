@@ -95,7 +95,7 @@ export default function AwardRecommendation() {
       tenders={tenders}
       status="scm_gate2"
       basePath="/scm-review"
-      title="SCM Review — Commercial & Award"
+      title="SCM Review - Award Decision"
       description="Select a tender to review the technical result and commercial recommendation, then award or reject"
       emptyText="No tenders pending SCM award review"
     />

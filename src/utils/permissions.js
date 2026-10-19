@@ -39,8 +39,8 @@ export const ADMIN_ROLES = [ROLE.IT_ADMIN, ROLE.BIZ_ADMIN]
 
 export const ITT_PATH = '/create-itt'
 
-// The Dashboard is restricted to the Contract Holder and the two admin roles.
-export const DASHBOARD_ROLES = [...ADMIN_ROLES, ROLE.CONTRACT_HOLDER]
+// The Dashboard is restricted to the Contract Holder, Supply Chain and the two admin roles.
+export const DASHBOARD_ROLES = [...ADMIN_ROLES, ROLE.CONTRACT_HOLDER, ROLE.SCM]
 
 // Roles allowed on each route. Keys are the first path segment, so
 // '/contract/:tenderId' is governed by the same entry as '/contract'.
@@ -69,6 +69,7 @@ export const ROUTE_ROLES = {
   '/commercial-eval-profile': [ROLE.CONTRACT_ENGINEER],
   // Supply Chain's three approval gates.                 module: scm_review
   '/scm-tech-review':     [ROLE.SCM],
+  '/scm-award-review':    [ROLE.SCM],
   '/scm-review':          [ROLE.SCM],
   '/scm-contract-review': [ROLE.SCM],
   '/contract':            [ROLE.CONTRACT_ENGINEER],  // module: contract_creation
@@ -123,8 +124,8 @@ export function canAccess(roleId, path, matrix = DEFAULT_MATRIX) {
  * page that would bounce the user straight back — including right after an admin
  * revoked whatever the role used to land on. Roles without the Dashboard land on
  * the ITT page; the review roles have no ITT access either, so they fall through
- * to their own workspace. The SCM lands on the award gate, the busiest of its
- * three. '/tenders' is last and is open to every signed-in role, so any role with
+ * to their own workspace. The SCM lands on its Dashboard (the award gate is
+ * its fallback). '/tenders' is last and is open to every signed-in role, so any role with
  * a session — a brand-new custom role included — has somewhere to go.
  */
 const LANDING_ORDER = ['/dashboard', ITT_PATH, '/scm-review', '/legal-review', '/tenders']

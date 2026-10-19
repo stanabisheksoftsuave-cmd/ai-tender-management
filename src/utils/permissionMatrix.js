@@ -59,7 +59,7 @@ export const MODULE_ROUTES = {
   comm_eval:         ['/commercial-eval'],
   // The SCM's three approval gates are one grant — a role that reviews one gate
   // reviews all three.
-  scm_review:        ['/scm-tech-review', '/scm-review', '/scm-contract-review'],
+  scm_review:        ['/scm-tech-review', '/scm-award-review', '/scm-review', '/scm-contract-review'],
   contract_creation: ['/contract'],
 }
 

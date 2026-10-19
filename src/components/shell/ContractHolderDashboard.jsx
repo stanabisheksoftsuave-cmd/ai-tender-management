@@ -49,7 +49,7 @@ const COLUMNS = [
   { label: 'Actions',   width: '8%', right: true },
 ]
 
-function StatCard({ label, value, icon: Icon }) {
+export function StatCard({ label, value, icon: Icon }) {
   return (
     <Card className="p-3">
       <div className="flex items-start gap-3">
@@ -65,7 +65,7 @@ function StatCard({ label, value, icon: Icon }) {
   )
 }
 
-function AttentionRow({ row, canOpen }) {
+export function AttentionRow({ row, canOpen }) {
   const overdue = daysOverdue(row.daysLeft)
   const { tender } = row
   return (

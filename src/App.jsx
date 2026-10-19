@@ -35,6 +35,7 @@ import TechnicalEvaluation from './pages/TechnicalEvaluation'
 import CommercialEvaluation from './pages/CommercialEvaluation'
 import TenderEvaluationProfile from './pages/TenderEvaluationProfile'
 import AwardRecommendation from './pages/AwardRecommendation'
+import ScmAwardReview from './pages/ScmAwardReview'
 import ScmGateReview from './pages/ScmGateReview'
 import ContractTemplate from './pages/ContractTemplate'
 import AuditLog from './pages/AuditLog'
@@ -107,7 +108,10 @@ function ProtectedRoutes() {
           {/* SCM gate 1 — technical evaluation review */}
           <Route path="/scm-tech-review" element={<ScmGateReview gate="scm_gate1" />} />
           <Route path="/scm-tech-review/:tenderId" element={<ScmGateReview gate="scm_gate1" />} />
-          {/* SCM gate 2 — commercial evaluation & award decision */}
+          {/* SCM gate 2 — the award review (rankings + per-bidder decision)… */}
+          <Route path="/scm-award-review" element={<ScmAwardReview />} />
+          <Route path="/scm-award-review/:tenderId" element={<ScmAwardReview />} />
+          {/* …and the award decision, the same gate's approve-one-bidder screen */}
           <Route path="/scm-review" element={<AwardRecommendation />} />
           <Route path="/scm-review/:tenderId" element={<AwardRecommendation />} />
           {/* SCM gate 3 — contract draft approval, which issues the outcome */}

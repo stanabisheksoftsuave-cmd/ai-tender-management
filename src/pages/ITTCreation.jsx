@@ -668,7 +668,7 @@ export default function ITTCreation() {
   const [downloadingZip, setDownloadingZip] = useState(false)
   const [zipError, setZipError] = useState(null)
   // The exported ITT has to actually leave the browser before the flow lets go of
-  // it — View in Tender List stays shut until the package is downloaded. Tracked
+  // it — View in Tender Tracking stays shut until the package is downloaded. Tracked
   // as the tender it was downloaded for: this page is not remounted between
   // tenders (see App.jsx's CreateIttRoute), so a plain boolean would stay latched
   // and let the next tender's export skip the download entirely.
@@ -771,7 +771,7 @@ export default function ITTCreation() {
           onClick={() => navigate('/tenders')}
           className="w-full justify-center py-3"
         >
-          <ChevronRight size={14} /> Back to Tender List
+          <ChevronRight size={14} /> Back to Tender Tracking
         </Button>
       </div>
     )
@@ -1161,7 +1161,7 @@ export default function ITTCreation() {
               {downloadingZip ? 'Building Package…' : 'Download ITT Package (.zip)'}
             </Button>
             <Button variant="brand" disabled={!packageDownloaded} onClick={() => navigate('/tenders')}>
-              <FileText size={15} /> View in Tender List
+              <FileText size={15} /> View in Tender Tracking
             </Button>
           </div>
           {!packageDownloaded && (

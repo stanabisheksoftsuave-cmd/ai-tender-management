@@ -45,6 +45,8 @@ const PARENT_ROUTES = {
   '/commercial-eval/:id':         '/commercial-eval',
   '/scm-tech-review':             '/dashboard',
   '/scm-tech-review/:id':         '/scm-tech-review',
+  '/scm-award-review':            '/dashboard',
+  '/scm-award-review/:id':        '/scm-award-review',
   '/scm-review':                  '/dashboard',
   '/scm-review/:id':              '/scm-review',
   '/scm-contract-review':         '/dashboard',

@@ -27,6 +27,7 @@ import { technicalCriteria } from '../data/mockData'
 import { tenderRef } from '../utils/tenderRef'
 import ContractHolderDashboard from '../components/shell/ContractHolderDashboard'
 import BusinessAdminDashboard from '../components/shell/BusinessAdminDashboard'
+import SupplyChainDashboard from '../components/shell/SupplyChainDashboard'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 // The three approval gates owned by Supply Chain.
@@ -271,6 +272,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   if (user?.role?.id === 'contract_holder') return <ContractHolderDashboard />
   if (user?.role?.id === 'biz_admin') return <BusinessAdminDashboard />
+  if (user?.role?.id === 'scm') return <SupplyChainDashboard />
   return <RoleDashboard />
 }
 

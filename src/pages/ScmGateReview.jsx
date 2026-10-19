@@ -51,7 +51,7 @@ const GATE_RETURN_SIDE = { scm_gate1: 'tech', scm_gate3: 'draft' }
 
 const GATE_COPY = {
   scm_gate1: {
-    title: 'SCM Review — Technical Evaluation',
+    title: 'SCM Review - Technical Evaluation',
     description: 'Review the technical evaluation outcome, then approve to release commercial evaluation or return it to the evaluator',
     empty: 'No tenders awaiting technical review',
     approveLabel: 'Approve — Release Commercial Evaluation',
@@ -60,7 +60,7 @@ const GATE_COPY = {
     returnStep: 'Technical Evaluation',
   },
   scm_gate3: {
-    title: 'SCM Review — Contract Draft',
+    title: 'SCM Review - Contract Draft',
     description: 'Review the drafted contract, then approve to issue the winner’s contract and the regret letters, or return it for redraft',
     empty: 'No contract drafts awaiting review',
     approveLabel: 'Approve — Issue Contract & Regret Letters',

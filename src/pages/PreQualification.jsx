@@ -469,7 +469,7 @@ export default function PreQualification() {
           </p>
         </div>
         <ShellFooter>
-          <PqqButton variant="secondary" onClick={() => navigate('/tenders')}>Back to Tender List</PqqButton>
+          <PqqButton variant="secondary" onClick={() => navigate('/tenders')}>Back to Tender Tracking</PqqButton>
           <PqqButton variant="primary" onClick={backToTemplates}>Back to Strategy Templates</PqqButton>
         </ShellFooter>
       </>

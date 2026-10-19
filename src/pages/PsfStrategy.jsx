@@ -82,7 +82,7 @@ export default function PsfStrategy() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
       <FileText size={32} />
       <p className="text-sm font-medium">Tender not found.</p>
-      <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/tenders')}>Back to Tender List</Button>
+      <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/tenders')}>Back to Tender Tracking</Button>
     </div>
   )
 
