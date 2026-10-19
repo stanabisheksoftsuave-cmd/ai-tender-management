@@ -262,7 +262,9 @@ export default function TenderList() {
   }
 
   return (
-    <div className="space-y-5">
+    // Fills the layout's parent container: the toolbar on top, then the table
+    // card stretching to the bottom — its rows scroll, its pagination stays put.
+    <div className="flex h-full min-h-0 flex-col gap-4">
 
       {/* Contract Engineer: Reassign Stage Modal */}
       {reassignModal && (
@@ -401,7 +403,7 @@ export default function TenderList() {
               onChange={e => { setSearch(e.target.value); setPage(1); setExpanded(null) }}
               placeholder={lang === 'ar' ? 'البحث بالرقم أو العنوان...' : 'Search by ID or title...'}
               aria-label={lang === 'ar' ? 'البحث بالرقم أو العنوان' : 'Search by ID or title'}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+              className="h-9 w-full pl-9 pr-3 text-sm rounded-lg border border-[#cce6f8] dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
             />
           </div>
           {/* Stage filter dropdown */}
@@ -435,10 +437,10 @@ export default function TenderList() {
       </div>
 
       {/* Table Card */}
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <Card className="flex min-h-[20rem] flex-1 flex-col overflow-hidden rounded-xl border border-[#cce6f8] dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[56rem] table-fixed">
-            <thead className="sticky top-0 z-[1] bg-slate-50 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700">
+            <thead className="sticky top-0 z-[1] bg-slate-50 dark:bg-slate-800/90 border-b border-[#cce6f8] dark:border-slate-700">
               <tr>
                 <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.id')}</th>
                 <th className="w-[24%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.title')}</th>
@@ -605,7 +607,7 @@ export default function TenderList() {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+        <div className="shrink-0 px-4 py-2.5 border-t border-[#cce6f8] dark:border-slate-800">
           <ListPagination
             page={safePage}
             pageSize={pageSize}

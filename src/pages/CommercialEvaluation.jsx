@@ -40,14 +40,13 @@ const Paperclip     = p => <Svg {...p}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 
 const Trash2        = p => <Svg {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Svg>
 const Search        = p => <Svg {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Svg>
 const Building2     = p => <Svg {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></Svg>
-const Calendar      = p => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Svg>
 const Users         = p => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>
 const Check         = p => <Svg {...p}><polyline points="20 6 9 17 4 12"/></Svg>
 const ShieldCheck   = p => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></Svg>
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
-import TenderSelectList from '../components/ui/TenderSelectList'
+import ListPagination from '../components/shell/ListPagination'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import {
   bidders, commercialEstimate, commercialBidFactors, commercialComplianceDocs,
@@ -123,6 +122,8 @@ export default function CommercialEvaluation() {
   // The nine steps run in order. `runs` holds each step's AI progress exactly
   // like the old two-step flow did, just keyed by step id.
   const [worklistSearch, setWorklistSearch] = useState('')
+  const [worklistPage, setWorklistPage] = useState(1)
+  const [worklistPageSize, setWorklistPageSize] = useState(10)
   const [step, setStep]       = useState('extraction')
   const [runs, setRuns]       = useState({})   // { [stepId]: { running, step, done } }
   // Linear-flow upload gate — one staged file per bidder, keyed by bidder id,
@@ -682,115 +683,133 @@ export default function CommercialEvaluation() {
         )
       : assignedTenders
 
+    const totalPages = Math.max(1, Math.ceil(filteredTenders.length / worklistPageSize))
+    const currentPage = Math.min(worklistPage, totalPages)
+    const pageTenders = filteredTenders.slice((currentPage - 1) * worklistPageSize, currentPage * worklistPageSize)
+
     return (
-      <div className="space-y-4">
-        {/* Worklist Panel Header matching reference app */}
-        <Card className="p-5 overflow-hidden">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center shrink-0 mt-0.5">
-                <Scale size={20} />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Commercial Evaluation</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-                  Only tenders open for Commercial Evaluation are listed. A tender whose commercial readiness cannot be confirmed from this screen is marked rather than hidden.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search by tender title..."
-                  value={worklistSearch}
-                  onChange={e => setWorklistSearch(e.target.value)}
-                  className="pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 w-48 sm:w-64 transition-all"
-                />
-              </div>
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full">
-                {assignedTenders.length} tender{assignedTenders.length !== 1 ? 's' : ''}
-              </span>
+      // The page IS the layout's parent container, like every worklist: it
+      // bleeds to the container's edges and fills it — heading on top, rows
+      // scrolling, pagination pinned below.
+      <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+        {/* ── Heading: icon, title, description · search and count ── */}
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+          <div className="flex min-w-0 flex-1 basis-96 items-center gap-3">
+            <span className="flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf] dark:bg-sky-950/60">
+              <Scale size={18} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-[#1b4c6f] dark:text-slate-100">Commercial Evaluation</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Only tenders open for Commercial Evaluation are listed. A tender whose commercial readiness cannot be confirmed from this screen is marked rather than hidden.
+              </p>
             </div>
           </div>
-        </Card>
-
-        {/* Tenders List matching reference app */}
-        {filteredTenders.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400 mb-3">
-              {q ? <Search size={22} /> : <Lock size={22} />}
+          <div className="flex items-center gap-2">
+            <div className="relative w-56 sm:w-64">
+              <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                placeholder="Search by tender title"
+                aria-label="Search by tender title"
+                value={worklistSearch}
+                onChange={e => { setWorklistSearch(e.target.value); setWorklistPage(1) }}
+                className="h-9 w-full rounded-lg border border-[#cce6f8] bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
             </div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {q ? 'No tenders match your search' : 'No tenders awaiting commercial evaluation'}
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              {q ? 'Try a different cost code, title or department.' : 'Tenders appear here once their ITT has been issued and technical evaluation is complete.'}
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-2.5">
-            {filteredTenders.map(t => {
-              const bidderCount = Array.isArray(t.bidderList) && t.bidderList.length ? t.bidderList.length : (t.bidders || 0)
-              const eligibleCount = t.commercialEvaluationCompleted ? bidderCount : Math.max(0, bidderCount - 1)
-              const status = t.commEvalSubmittedAt
-                ? { label: 'SUBMITTED', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' }
-                : t.evalProgress === 'ranking_ready'
-                ? { label: 'RANKING READY', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' }
-                : t.evalProgress === 'in_progress'
-                ? { label: 'IN PROGRESS', cls: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800' }
-                : { label: 'NOT STARTED', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' }
+            <span className="shrink-0 rounded-full bg-[#ecf4fc] px-2.5 py-1 text-xs text-slate-500 tabular-nums dark:bg-slate-800 dark:text-slate-300">
+              {filteredTenders.length} tender{filteredTenders.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
 
-              return (
-                <Card
-                  key={t.id}
-                  className="p-4 cursor-pointer hover:shadow-md hover:border-[var(--color-primary)]/40 transition-all rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900 group"
-                  onClick={() => navigate(`/commercial-eval/${t.id}`)}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-[var(--color-primary)] transition-colors truncate">
-                          {t.title}
-                        </h3>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${status.cls}`}>
-                          {status.label}
-                        </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
-                          Readiness Not Confirmed
-                        </span>
-                        {isUnassignedSide(t, 'comm') && (
-                          <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200 dark:border-violet-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            Unassigned
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 mt-1.5 flex-wrap text-xs text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1.5">
-                          <Building2 size={12} className="text-slate-400 shrink-0" /> {t.department}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Users size={12} className="text-slate-400 shrink-0" /> {bidderCount} bidder{bidderCount !== 1 ? 's' : ''} · {eligibleCount} eligible
-                        </span>
-                        {t.deadline && (
-                          <span className="flex items-center gap-1.5">
-                            <Calendar size={12} className="text-slate-400 shrink-0" /> {t.deadline}
-                          </span>
-                        )}
+        {/* ── Rows ── */}
+        <div role="region" aria-label="Commercial Evaluation worklist" tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto border-t border-[#cce6f8] px-3 py-2.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0089cf] dark:border-slate-800">
+          {filteredTenders.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[#cce6f8] p-6 text-center sm:p-10 dark:border-slate-800">
+              <span className="flex w-10 h-10 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf] dark:bg-sky-950/60">
+                {q ? <Search size={18} /> : <Lock size={18} />}
+              </span>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {q ? 'No tenders match your search' : 'No tenders awaiting commercial evaluation'}
+              </p>
+              <p className="max-w-md text-xs text-slate-500">
+                {q ? 'Try a different cost code, title or department.' : 'Tenders appear here once their ITT has been issued and technical evaluation is complete.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {pageTenders.map(t => {
+                const bidderCount = Array.isArray(t.bidderList) && t.bidderList.length ? t.bidderList.length : (t.bidders || 0)
+                const eligibleCount = t.commercialEvaluationCompleted ? bidderCount : Math.max(0, bidderCount - 1)
+                const status = t.commEvalSubmittedAt
+                  ? { label: 'Submitted', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' }
+                  : t.evalProgress === 'ranking_ready'
+                  ? { label: 'Ranking Ready', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' }
+                  : t.evalProgress === 'in_progress'
+                  ? { label: 'In Progress', cls: 'border-sky-200 bg-sky-50 text-sky-600 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300' }
+                  : { label: 'Not Started', cls: 'border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400' }
+
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => navigate(`/commercial-eval/${t.id}`)}
+                    className="group block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0089cf]/30"
+                  >
+                    <div className="overflow-hidden rounded-xl border border-[#cce6f8] bg-white px-3.5 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.06] dark:border-slate-800 dark:bg-slate-800/40">
+                      <div className="flex items-center justify-between gap-3 sm:gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            <h3 className="max-w-full truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${status.cls}`}>
+                              {status.label}
+                            </span>
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                              Readiness Not Confirmed
+                            </span>
+                            {isUnassignedSide(t, 'comm') && (
+                              <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300">
+                                Unassigned
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="flex min-w-0 items-center gap-1">
+                              <Building2 size={12} className="shrink-0" aria-hidden="true" /> {t.department || 'N/A'}
+                            </span>
+                            <span className="flex min-w-0 items-center gap-1">
+                              <Users size={12} className="shrink-0" aria-hidden="true" /> {bidderCount} bidder{bidderCount !== 1 ? 's' : ''} · {eligibleCount} eligible
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-[11px] text-slate-500">Budget</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t.budget || '—'}</p>
+                          </div>
+                          <ChevronRight size={16} className="shrink-0 text-slate-400 transition-colors group-hover:text-[#0089cf]" aria-hidden="true" />
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right">
-                        <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">Budget</p>
-                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{t.budget}</p>
-                      </div>
-                      <ChevronRight size={16} className="text-slate-300 dark:text-slate-600 group-hover:text-[var(--color-primary)] group-hover:translate-x-0.5 transition-all" />
-                    </div>
-                  </div>
-                </Card>
-              )
-            })}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Pagination ── */}
+        {filteredTenders.length > 0 && (
+          <div className="shrink-0 border-t border-[#cce6f8] px-3 py-1.5 dark:border-slate-800">
+            <ListPagination
+              page={currentPage}
+              pageSize={worklistPageSize}
+              total={filteredTenders.length}
+              onPageChange={setWorklistPage}
+              onPageSizeChange={size => { setWorklistPageSize(size); setWorklistPage(1) }}
+            />
           </div>
         )}
       </div>
