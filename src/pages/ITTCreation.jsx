@@ -34,6 +34,7 @@ import StrategyTemplatesCard from '../components/itt/ch/StrategyTemplatesCard'
 import IttSectionPicker from '../components/itt/ch/IttSectionPicker'
 import ApprovedSectionSummary from '../components/itt/ch/ApprovedSectionSummary'
 import { WizardStatusBanner, IttWizardStepper } from '../components/itt/ch/WizardChrome'
+import { tenderHeaderDetails } from '../components/itt/ch/wizardHeader'
 import { SectionAssignmentsCard, AssignedTeamSelectCard } from '../components/itt/ch/TeamCards'
 import { QualifiedBiddersCard, InternalReferenceDocumentsCard, GeneratedTemplatesCard } from '../components/itt/ch/ReferenceCards'
 import { useDescriptionUpload } from '../components/itt/ch/useDescriptionUpload'
@@ -796,16 +797,26 @@ export default function ITTCreation() {
     )
   }
 
+  // The tender the wizard is open on — from the URL, or the draft this
+  // session just saved. A brand-new, unsaved draft has none.
+  const headerTender = existingTender || (draftTenderId ? tenders.find(t => t.id === draftTenderId) : null)
+
   return (
-    <div className="space-y-5">
+    // One white container for the whole wizard: the tender header band on top,
+    // a divider, then the stepper and the step's content. No overflow-hidden —
+    // dropdowns and the AI-edit popups inside must not be clipped.
+    <section className="divide-y divide-[#cce6f8] rounded-2xl border border-[#cce6f8] bg-white shadow-sm shadow-black/[0.03] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
       <WizardStatusBanner
+        tenderTitle={headerTender?.title}
         statusText={step === 2
           ? 'Filling in section templates'
           : step === 1
             ? 'Preparing document templates...'
             : existingTender ? 'Project details and strategy templates' : 'Filling in project details'}
-        reference={existingTender ? (tenderRef(existingTender) || existingTender.reference || draftTenderId) : (draftTenderId || 'New Draft')}
+        reference={headerTender ? (tenderRef(headerTender) || headerTender.reference || '') : ''}
+        details={tenderHeaderDetails(headerTender)}
       />
+      <div className="space-y-5 p-4 sm:p-6">
       <IttWizardStepper current={step} />
 
       {/* Section-owner / exporter roles wait until the Contract Holder has generated the ITT */}
@@ -1172,6 +1183,7 @@ export default function ITTCreation() {
           )}
         </Card>
       )}
-    </div>
+      </div>
+    </section>
   )
 }

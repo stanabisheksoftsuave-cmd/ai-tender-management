@@ -1,29 +1,46 @@
 import { CheckCircle } from 'lucide-react'
+import Badge from '../../ui/Badge'
 
 const ITT_WIZARD_STEPS = ['Project Details', 'AI Generation', 'Review & Redesign', 'Export']
 
 /*
- * "ITT Draft · {status}" pill plus the tender reference badge — shared by the
- * Project Details form and the section workbench (MAIN's WizardStatusBanner).
+ * The tender header band at the top of the ITT wizard's white container,
+ * laid out like the other tender headers (MAIN's WizardStatusBanner /
+ * CommercialTenderHeader): the tender title with an "ITT Draft" badge and the
+ * cost code, then a caption with the live status and the tender's details
+ * (department · bidders · closing date — see tenderHeaderDetails).
+ *
+ * `reference` is the cost code; an empty one hides the chip, so a brand-new
+ * draft shows "New ITT draft" with no code rather than a placeholder.
  */
-export function WizardStatusBanner({ statusText, reference }) {
+export function WizardStatusBanner({ statusText, reference, tenderTitle, details = [] }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 olng-slide-up">
-      <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-sm">
-        <span className="relative flex w-1.5 h-1.5 shrink-0">
-          <span className="absolute inline-flex w-full h-full animate-ping rounded-full" style={{ background: 'rgba(0,137,207,0.6)' }} />
-          <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: '#0089cf' }} />
-        </span>
-        <span className="shrink-0 text-xs font-semibold" style={{ color: '#1e293b' }}>ITT Draft</span>
-        <span className="shrink-0 text-slate-400">·</span>
-        <span className="truncate text-xs text-slate-500">{statusText}</span>
+    <header className="space-y-2 px-4 py-4 sm:px-6 sm:py-5 olng-slide-up">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="min-w-0 break-words text-lg font-bold text-slate-800 dark:text-slate-100">
+          {tenderTitle || 'New ITT draft'}
+        </h2>
+        <Badge variant="info">ITT Draft</Badge>
+        {reference ? (
+          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-800">
+            {`Cost Code: ${reference}`}
+          </span>
+        ) : null}
       </div>
-      {reference ? (
-        <span className="shrink-0 rounded-lg px-2.5 py-1 font-secondary text-xs font-medium" style={{ background: 'rgba(0,137,207,0.08)', color: '#0089cf', border: '1px solid rgba(0,137,207,0.2)' }}>
-          {reference}
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-500">
+        <span className="relative flex w-1.5 h-1.5 shrink-0" aria-hidden="true">
+          <span className="absolute inline-flex w-full h-full animate-ping rounded-full bg-[#0089cf]/60" />
+          <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-[#0089cf]" />
         </span>
-      ) : null}
-    </div>
+        <span className="font-medium text-slate-800 dark:text-slate-100">{statusText}</span>
+        {details.map(detail => (
+          <span key={detail} className="contents">
+            <span aria-hidden="true">·</span>
+            <span>{detail}</span>
+          </span>
+        ))}
+      </p>
+    </header>
   )
 }
 
