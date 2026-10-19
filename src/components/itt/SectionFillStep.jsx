@@ -432,8 +432,8 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
                 <button
                   onClick={jumpToNextEmpty}
                   disabled={allFilled || readOnly}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold hover:underline underline-offset-2 disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed transition-colors"
-                  style={{ color: '#0089cf' }}>
+                  className="flex items-center gap-1.5 text-[11px] font-bold hover:underline underline-offset-2 disabled:opacity-30 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+                  style={{ color: '#0f172a' }}>
                   <ArrowDown size={12} /> Jump to next empty
                 </button>
               )}
@@ -444,9 +444,8 @@ export default function SectionFillStep({ section, answers, onAnswersChange, onN
               className={`h-full rounded-full transition-all duration-500 ${allFilled ? '' : ''}`}
               style={{
                 width: `${Math.max(pct, 2)}%`,
-                background: allFilled
-                  ? 'linear-gradient(90deg, #0089cf, #10b981)'
-                  : 'linear-gradient(90deg, #1b4c6f, #0089cf)',
+                // The sidebar's navy, filled or not.
+                background: '#1b4c6f',
                 position: 'relative', overflow: 'hidden'
               }}
             />

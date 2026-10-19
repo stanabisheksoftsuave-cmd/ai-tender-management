@@ -947,7 +947,7 @@ export default function ITTCreation() {
 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'linear-gradient(135deg, rgba(0,137,207,0.1), rgba(27,76,111,0.06))', color: '#1e293b', border: '1px solid rgba(0,137,207,0.15)' }}>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: '#ffffff', color: '#1e293b', border: '1px solid rgba(0,137,207,0.15)' }}>
                     <Layers size={12} style={{ color: '#0089cf' }} />
                     {current?.title}
                   </div>
