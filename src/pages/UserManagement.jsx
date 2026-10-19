@@ -33,6 +33,7 @@ const IcoUnlock    = p => <Svg {...p}><rect x="3" y="11" width="18" height="11" 
 const IcoUserCheck = p => <Svg {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Svg>
 const IcoSave      = p => <Svg {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Svg>
 const IcoArrows    = p => <Svg {...p}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></Svg>
+const IcoChevron   = p => <Svg {...p}><polyline points="6 9 12 15 18 9"/></Svg>
 const IcoUsers     = p => <Svg {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>
 
 // ── Module icon SVGs (paths from src/assets/icons/) ──────────────────────────
@@ -107,6 +108,20 @@ const TABS = [
   { id: 'access',    label: 'Access Control' },
   { id: 'dropdowns', label: 'Dropdowns' },
 ]
+
+// Access Control card badge — the main app's role code per actor, drawn in the
+// same blue as the user avatars. Custom roles fall back to their initials.
+const ROLE_CODES = {
+  contract_holder: 'CH',
+  pof:             'CE',
+  hse:             'HSE',
+  icv:             'ICV',
+  scm:             'SCM',
+  it_admin:        'ITA',
+  biz_admin:       'BA',
+}
+const roleCode = role => ROLE_CODES[role.id]
+  || role.label.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 3)
 
 const emptyUser     = { name: '', email: '', role: 'pof', status: 'active' }
 const emptyRoleForm = { label: '', color: '#64748B', description: '' }
@@ -197,6 +212,9 @@ export default function UserManagement() {
   // so edits here reach the router and the sidebar on the next render.
   const [savedRole, setSavedRole] = useState(null)
   const [lastLevel, setLastLevel] = useState({})
+  // Role cards start collapsed — seven roles × every module is too long to scan open.
+  const [expandedRoles, setExpandedRoles] = useState([])
+  const toggleExpanded = id => setExpandedRoles(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
   const [showRoleModal, setShowRoleModal] = useState(false)
   const [roleForm,      setRoleForm]      = useState(emptyRoleForm)
@@ -516,10 +534,10 @@ export default function UserManagement() {
                       {/* User */}
                       <td className="px-5 py-3.5 overflow-hidden">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0"
-                            style={{ background: `linear-gradient(135deg, ${role?.color || '#64748B'}, ${role?.color || '#64748B'}bb)` }}>
+                          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#afd9f4] text-xs font-semibold text-[#0089cf] select-none"
+                            aria-hidden="true">
                             {u.avatar}
-                          </div>
+                          </span>
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate" style={{ color: text }}>{u.name}</p>
                             <p className="text-[11px] truncate flex items-center gap-1" style={{ color: sub }}>
@@ -609,19 +627,19 @@ export default function UserManagement() {
         <div className="space-y-4">
 
           {/* Legend */}
-          <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-xl"
-            style={{ background: surface, border: `1px solid ${border}` }}>
-            <span className="text-xs font-semibold" style={{ color: sub }}>Permission levels:</span>
-            {[
-              { label: 'Read Only',     bg: 'rgba(100,116,139,0.1)', color: '#64748B' },
-              { label: 'Full Access',   bg: 'rgba(5,150,105,0.1)',   color: '#059669' },
-            ].map(l => (
-              <span key={l.label} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                style={{ background: l.bg, color: l.color, border: `1px solid ${l.color}30` }}>
-                {l.label}
+          <div className="flex items-center gap-3 flex-wrap px-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: sub }}>Permission levels:</span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full px-3 py-1 text-[11px] font-medium"
+                style={{ background: surface, color: sub, border: `1px solid ${border}` }}>
+                Read Only
               </span>
-            ))}
-            <span className="text-[11px]" style={{ color: sub }}>
+              <span className="rounded-full px-3 py-1 text-[11px] font-medium"
+                style={{ color: '#059669', border: '1px solid #059669' }}>
+                Full Access
+              </span>
+            </div>
+            <span className="text-xs ml-2 hidden sm:inline" style={{ color: sub }}>
               Off means no access. Any level opens the module's pages for that role — applied immediately.
             </span>
             {!canAdminEdit && (
@@ -635,53 +653,68 @@ export default function UserManagement() {
           {roles.map(role => {
             const enabledCount = MODULES.filter(m => (matrix[role.id]?.[m.key] || 'NONE') !== 'NONE').length
             const roleUsers    = users.filter(u => u.roleId === role.id)
+            const code         = roleCode(role)
+            const isExpanded   = expandedRoles.includes(role.id)
+            const panelId      = `role-access-${role.id}`
             return (
-              <div key={role.id} className="rounded-2xl overflow-hidden"
-                style={{ background: surface, border: `1px solid ${border}`, boxShadow: shadow }}>
+              <div key={role.id} className="rounded-xl overflow-hidden"
+                style={{ background: surface, border: `1px solid ${border}`, boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
 
-                {/* Role header */}
-                <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-2"
-                  style={{ borderBottom: `1px solid ${border}` }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0"
-                      style={{ background: role.color }}>
-                      {role.label[0]}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold" style={{ color: text }}>{role.label}</h3>
+                {/* Role header — the whole left side toggles the module list */}
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+                  <button type="button" onClick={() => toggleExpanded(role.id)}
+                    aria-expanded={isExpanded} aria-controls={panelId}
+                    className="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg p-1 text-left transition-colors"
+                    onMouseOver={e => e.currentTarget.style.background = surfBg}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                    <span aria-hidden="true"
+                      className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#afd9f4] text-sm font-bold text-[#0089cf] select-none">
+                      {code}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-bold" style={{ color: text }}>{role.label}</span>
                         {role.custom && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                             style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>Custom</span>
                         )}
-                      </div>
-                      <p className="text-[11px]" style={{ color: sub }}>
-                        {enabledCount}/{MODULES.length} modules · {roleUsers.length} user(s)
-                      </p>
-                    </div>
-                  </div>
+                      </span>
+                      <span className="mt-1 block text-xs font-medium" style={{ color: sub }}>
+                        {enabledCount}/{MODULES.length} modules - {roleUsers.length} user(s)
+                      </span>
+                    </span>
+                    <IcoChevron size={20}
+                      className={`ml-auto shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      style={{ color: sub }} />
+                  </button>
 
                   {canAdminEdit && (
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => deleteRole(role.id)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                        style={{ color: '#EF4444' }}
-                        onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
-                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-                        <IcoTrash size={14} />
-                      </button>
-                      <button onClick={() => saveMatrix(role.id)}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white"
+                    <div className="flex shrink-0 items-center gap-3">
+                      {/* Built-in actors can't be deleted — only roles created here. */}
+                      {role.custom && (
+                        <button type="button" onClick={() => deleteRole(role.id)}
+                          aria-label={`Delete the ${role.label} role`}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                          style={{ color: '#EF4444' }}
+                          onMouseOver={e => e.currentTarget.style.background = '#FEF2F2'}
+                          onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                          <IcoTrash size={14} />
+                        </button>
+                      )}
+                      <button type="button" onClick={() => saveMatrix(role.id)}
+                        aria-label={`Save changes to ${role.label}`}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-xs font-semibold text-white shadow-sm"
                         style={{ background: savedRole === role.id ? '#059669' : 'var(--color-primary)', transition: 'background 0.2s' }}>
                         {savedRole === role.id
-                          ? <><IcoCheckCircle size={12} /> Saved!</>
-                          : <><IcoSave size={12} /> Save</>}
+                          ? <><IcoCheckCircle size={14} /> Saved!</>
+                          : <><IcoSave size={14} /> Save</>}
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Module rows */}
+                {/* Module rows — collapsed by default */}
+                <div id={panelId} hidden={!isExpanded} style={{ borderTop: `1px solid ${border}` }}>
                 {MODULES.map((mod, mi) => {
                   const level   = matrix?.[role.id]?.[mod.key] || 'NONE'
                   const enabled = level !== 'NONE'
@@ -696,56 +729,53 @@ export default function UserManagement() {
                   // close the only screen that could ever switch it back on.
                   const locked  = role.id === 'it_admin' && mod.key === 'user_management'
                   return (
-                    <div key={mod.key} className="flex items-center gap-4 px-5 py-3 transition-colors flex-wrap"
-                      style={{
-                        borderBottom: mi < MODULES.length - 1 ? `1px solid ${border}` : 'none',
-                        opacity: !enabled ? 0.45 : 1,
-                      }}>
+                    <div key={mod.key} className="flex flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6"
+                      style={{ borderBottom: mi < MODULES.length - 1 ? `1px solid ${border}` : 'none' }}>
 
                       {/* Module name */}
-                      <div className="flex items-center gap-2.5 shrink-0" style={{ width: 210 }}>
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: 'var(--color-primary)12' }}>
-                          {ModIcon && <ModIcon size={14} style={{ color: 'var(--color-primary)' }} />}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-sm font-medium block" style={{ color: text }}>{mod.label}</span>
-                          <span className="text-[10px] font-mono truncate block" style={{ color: sub }}>
-                            {routes.length ? routes.join('  ') : 'In-page action — no menu item'}
-                          </span>
-                        </div>
-                      </div>
+                      <span className="inline-flex size-9 shrink-0 items-center justify-center"
+                        style={{ opacity: !enabled ? 0.45 : 1 }}>
+                        {ModIcon && <ModIcon size={20} style={{ color: 'var(--color-primary)' }} />}
+                      </span>
+                      <span className="min-w-0 flex-1" style={{ opacity: !enabled ? 0.45 : 1 }}>
+                        <span className="block text-base font-medium" style={{ color: text }}>{mod.label}</span>
+                        <span className="block truncate text-[11px]" style={{ color: sub }}>
+                          {routes.length ? routes.join('  ') : 'In-page action — no menu item'}
+                        </span>
+                      </span>
 
-                      {/* Toggle */}
-                      <Toggle on={enabled} locked={locked} readOnly={!canAdminEdit}
-                        onChange={() => toggleModule(role.id, mod.key)} />
+                      <div className="flex items-center gap-4">
+                        {/* Toggle */}
+                        <Toggle on={enabled} locked={locked} readOnly={!canAdminEdit}
+                          onChange={() => toggleModule(role.id, mod.key)} />
 
-                      {/* Level selector — a viewer without write access gets the
-                          granted level as a chip instead of three live buttons. */}
-                      {enabled && (
-                        <div className="flex items-center gap-1.5">
-                          {LEVEL_OPTIONS.filter(opt => canAdminEdit || opt.val === level).map(opt => (
+                        {/* Level selector — a viewer without write access gets the
+                            granted level as a chip instead of live buttons. */}
+                        <div className="hidden items-center gap-1.5 sm:flex" style={{ minWidth: 220 }}>
+                          {enabled ? LEVEL_OPTIONS.filter(opt => canAdminEdit || opt.val === level).map(opt => (
                             <button key={opt.val} type="button" disabled={!canAdminEdit}
+                              aria-pressed={level === opt.val}
                               onClick={canAdminEdit ? () => setLevel(role.id, mod.key, opt.val) : undefined}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all"
+                              className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors"
                               style={{
                                 cursor: canAdminEdit ? 'pointer' : 'default',
                                 ...(level === opt.val
-                                  ? { background: opt.activeColor + '15', color: opt.activeColor, border: `1.5px solid ${opt.activeColor}40` }
-                                  : { background: 'transparent', color: sub, border: `1.5px solid ${border}` }),
+                                  ? opt.val === 'CRUD'
+                                    ? { background: '#05966915', color: '#059669', border: '1px solid #059669' }
+                                    : { background: '#afd9f4', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' }
+                                  : { background: 'transparent', color: sub, border: `1px solid ${border}` }),
                               }}>
                               {opt.label}
                             </button>
-                          ))}
+                          )) : (
+                            <span className="text-[11px]" style={{ color: sub }}>No access</span>
+                          )}
                         </div>
-                      )}
-
-                      {!enabled && (
-                        <span className="text-[11px]" style={{ color: sub }}>No access</span>
-                      )}
+                      </div>
                     </div>
                   )
                 })}
+                </div>
               </div>
             )
           })}

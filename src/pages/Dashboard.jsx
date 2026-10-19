@@ -3,7 +3,7 @@ import {
   FileText, Clock, ArrowRight,
   Activity, ClipboardCheck, BarChart3, Briefcase, UserCog,
   Download,
-  Eye, MoreVertical, Users, Shield,
+  Eye, MoreVertical, Users, ShieldCheck, CheckCircle2, UserX,
   ChevronRight, Inbox, CheckCircle, ClipboardList
 } from 'lucide-react'
 
@@ -162,17 +162,6 @@ const getStatCards = (roleId, tenders) => {
       { label: 'Awaiting You',   value: String(awaitingYou),            icon: Inbox,          accentColor: '#F59E0B', sub: 'Stages you can advance' },
       { label: 'In Evaluation',  value: String(byStatus('tech_eval').length + byStatus('comm_eval').length), icon: ClipboardList, accentColor: '#64748B', sub: 'Technical or commercial' },
       { label: 'Completed',      value: String(completed),              icon: CheckCircle,    accentColor: '#10B981' },
-    ]
-  }
-
-  if (roleId === 'it_admin') {
-    const active   = INITIAL_USERS.filter(u => u.status === 'active').length
-    const inactive = INITIAL_USERS.filter(u => u.status === 'inactive').length
-    return [
-      { label: 'Total Users',    value: String(INITIAL_USERS.length), icon: Users,  accentColor: '#7C3AED', trend: 'All roles', chipVariant: '',       sub: 'Registered accounts' },
-      { label: 'Active Users',   value: String(active),               icon: Users,  accentColor: '#10B981', trend: 'Online',    chipVariant: '',       sub: 'Currently active' },
-      { label: 'Inactive Users', value: String(inactive),             icon: Users,  accentColor: '#EF4444', trend: 'URGENT',    chipVariant: 'urgent', sub: 'Suspended accounts' },
-      { label: 'Total Roles',    value: '6',                          icon: Shield, accentColor: '#2563EB', trend: 'Defined',   chipVariant: '',       sub: 'RBAC roles configured' },
     ]
   }
 
@@ -349,7 +338,36 @@ function RoleDashboard() {
         )}
       </div>
 
+      {/* ── IT Admin: KPI Cards (main app's compact StatCard, icon left) ── */}
+      {isItAdmin && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            { label: 'Active Users',   value: users.filter(u => u.status === 'active').length,   icon: CheckCircle2 },
+            { label: 'Inactive Users', value: users.filter(u => u.status !== 'active').length,   icon: UserX },
+            { label: 'Total Roles',    value: roles.length,                                      icon: ShieldCheck },
+          ].map(s => (
+            <div key={s.label}
+              className="rounded-xl border border-[#cce6f8] dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-sm shadow-black/[0.03]">
+              <div className="flex items-start justify-start gap-3">
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#ecf4fc] dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <s.icon className="size-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    {s.label}
+                  </p>
+                  <p className="mt-1.5 text-3xl font-bold leading-none tabular-nums text-slate-800 dark:text-slate-100">
+                    {s.value}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── KPI Cards ── */}
+      {!isItAdmin && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {roleId === 'contract_holder' ? statCards.map((s, i) => (
           <div key={i} className="rounded-2xl p-5"
@@ -419,6 +437,7 @@ function RoleDashboard() {
           )
         })}
       </div>
+      )}
 
       {/* ── Admin: Workflow Pipeline Overview ── */}
       {isAdmin && (
@@ -479,7 +498,7 @@ function RoleDashboard() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: `1px solid ${c.border}` }}>
-                  {['User', 'Email', 'Role', 'Status', 'Last Login'].map(h => (
+                  {['User', 'Email', 'Role', 'Status'].map(h => (
                     <th key={h} className="text-left px-5 py-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: c.muted }}>{h}</th>
                   ))}
                 </tr>
@@ -493,10 +512,10 @@ function RoleDashboard() {
                       onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0"
-                            style={{ background: roleInfo?.color || '#64748B' }}>
+                          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#afd9f4] text-xs font-semibold text-[#0089cf] select-none"
+                            aria-hidden="true">
                             {u.avatar || u.name?.[0]}
-                          </div>
+                          </span>
                           <span className="text-xs font-semibold" style={{ color: c.text }}>{u.name}</span>
                         </div>
                       </td>
@@ -511,7 +530,6 @@ function RoleDashboard() {
                           {u.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-xs" style={{ color: c.sub }}>{u.lastLogin}</td>
                     </tr>
                   )
                 })}

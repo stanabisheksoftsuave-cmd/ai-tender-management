@@ -126,7 +126,8 @@ export default function AuditLog() {
               {filtered.map(log => (
                 <tr key={log.id} className="hover:bg-slate-50/50 text-sm">
                   <td className="px-4 py-3">
-                    <span className="text-xs font-mono text-slate-500">{log.timestamp}</span>
+                    {/* !font-sans: the global .text-slate-500 rule would otherwise swap this to Candara. */}
+                    <span className="text-xs !font-sans tabular-nums text-slate-500">{log.timestamp}</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-medium text-slate-700">{log.user}</span>
