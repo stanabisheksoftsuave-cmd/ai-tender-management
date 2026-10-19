@@ -130,7 +130,7 @@ const emptyRoleForm = { label: '', color: '#64748B', description: '' }
 function RolePill({ role }) {
   if (!role) return null
   return (
-    <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200">
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">
       {role.label}
     </span>
   )
@@ -558,13 +558,7 @@ export default function UserManagement() {
 
                       {/* Status */}
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md"
-                          style={u.status === 'active'
-                            ? { background: '#05966918', color: '#059669', border: '1px solid #05966930' }
-                            : { background: '#94A3B818', color: '#94A3B8', border: '1px solid #94A3B830' }}>
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ background: u.status === 'active' ? '#059669' : '#94A3B8',
-                              boxShadow: u.status === 'active' ? '0 0 6px rgba(5,150,105,0.5)' : 'none' }} />
+                        <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${u.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-red-300 bg-red-50 text-red-600'}`}>
                           {u.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                       </td>

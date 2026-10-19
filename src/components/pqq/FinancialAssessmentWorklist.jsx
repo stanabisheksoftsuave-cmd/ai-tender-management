@@ -34,9 +34,9 @@ export default function FinancialAssessmentWorklist({ tenders }) {
   const pageItems = assignments.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
-    // Fills the viewport below the 4rem header and the page's p-6, so the
-    // footer stays pinned at the bottom and only the rows scroll.
-    <div className="flex h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-xl border border-[#cce6f8] bg-white shadow-sm">
+    // Fills the layout's parent container, so the footer stays pinned at the
+    // bottom and only the rows scroll.
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-[#cce6f8] bg-white">
       {/* ── Header ── */}
       <div className="flex shrink-0 items-start justify-between gap-4 px-3 pt-3 pb-2.5">
         <div className="flex min-w-0 items-center gap-3">

@@ -92,8 +92,23 @@ export default function MainLayout({ children }) {
       <Sidebar />
       <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}
         style={lightCanvas ? { background: '#F8FAFC' } : undefined}>
-        <main className="flex-1 p-6 overflow-auto fade-in">
-          {children}
+        <main className="flex-1 p-6 fade-in">
+          {/* The one parent container every page renders into, as in the main
+              app: a white card fixed to the viewport (below the 4rem header
+              and this p-6), whose content scrolls inside it. A page's own
+              cards are the secondary containers within. */}
+          <div
+            className="flex h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl border"
+            style={{
+              background: isDark ? '#111827' : '#ffffff',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#cce6f8',
+              boxShadow: '0 1px 4px rgba(27,76,111,0.06), 0 4px 16px rgba(27,76,111,0.06)',
+            }}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {children}
+            </div>
+          </div>
         </main>
       </div>
     </div>

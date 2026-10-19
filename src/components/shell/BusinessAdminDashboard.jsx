@@ -106,13 +106,12 @@ export default function BusinessAdminDashboard() {
   )
 
   return (
-    // One white container for the whole dashboard, as in the main app, fixed
-    // to the viewport (below the 4rem header and the page's p-6). Its top part
-    // — greeting and KPI tiles — stays put; only the part below it (pipeline
-    // and recent tenders) scrolls, inside the container.
-    <div className="flex h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl border border-[#cce6f8] bg-white shadow-[0_1px_4px_rgba(27,76,111,0.06),0_4px_16px_rgba(27,76,111,0.06)] dark:border-slate-800 dark:bg-slate-900">
+    // Fills the layout's parent container. Its top part — greeting and KPI
+    // tiles — stays put; only the part below it (pipeline and recent tenders)
+    // scrolls, inside the container.
+    <div className="flex h-full flex-col">
     {/* ── Fixed part ── */}
-    <div className="shrink-0 space-y-5 px-4 pt-4 sm:px-5 sm:pt-5">
+    <div className="shrink-0 space-y-5">
       {/* ── Greeting Header ── */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
@@ -201,7 +200,8 @@ export default function BusinessAdminDashboard() {
     </div>
 
     {/* ── Scrolling part ── */}
-    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
+    {/* -mx-2 px-2: room for the cards' hover lift and shadow at the edges. */}
+    <div className="-mx-2 mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pt-2 pb-1">
       {/* ── Workflow Pipeline Card ── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-[0_6px_24px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
         <div className="flex items-center justify-between">

@@ -523,12 +523,12 @@ function RoleDashboard() {
                       </td>
                       <td className="px-5 py-3.5 text-xs" style={{ color: c.sub }}>{u.username}</td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200">
-                          {roleInfo?.label || u.roleId}
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                          {roleInfo?.label || 'None'}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${u.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                        <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${u.status === 'active' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-red-300 bg-red-50 text-red-600'}`}>
                           {u.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                       </td>

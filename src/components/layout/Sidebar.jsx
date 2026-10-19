@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Loader2, Lock, LogOut, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -48,10 +48,12 @@ const PSF_EMPTY_STATE_MESSAGE =
 // can never appear for a role the route itself would turn away — the Dashboard,
 // for instance, belongs to the Contract Holder, Supply Chain and the two admin roles only.
 const navByRole = {
+  // Main app layout: Dashboard under NAVIGATION, the admin pages under their
+  // own ADMINISTRATION heading (`section` starts a new labelled group).
   it_admin: [
     { to: '/dashboard', icon: '/icons/dashboard.svg', labelKey: 'nav.dashboard' },
-    { to: '/users',     icon: '/icons/users.svg',     labelKey: 'nav.users'     },
-    { to: '/audit-log', icon: '/icons/audit-log.svg', labelKey: 'nav.auditLog'  },
+    { to: '/users',     icon: '/icons/users.svg',     labelKey: 'nav.users',    section: 'admin' },
+    { to: '/audit-log', icon: '/icons/scroll-text.svg', labelKey: 'nav.auditLog', section: 'admin' },
   ],
   biz_admin: [
     { to: '/dashboard', icon: '/icons/dashboard.svg', labelKey: 'nav.dashboard'   },
@@ -108,7 +110,7 @@ const navByRole = {
 // design — there is nothing to navigate to.
 const MODULE_NAV = {
   user_management:   [{ to: '/users',           icon: '/icons/users.svg',       labelKey: 'nav.users'      }],
-  audit_log:         [{ to: '/audit-log',       icon: '/icons/audit-log.svg',   labelKey: 'nav.auditLog'   }],
+  audit_log:         [{ to: '/audit-log',       icon: '/icons/scroll-text.svg',   labelKey: 'nav.auditLog'   }],
   itt_creation:      [{ to: '/create-itt',      icon: '/icons/create-itt.svg',  labelKey: 'nav.ittDraft'   }],
   ingestion:         [{ to: '/upload',          icon: '/icons/ingestion.svg',   labelKey: 'nav.ingestion'  }],
   tech_eval:         [{ to: '/technical-eval',  icon: '/icons/tech-eval.svg',   labelKey: 'nav.techEval'   }],
@@ -434,7 +436,7 @@ export default function Sidebar() {
 
       {/* ── Nav items ── */}
       <nav className="flex-1 px-3 overflow-y-auto space-y-0.5" aria-label="Main" inert={isGenerating}>
-        {navItems.map((item) => {
+        {navItems.map((item, idx) => {
           // ── Contract Strategy with collapsible children ──
           if (item.hasChildren) {
             const isParentActive = isStrategySection
@@ -516,8 +518,18 @@ export default function Sidebar() {
             return pathname === item.to || pathname.startsWith(`${item.to}/`)
           })()
 
+          // A `section` item that follows a different section opens a new
+          // labelled group, drawn like the NAVIGATION label above.
+          const startsSection = item.section && item.section !== navItems[idx - 1]?.section
+
           return (
-            <NavLink key={item.to} to={item.to} className="block">
+            <Fragment key={item.to}>
+            {startsSection && (
+              <p className="px-3 pt-4 pb-2 text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: navLabel }}>
+                {t(`nav.section.${item.section}`)}
+              </p>
+            )}
+            <NavLink to={item.to} className="block">
               {() => (
                 <div
                   className="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
@@ -551,6 +563,7 @@ export default function Sidebar() {
                 </div>
               )}
             </NavLink>
+            </Fragment>
           )
         })}
       </nav>

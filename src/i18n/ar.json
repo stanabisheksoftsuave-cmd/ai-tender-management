@@ -1,4 +1,5 @@
 {
+  "nav.section.admin": "الإدارة",
   "nav.label":        "التنقل",
   "nav.dashboard":    "لوحة التحكم",
   "nav.tenders":      "متابعة المناقصات",
@@ -78,7 +79,7 @@
   "page.contractClosure":       "إغلاق العقد",
   "page.contractClosure.sub":   "التسليمات النهائية والتسوية والأرشفة",
   "page.auditLog":           "سجل المراجعة",
-  "page.auditLog.sub":       "سجل مراجعة كامل لجميع إجراءات النظام",
+  "page.auditLog.sub":       "كل إجراء مسجل عبر دورة حياة المناقصة، الأحدث أولاً.",
   "page.users":              "إدارة المستخدمين",
   "page.users.sub":          "إدارة مستخدمي النظام والأدوار وصلاحيات الوصول",
 
