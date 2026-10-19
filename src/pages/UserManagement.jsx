@@ -92,7 +92,7 @@ const DEFAULT_ROLES = [
   { id: 'contract_holder', label: 'Contract Holder',  color: '#0891B2' },
   { id: 'scm',         label: 'Supply Chain',         color: '#0F766E' },
   { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
-  { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
+  { id: 'icv',         label: 'LC Team',              color: '#DB2777' },
 ]
 
 // MODULES / DEFAULT_MATRIX now live in utils/permissionMatrix, because the router
@@ -115,7 +115,7 @@ const ROLE_CODES = {
   contract_holder: 'CH',
   pof:             'CE',
   hse:             'HSE',
-  icv:             'ICV',
+  icv:             'LC',
   scm:             'SCM',
   it_admin:        'ITA',
   biz_admin:       'BA',
@@ -201,10 +201,16 @@ export default function UserManagement() {
       if (!s) return DEFAULT_ROLES
       // Drop removed roles (tech_eval / comm_eval) from any persisted list.
       const parsed = JSON.parse(s).filter(r => !REMOVED_ROLE_IDS.has(r.id))
-      // Merge: ensure all DEFAULT_ROLES exist (remove superAdmin flag if stale)
+      // Merge: ensure all DEFAULT_ROLES exist (remove superAdmin flag if stale).
+      // Built-in roles always take today's label (ICV → LC Team), so a renamed
+      // actor isn't stuck on the name stored before the rename.
       const ids = new Set(parsed.map(r => r.id))
       const missing = DEFAULT_ROLES.filter(r => !ids.has(r.id))
-      const merged = [...parsed.map(r => ({ ...r, superAdmin: undefined })), ...missing]
+      const labelOf = id => DEFAULT_ROLES.find(d => d.id === id)?.label
+      const merged = [
+        ...parsed.map(r => ({ ...r, label: labelOf(r.id) ?? r.label, superAdmin: undefined })),
+        ...missing,
+      ]
       return merged
     } catch { return DEFAULT_ROLES }
   })

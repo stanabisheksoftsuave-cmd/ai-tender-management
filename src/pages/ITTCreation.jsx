@@ -69,7 +69,7 @@ const ASSIGNEE_FIELD = { pof: 'assignedContractEngineers', hse: 'assignedHseOffi
 
 // Sections whose owner may attach a finalised document alongside filling the
 // template fields — Section B1 (General Conditions) and Section H (ICV).
-const SECTION_UPLOAD_LABELS = { sectionB1: 'General Conditions of Contract', sectionH: 'ICV Requirements' }
+const SECTION_UPLOAD_LABELS = { sectionB1: 'General Conditions of Contract', sectionH: 'LC Requirements' }
 
 // steps moved inside component to use t()
 
@@ -81,7 +81,7 @@ const generationTasks = [
   'Loading Sections B1 & B2 — General & Special Conditions of Contract',
   'Loading Section C — QHSSE Requirements',
   'Loading Sections E & F — Pricing & Methodology',
-  'Loading Sections H, J, K, L — ICV, JSRS, OPAL & Salaries',
+  'Loading Sections H, J, K, L — LC, JSRS, OPAL & Salaries',
   'Loading Section G — Administration Instructions',
   'Preparing fill-in workspace',
 ]

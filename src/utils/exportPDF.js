@@ -617,7 +617,7 @@ export function exportPsfPDF(tender, psf = {}) {
   section('RECOMMENDATION / REQUEST')
   paragraph(psf.narrative?.recommendation)
 
-  section('ICV REVIEW DETAIL')
+  section('LC REVIEW DETAIL')
   paragraph(psf.icvReviewDetail)
   table(
     ['#', 'Requirement', 'Yes/No · %', 'Justification / Comments'],
@@ -633,7 +633,7 @@ export function exportPsfPDF(tender, psf = {}) {
       many: 'ASSIGNED CONTRACT ENGINEERS',
     },
     { people: tender.assignedHseOfficers, one: 'ASSIGNED HSE OFFICER', many: 'ASSIGNED HSE OFFICERS' },
-    { people: tender.assignedIcvLeads,    one: 'ASSIGNED ICV LEAD',    many: 'ASSIGNED ICV LEADS'    },
+    { people: tender.assignedIcvLeads,    one: 'ASSIGNED LC LEAD',     many: 'ASSIGNED LC LEADS'    },
   ]
   assignmentBlocks.forEach(({ people, one, many }) => {
     if (!people?.length) return

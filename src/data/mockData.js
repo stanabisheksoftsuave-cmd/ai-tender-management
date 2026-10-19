@@ -491,7 +491,7 @@ export const tenders = [
       { id: 107, name: 'Al Amana Fire & Safety', country: 'Oman' },
     ],
     handoffDocuments: {
-      icv: 'ICV-Plan.xlsx',
+      icv: 'LC-Plan.xlsx',
       companyEstimate: 'Internal-Company-Estimate.xlsx',
       riskAssessment: 'Contract-Risk-Assessment.xlsx',
     },
@@ -1147,7 +1147,7 @@ export const erpBidders = [
 
 // ── Stage 4 handoff documents — tender-level internal company documents
 export const HANDOFF_DOCS = [
-  { key: 'icv',             label: 'ICV Plan' },
+  { key: 'icv',             label: 'LC Plan' },
   { key: 'companyEstimate', label: 'Company Estimate' },
   { key: 'riskAssessment',  label: 'Contract Risk Assessment' },
 ]

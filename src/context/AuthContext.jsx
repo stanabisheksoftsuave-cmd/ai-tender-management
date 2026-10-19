@@ -16,7 +16,7 @@ export const roles = [
   { id: 'scm',         label: 'Supply Chain',         color: '#0F766E' },
   { id: 'legal_review',label: 'Legal Reviewer',       color: '#B45309' },
   { id: 'hse',         label: 'Contract HSE',         color: '#0EA5E9' },
-  { id: 'icv',         label: 'ICV',                  color: '#DB2777' },
+  { id: 'icv',         label: 'LC Team',              color: '#DB2777' },
 ]
 
 // Single source of truth — credentials + profile + status
@@ -74,7 +74,9 @@ export function AuthProvider({ children }) {
         localStorage.removeItem(STORAGE_KEY)
         return null
       }
-      if (roleInfo.id !== parsed?.role?.id) {
+      // A relabelled role (ICV → LC Team) refreshes too, so the sidebar and
+      // header never keep showing the name the session was saved with.
+      if (roleInfo.id !== parsed?.role?.id || roleInfo.label !== parsed?.role?.label) {
         const upgraded = { ...parsed, role: roleInfo }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(upgraded))
         return upgraded

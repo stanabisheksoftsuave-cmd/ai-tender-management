@@ -107,7 +107,7 @@ const CONTRACT_RISK_FIELDS = [
 ]
 
 const ICV_FIELDS = [
-  { id: 'icvCategory', label: 'ICV Category', type: 'select', required: true, options: [
+  { id: 'icvCategory', label: 'LC Category', type: 'select', required: true, options: [
     'Local Fabrication',
     'Omanisation (Skilled)',
     'Local Subcontracting',
@@ -118,7 +118,7 @@ const ICV_FIELDS = [
   { id: 'plannedSpend', label: 'Planned Contract Spend', type: 'number', required: true, placeholder: 'e.g. 500000' },
   { id: 'icvSpend', label: 'In-Country Spend', type: 'number', required: true, placeholder: 'e.g. 350000' },
   {
-    id: 'icvPercent', label: 'ICV %', type: 'computed',
+    id: 'icvPercent', label: 'LC %', type: 'computed',
     compute: row => {
       const planned = parseDecimal(row.plannedSpend)
       const inCountry = parseDecimal(row.icvSpend)
@@ -126,7 +126,7 @@ const ICV_FIELDS = [
       return `${((inCountry / planned) * 100).toFixed(1)}%`
     },
   },
-  { id: 'targetPercent', label: 'Target ICV %', type: 'number', placeholder: 'e.g. 40' },
+  { id: 'targetPercent', label: 'Target LC %', type: 'number', placeholder: 'e.g. 40' },
   {
     id: 'icvStatus', label: 'Against Target', type: 'computed',
     compute: row => {
