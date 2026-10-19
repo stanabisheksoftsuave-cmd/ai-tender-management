@@ -13,9 +13,10 @@ const ITT_WIZARD_STEPS = ['Project Details', 'AI Generation', 'Review & Redesign
  * `reference` is the cost code; an empty one hides the chip, so a brand-new
  * draft shows "New ITT draft" with no code rather than a placeholder.
  */
-export function WizardStatusBanner({ statusText, reference, tenderTitle, details = [] }) {
+export function WizardStatusBanner({ statusText, reference, tenderTitle, details = [], bare = false }) {
   return (
-    <header className="space-y-2 px-4 py-4 sm:px-6 sm:py-5 olng-slide-up">
+    // `bare` drops the band padding when there is no wizard container around it.
+    <header className={`space-y-2 olng-slide-up ${bare ? '' : 'px-4 py-4 sm:px-6 sm:py-5'}`}>
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="min-w-0 break-words text-lg font-bold text-slate-800 dark:text-slate-100">
           {tenderTitle || 'New ITT draft'}

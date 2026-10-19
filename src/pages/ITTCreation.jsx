@@ -800,12 +800,17 @@ export default function ITTCreation() {
   // The tender the wizard is open on — from the URL, or the draft this
   // session just saved. A brand-new, unsaved draft has none.
   const headerTender = existingTender || (draftTenderId ? tenders.find(t => t.id === draftTenderId) : null)
+  // The white wizard container is the HSE and LC (icv) review desk's look;
+  // the Contract Holder and Contract Engineer keep the open, uncontained layout.
+  const showWizardContainer = roleId === 'hse' || roleId === 'icv'
 
   return (
     // One white container for the whole wizard: the tender header band on top,
     // a divider, then the stepper and the step's content. No overflow-hidden —
     // dropdowns and the AI-edit popups inside must not be clipped.
-    <section className="divide-y divide-[#cce6f8] rounded-2xl border border-[#cce6f8] bg-white shadow-sm shadow-black/[0.03] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+    <section className={showWizardContainer
+      ? 'divide-y divide-[#cce6f8] rounded-2xl border border-[#cce6f8] bg-white shadow-sm shadow-black/[0.03] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900'
+      : 'space-y-5'}>
       <WizardStatusBanner
         tenderTitle={headerTender?.title}
         statusText={step === 2
@@ -815,8 +820,9 @@ export default function ITTCreation() {
             : existingTender ? 'Project details and strategy templates' : 'Filling in project details'}
         reference={headerTender ? (tenderRef(headerTender) || headerTender.reference || '') : ''}
         details={tenderHeaderDetails(headerTender)}
+        bare={!showWizardContainer}
       />
-      <div className="space-y-5 p-4 sm:p-6">
+      <div className={showWizardContainer ? 'space-y-5 p-4 sm:p-6' : 'space-y-5'}>
       <IttWizardStepper current={step} />
 
       {/* Section-owner / exporter roles wait until the Contract Holder has generated the ITT */}

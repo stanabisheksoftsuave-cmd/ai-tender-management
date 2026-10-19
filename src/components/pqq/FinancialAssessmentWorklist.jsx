@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Undo2, Users, Wallet } from 'lucide-react'
 import ListPagination from '../shell/ListPagination'
 import { PREQUAL_STATUSES, STAGE_OWNER } from './pqqModel'
+import { PAGE_FILL } from '../layout/pageFill'
 
 /*
  * The Contract Engineer's PQQ Financial Assessment worklist — the main app's
@@ -37,7 +38,7 @@ export default function FinancialAssessmentWorklist({ tenders }) {
     // The page IS the layout's parent container, like every worklist: it bleeds
     // to the container's edges and fills it — heading on top, rows scrolling,
     // pagination pinned below.
-    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+    <div className={PAGE_FILL}>
       {/* ── Header ── */}
       <div className="flex shrink-0 items-start justify-between gap-4 px-4 pt-4 pb-3">
         <div className="flex min-w-0 items-center gap-3">

@@ -75,6 +75,7 @@ import { openHtmlDoc, clarificationRequestDoc } from '../utils/docGen'
 import { tenderRef } from '../utils/tenderRef'
 import AwardPackagePanel from '../components/commercial/AwardPackagePanel'
 import { finalDarEntry } from '../utils/awardPackage'
+import { PAGE_FILL } from '../components/layout/pageFill'
 
 // OMR money — whole numbers for totals, 3 dp for unit rates (per the workbook).
 const fmtMoney = (n) => 'OMR ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -691,7 +692,7 @@ export default function CommercialEvaluation() {
       // The page IS the layout's parent container, like every worklist: it
       // bleeds to the container's edges and fills it — heading on top, rows
       // scrolling, pagination pinned below.
-      <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+      <div className={PAGE_FILL}>
         {/* ── Heading: icon, title, description · search and count ── */}
         <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
           <div className="flex min-w-0 flex-1 basis-96 items-center gap-3">

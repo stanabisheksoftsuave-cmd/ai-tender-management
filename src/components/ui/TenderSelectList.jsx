@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import ListPagination from '../shell/ListPagination'
 import { tenderRef } from '../../utils/tenderRef'
+import { PAGE_FILL } from '../layout/pageFill'
 
 
 const formatDeadline = (value) => {
@@ -78,7 +79,7 @@ export default function TenderSelectList({
     // The page IS the layout's parent container (main app's FixedListCard):
     // it bleeds to the container's edges (cancelling its p-5) and fills it —
     // heading on top, rows scrolling in the middle, pagination pinned below.
-    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+    <div className={PAGE_FILL}>
       {/* ── Heading: icon, title, description · search and count ── */}
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
         <div className="flex min-w-0 items-center gap-3">

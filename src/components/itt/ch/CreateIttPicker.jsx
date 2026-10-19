@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Building2, CalendarClock, ChevronLeft, ChevronRight, Hash, Inbox, Plus, Search, ShieldAlert, X } from 'lucide-react'
+import { PAGE_FILL } from '../../layout/pageFill'
 
 /*
  * Create ITT — the Contract Holder's tender picker (MAIN's TenderPicker):
@@ -122,7 +123,7 @@ export default function CreateIttPicker({
     // The page IS the layout's parent container, like every worklist: it bleeds
     // to the container's edges and fills it — heading on top, rows scrolling,
     // footer pinned below.
-    <div className="olng-slide-up -m-5 flex h-[calc(100%+2.5rem)] flex-col">
+    <div className={`olng-slide-up ${PAGE_FILL}`}>
       <div className="shrink-0 px-4 pt-4 pb-1">
         <div className="flex items-start gap-3">
           <span

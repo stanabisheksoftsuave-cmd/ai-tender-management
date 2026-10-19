@@ -12,6 +12,7 @@ import {
   routeForDraftProgress,
   selectCifDrafts,
 } from './cifUtils'
+import { PAGE_FILL } from '../layout/pageFill'
 
 function EmptyState({ icon: Icon, title, children }) {
   return (
@@ -62,7 +63,7 @@ export default function CifDraftsPicker() {
     // The page IS the layout's parent container, like every worklist: it bleeds
     // to the container's edges and fills it — heading on top, rows scrolling,
     // footer pinned below.
-    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col olng-slide-up">
+    <div className={`${PAGE_FILL} olng-slide-up`}>
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-[#cce6f8] dark:border-slate-800">

@@ -85,6 +85,8 @@ export default function MainLayout({ children }) {
   // Dark theme already has its own (dark) canvas via var(--color-background) —
   // this override is only for the OLNG light theme's pale-blue tint.
   const lightCanvas = !isDark && LIGHT_CANVAS_ROUTES.has(basePath)
+  // No white parent container for the Contract Holder and Contract Engineer.
+  const hasContainer = !['contract_holder', 'pof'].includes(user?.role?.id)
 
   return (
     <div className="app-root flex min-h-screen">
@@ -93,19 +95,23 @@ export default function MainLayout({ children }) {
       <div className={`flex-1 ${isRtl ? 'mr-[220px]' : 'ml-[220px]'} flex flex-col pt-16`}
         style={lightCanvas ? { background: '#F8FAFC' } : undefined}>
         <main className="flex-1 p-6 fade-in">
-          {/* The one parent container every page renders into, as in the main
-              app: a white card fixed to the viewport (below the 4rem header
-              and this p-6), whose content scrolls inside it. A page's own
-              cards are the secondary containers within. */}
+          {/* The one parent container pages render into, as in the main app:
+              a white card fixed to the viewport (below the 4rem header and
+              this p-6), whose content scrolls inside it. A page's own cards
+              are the secondary containers within.
+              The Contract Holder and Contract Engineer get no container — the
+              same fixed, scrolling area, but bare. Full-area pages read this
+              off `data-container` (see layout/pageFill.js). */}
           <div
-            className="flex h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl border"
-            style={{
+            className={`flex h-[calc(100dvh-7rem)] flex-col ${hasContainer ? 'overflow-hidden rounded-2xl border' : ''}`}
+            style={hasContainer ? {
               background: isDark ? '#111827' : '#ffffff',
               borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#cce6f8',
               boxShadow: '0 1px 4px rgba(27,76,111,0.06), 0 4px 16px rgba(27,76,111,0.06)',
-            }}
+            } : undefined}
           >
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div data-container={hasContainer ? 'on' : 'off'}
+              className={`group/page min-h-0 flex-1 overflow-y-auto ${hasContainer ? 'p-5' : 'p-1'}`}>
               {children}
             </div>
           </div>

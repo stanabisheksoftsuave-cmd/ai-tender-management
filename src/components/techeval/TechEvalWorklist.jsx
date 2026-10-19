@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTenders } from '../../context/TenderContext'
 import { canEvaluate, isUnassignedSide } from '../../utils/evalAssignment'
 import { isOpenForTech, scmReturnFor } from './model'
+import { PAGE_FILL } from '../layout/pageFill'
 
 const LIST_TITLE = 'Technical Evaluation'
 const LIST_DESCRIPTION = 'Select a tender to begin compliance evaluation'
@@ -48,7 +49,7 @@ export function TechEvalWorklist() {
     // The page IS the layout's parent container, like every worklist: it bleeds
     // to the container's edges and fills it — heading on top, rows scrolling,
     // pagination pinned below.
-    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+    <div className={PAGE_FILL}>
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
         <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf]">

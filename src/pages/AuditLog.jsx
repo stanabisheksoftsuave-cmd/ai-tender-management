@@ -6,6 +6,7 @@ import ListPagination from '../components/shell/ListPagination'
 import { auditLogs } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { useDismissable } from '../context/NavigationContext'
+import { PAGE_FILL } from '../components/layout/pageFill'
 
 /*
  * Audit logs — the main app's AuditLogPanel layout: one panel filling the
@@ -130,7 +131,7 @@ export default function AuditLog() {
   return (
     // Bleeds to the edges of the layout's parent container (cancelling its
     // p-5), so the filters, the table rules and the footer run full width.
-    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+    <div className={PAGE_FILL}>
       {/* ── Filters ── */}
       <div className="shrink-0 px-5 pt-4 pb-4">
         <div className="flex flex-wrap items-end gap-3">
