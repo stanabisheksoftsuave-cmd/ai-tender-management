@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, ClipboardCheck, FileText, Inbox, Plus, Search } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ClipboardCheck, FileText, Inbox, Search } from 'lucide-react'
 import Card from '../ui/Card'
-import Button from '../ui/Button'
+import CreateButton from './CreateButton'
 import SearchableSelect from '../ui/SearchableSelect'
 import { useAuth } from '../../context/AuthContext'
 import { useTenders } from '../../context/TenderContext'
@@ -186,15 +186,10 @@ export default function ContractHolderDashboard() {
             </span>
           )}
           {canCreateCif && (
-            <Button type="button" variant="brand" onClick={() => navigate('/contract-strategy/new')}>
-              <Plus size={16} aria-hidden="true" /> New CIF
-            </Button>
+            <CreateButton tone="navy" onClick={() => navigate('/contract-strategy/new')}>New CIF</CreateButton>
           )}
           {canCreateItt && (
-            <Button type="button" variant="secondary" className="border border-slate-200 bg-white"
-              onClick={() => navigate('/create-itt?new=1')}>
-              <Plus size={16} aria-hidden="true" /> New ITT
-            </Button>
+            <CreateButton tone="blue" onClick={() => navigate('/create-itt?new=1')}>New ITT</CreateButton>
           )}
         </div>
       </div>

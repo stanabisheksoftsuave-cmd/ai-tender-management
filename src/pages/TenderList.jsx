@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react'
-import { Search, Filter, Plus, Eye, Download, Upload, ChevronRight, Briefcase, FileText, RefreshCw, X } from 'lucide-react'
+import { Search, Filter, Eye, Download, Upload, ChevronRight, Briefcase, FileText, RefreshCw, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -15,6 +15,7 @@ import { tenderRef } from '../utils/tenderRef'
 import { useAccess } from '../utils/permissions'
 import { BudgetAmount, CostCodeChip } from '../components/shell/TableBits'
 import ListPagination from '../components/shell/ListPagination'
+import CreateButton from '../components/shell/CreateButton'
 import { formatDate } from '../components/shell/chFlow'
 
 const REASSIGN_OPTIONS = [
@@ -418,16 +419,12 @@ export default function TenderList() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {/* Same shared buttons as the Dashboard — same size, equal weight. */}
           {isContractHolder && (
-            <Button onClick={() => navigate('/contract-strategy/new')} size="sm">
-              <Plus size={13} /> New CIF
-            </Button>
+            <CreateButton tone="navy" onClick={() => navigate('/contract-strategy/new')}>New CIF</CreateButton>
           )}
           {(isContractHolder || isPof) && (
-            <Button variant="secondary" onClick={() => navigate('/create-itt')} size="sm"
-              className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-              <Plus size={13} /> New ITT
-            </Button>
+            <CreateButton tone="blue" onClick={() => navigate('/create-itt')}>New ITT</CreateButton>
           )}
           {isPof && tenders.filter(td => td.status === 'award').length > 0 && (
             <Button onClick={() => navigate(`/contract/${tenders.find(td => td.status === 'award').id}`)} size="sm">
