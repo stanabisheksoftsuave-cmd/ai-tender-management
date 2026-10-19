@@ -49,11 +49,18 @@ const COLUMNS = [
   { label: 'Actions',   width: '8%', right: true },
 ]
 
-export function StatCard({ label, value, icon: Icon }) {
+// Icon tile colour: `neutral` grey (Contract Holder) or `blue`, the brand
+// light-blue tile with a blue icon (Supply Chain).
+const STAT_ICON_TONES = {
+  neutral: 'bg-slate-100 text-slate-500',
+  blue: 'bg-[#e8f3fb] text-[#0089cf]',
+}
+
+export function StatCard({ label, value, icon: Icon, tone = 'neutral' }) {
   return (
     <Card className="p-3">
       <div className="flex items-start gap-3">
-        <span className="inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <span className={`inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-lg ${STAT_ICON_TONES[tone] || STAT_ICON_TONES.neutral}`}>
           <Icon size={16} aria-hidden="true" />
         </span>
         <div className="min-w-0 space-y-1">

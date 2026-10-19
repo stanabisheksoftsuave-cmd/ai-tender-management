@@ -157,16 +157,16 @@ export default function SupplyChainDashboard() {
       {/* ── KPIs ── */}
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 min-[20rem]:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Awaiting approval" value={kpis.awaiting}        icon={Inbox} />
-          <StatCard label="Technical review"  value={kpis.technicalReview} icon={ClipboardCheck} />
-          <StatCard label="Award review"      value={kpis.awardReview}     icon={Trophy} />
-          <StatCard label="Contract review"   value={kpis.contractReview}  icon={FileText} />
+          <StatCard label="Awaiting approval" value={kpis.awaiting}        icon={Inbox} tone="blue" />
+          <StatCard label="Technical review"  value={kpis.technicalReview} icon={ClipboardCheck} tone="blue" />
+          <StatCard label="Award review"      value={kpis.awardReview}     icon={Trophy} tone="blue" />
+          <StatCard label="Contract review"   value={kpis.contractReview}  icon={FileText} tone="blue" />
         </div>
         <div className="grid grid-cols-1 gap-3 min-[20rem]:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Overdue"                value={kpis.overdue}          icon={Clock} />
-          <StatCard label="Returned"               value={kpis.returned}         icon={Undo2} />
-          <StatCard label="Approved, last 30 days" value={kpis.approvedRecently} icon={CheckCircle2} />
-          <StatCard label="Average decision time"  value="-"                     icon={Timer} />
+          <StatCard label="Overdue"                value={kpis.overdue}          icon={Clock} tone="blue" />
+          <StatCard label="Returned"               value={kpis.returned}         icon={Undo2} tone="blue" />
+          <StatCard label="Approved, last 30 days" value={kpis.approvedRecently} icon={CheckCircle2} tone="blue" />
+          <StatCard label="Average decision time"  value="-"                     icon={Timer} tone="blue" />
         </div>
       </div>
 
