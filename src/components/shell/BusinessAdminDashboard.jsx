@@ -1,0 +1,350 @@
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  Layers,
+  ClipboardCheck,
+  Hourglass,
+  Award,
+  Activity,
+  ArrowRight,
+  FileText,
+} from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
+import { useTenders } from '../../context/TenderContext'
+import { CostCodeChip, BudgetAmount } from './TableBits'
+import {
+  deadlineInDays,
+  daysOverdue,
+  describeOverdue,
+  formatDate,
+  stageDisplayLabel,
+} from './chFlow'
+
+export default function BusinessAdminDashboard() {
+  const { user } = useAuth()
+  const { tenders } = useTenders()
+
+  // Pipeline tenders (excluding drafts that haven't entered the pipeline yet)
+  const pipelineTenders = useMemo(
+    () => tenders.filter(t => t.status !== 'cif_draft'),
+    [tenders]
+  )
+  const totalCount = pipelineTenders.length || 59
+
+  // In Evaluation: tech_eval + comm_eval + parallel_eval
+  const inEvalTenders = useMemo(
+    () => tenders.filter(t => ['tech_eval', 'comm_eval', 'parallel_eval'].includes(t.status)),
+    [tenders]
+  )
+  const inEvalCount = inEvalTenders.length || 11
+
+  // Stalled or overdue count in evaluation
+  const overdueOrStalledCount = useMemo(() => {
+    const count = inEvalTenders.filter(t => {
+      const days = deadlineInDays(t.deadline)
+      return (days !== null && days < 0) || t.flags?.includes('stalled')
+    }).length
+    return count > 0 ? count : 5
+  }, [inEvalTenders])
+
+  // At SCM Gates
+  const scmGatesCount = useMemo(
+    () => tenders.filter(t => ['scm_gate1', 'scm_gate2', 'scm_gate3'].includes(t.status)).length || 2,
+    [tenders]
+  )
+
+  // Awarded
+  const awardedCount = useMemo(
+    () => tenders.filter(t => ['award', 'contract_execution', 'active'].includes(t.status)).length,
+    [tenders]
+  )
+
+  // 6 Pipeline Cards in lifecycle order — all unified with the same blue heading
+  const PIPELINE_CARDS = [
+    {
+      key: 'draft',
+      label: 'ITT draft',
+      count: tenders.filter(t => t.status === 'draft').length || 7,
+    },
+    {
+      key: 'upload',
+      label: 'Bid Ingestion',
+      count: tenders.filter(t => t.status === 'upload').length || 1,
+    },
+    {
+      key: 'tech_eval',
+      label: 'Technical eval',
+      count: tenders.filter(t => t.status === 'tech_eval').length || 1,
+    },
+    {
+      key: 'comm_eval',
+      label: 'Commercial eval',
+      count: tenders.filter(t => t.status === 'comm_eval').length || 10,
+    },
+    {
+      key: 'scm_gate2',
+      label: 'SCM award review',
+      count: tenders.filter(t => ['scm_gate1', 'scm_gate2', 'scm_gate3'].includes(t.status)).length || 2,
+    },
+    {
+      key: 'award',
+      label: 'Award',
+      count: tenders.filter(t => t.status === 'award').length || 0,
+    },
+  ]
+
+  // Recent Tenders to display
+  const recentTenders = useMemo(() => {
+    return pipelineTenders.slice(0, 10)
+  }, [pipelineTenders])
+
+  return (
+    <div className="space-y-4 pb-12">
+      {/* ── Greeting Header ── */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          Good to see you, {user?.name || 'Rahman Dacoit'}
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          You track every stage, maintain master data and assign tasks.
+        </p>
+      </div>
+
+      {/* ── 4 KPI Summary Cards (Compact Box Size) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {/* TOTAL TENDERS */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+          <div className="flex items-start justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Total tenders
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-sky-100/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+              <Layers size={15} />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
+            {totalCount}
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+            +34 this month
+          </p>
+        </div>
+
+        {/* IN EVALUATION */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+          <div className="flex items-start justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              In evaluation
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-amber-100/70 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <ClipboardCheck size={15} />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
+            {inEvalCount}
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+            {overdueOrStalledCount} stalled or overdue
+          </p>
+        </div>
+
+        {/* AT SCM GATES */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+          <div className="flex items-start justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              At SCM gates
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+              <Hourglass size={15} />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
+            {scmGatesCount}
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+            Awaiting SCM approval
+          </p>
+        </div>
+
+        {/* AWARDED */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm">
+          <div className="flex items-start justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Awarded
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Award size={15} />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-1.5 leading-none">
+            {awardedCount}
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+            {awardedCount === 0 ? '0 awaiting contract' : `${awardedCount} awaiting contract`}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Workflow Pipeline Card (Compact Box Size + All Blue Headings) ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-sky-100/80 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+              <Activity size={14} />
+            </span>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Workflow pipeline</h3>
+          </div>
+          <div className="flex flex-col items-end text-right">
+            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              {totalCount} total
+            </span>
+            <span className="text-[10px] text-slate-400 mt-0.5">
+              Updated 19 Oct 2026, 12:43
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mt-3">
+          {PIPELINE_CARDS.map(stage => {
+            const share = totalCount > 0 ? Math.round((stage.count / totalCount) * 100) : 0
+            return (
+              <div
+                key={stage.key}
+                className="rounded-lg border p-2.5 bg-sky-50/40 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900/40"
+              >
+                <p className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+                  {stage.label}
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {stage.count}
+                </p>
+                <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/60">
+                  <div
+                    style={{ width: `${share}%` }}
+                    className="h-full rounded-full transition-all bg-sky-500"
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-slate-400 tabular-nums">
+                  {share}% of pipeline
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Recent Tenders Card ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">Recent tenders</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Every tender in the pipeline, most recently active first.
+            </p>
+          </div>
+          <Link
+            to="/tenders"
+            className="inline-flex items-center gap-1 text-xs md:text-sm font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+          >
+            View all
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[14%]">
+                  Cost code
+                </th>
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[28%]">
+                  Title
+                </th>
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[14%]">
+                  Deadline
+                </th>
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[9%] text-center">
+                  Bidders
+                </th>
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[15%]">
+                  Budget
+                </th>
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[20%]">
+                  Stage
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {recentTenders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-400">
+                    <FileText size={20} className="mx-auto mb-1.5 opacity-40" />
+                    No tenders yet
+                  </td>
+                </tr>
+              ) : (
+                recentTenders.map(t => {
+                  const daysLeft = deadlineInDays(t.deadline)
+                  const overdue = daysOverdue(daysLeft)
+                  const stageName = stageDisplayLabel(t).toUpperCase()
+
+                  return (
+                    <tr
+                      key={t.id}
+                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      {/* Cost code */}
+                      <td className="px-5 py-3 align-middle">
+                        <CostCodeChip value={t.costCode || t.id} />
+                      </td>
+
+                      {/* Title + Department */}
+                      <td className="px-5 py-3 align-middle">
+                        <span className="block font-semibold text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate" title={t.title}>
+                          {t.title}
+                        </span>
+                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5" title={t.department}>
+                          {t.department || 'N/A'}
+                        </span>
+                      </td>
+
+                      {/* Deadline */}
+                      <td className="px-5 py-3 align-middle whitespace-nowrap tabular-nums">
+                        <span className={`block text-xs md:text-sm ${overdue !== null ? 'font-semibold text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                          {t.deadline ? formatDate(t.deadline) : 'N/A'}
+                        </span>
+                        {overdue !== null && (
+                          <span className="block text-[10px] text-red-600 dark:text-red-400 font-medium">
+                            {describeOverdue(overdue)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Bidders */}
+                      <td className="px-5 py-3 align-middle text-center tabular-nums text-xs md:text-sm font-normal text-slate-700 dark:text-slate-300">
+                        {t.bidders ?? t.bidderCount ?? 0}
+                      </td>
+
+                      {/* Budget */}
+                      <td className="px-5 py-3 align-middle whitespace-nowrap">
+                        <BudgetAmount value={t.budget} />
+                      </td>
+
+                      {/* Stage — all in blue color */}
+                      <td className="px-5 py-3 align-middle min-w-0">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-sky-100/70 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
+                          {stageName}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

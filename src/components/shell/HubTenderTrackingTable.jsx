@@ -21,7 +21,7 @@ const BADGE_CLASSES = {
 
 function StatusBadge({ tender }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${BADGE_CLASSES[hubStatusTone(tender)]}`}>
+    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60">
       {hubStatusLabel(tender)}
     </span>
   )
