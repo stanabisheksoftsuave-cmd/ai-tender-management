@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Building2, Calendar, ChevronLeft, ChevronRight, ClipboardList, FileText, Hash,
+  Building2, Calendar, ChevronRight, ClipboardList, FileText, Hash,
   RefreshCw, RotateCcw, Search, UserPlus, Users,
 } from 'lucide-react'
-import Card from '../ui/Card'
 import Badge from '../ui/Badge'
 import ListPagination from '../shell/ListPagination'
 import { useAuth } from '../../context/AuthContext'
@@ -46,15 +45,18 @@ export function TechEvalWorklist() {
   const pageItems = filtered.slice((current - 1) * pageSize, current * pageSize)
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div className="flex min-w-0 flex-1 basis-72 items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+    // The page IS the layout's parent container, like every worklist: it bleeds
+    // to the container's edges and fills it — heading on top, rows scrolling,
+    // pagination pinned below.
+    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+        <div className="flex min-w-0 flex-1 basis-72 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf]">
             <ClipboardList size={18} />
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-800">{LIST_TITLE}</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{LIST_DESCRIPTION}</p>
+            <h2 className="text-base font-semibold text-[#1b4c6f]">{LIST_TITLE}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{LIST_DESCRIPTION}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -66,18 +68,19 @@ export function TechEvalWorklist() {
                 type="search"
                 value={searchInput}
                 onChange={(e) => { setSearchInput(e.target.value); setPage(1) }}
-                placeholder="Search…"
-                className="olng-input w-48 rounded-lg border border-slate-200 py-1.5 pl-8 pr-2.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                placeholder="Search by tender title"
+                className="h-9 w-56 rounded-lg border border-[#cce6f8] bg-white pl-8 pr-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 sm:w-64"
               />
             </label>
           )}
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+          <span className="rounded-full bg-[#ecf4fc] px-2.5 py-1 text-xs text-slate-500 tabular-nums">
             {filtered.length} tender{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
-      <div className="p-4">
+      <div role="region" aria-label={`${LIST_TITLE} worklist`} tabIndex={0}
+        className="min-h-0 flex-1 overflow-y-auto border-t border-[#cce6f8] px-3 py-2.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0089cf]">
         {filtered.length === 0 && board.length > 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-14 text-slate-400">
             <Search size={28} />
@@ -90,7 +93,7 @@ export function TechEvalWorklist() {
             <p className="text-sm font-medium">No tenders awaiting technical evaluation</p>
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {pageItems.map(tender => {
               const returned = scmReturnFor(tender)
               return (
@@ -98,11 +101,11 @@ export function TechEvalWorklist() {
                   <button
                     type="button"
                     onClick={() => navigate(`/technical-eval/${tender.id}`)}
-                    className="group block w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition-all hover:border-[var(--color-primary)]/30 hover:shadow-md"
+                    className="group block w-full rounded-xl border border-[#cce6f8] bg-white px-3.5 py-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.06]"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
-                        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <h3 className="truncate text-sm font-semibold text-slate-800">{tender.title}</h3>
                           <Badge variant="tech_eval">{tender.status === 'parallel_eval' ? 'Parallel Evaluation' : 'Technical Evaluation'}</Badge>
                           {tender.evalProgress === 'in_progress' && (
@@ -127,7 +130,7 @@ export function TechEvalWorklist() {
                             </span>
                           )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                           <span className="flex items-center gap-1"><Hash size={11} /> Cost Code: {tender.costCode?.trim() || 'N/A'}</span>
                           <span className="flex items-center gap-1"><Calendar size={11} /> {tender.deadline || 'N/A'}</span>
                           <span className="flex items-center gap-1"><Building2 size={11} /> {tender.department}</span>
@@ -138,8 +141,8 @@ export function TechEvalWorklist() {
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
                         <div className="text-right">
+                          <p className="text-[11px] text-slate-500">Budget</p>
                           <p className="text-sm font-bold text-slate-800">{tender.budget}</p>
-                          <p className="text-[10px] text-slate-400">Budget</p>
                         </div>
                         <ChevronRight size={16} className="text-slate-300 transition-colors group-hover:text-[var(--color-primary)]" />
                       </div>
@@ -153,7 +156,7 @@ export function TechEvalWorklist() {
       </div>
 
       {filtered.length > 0 && (
-        <div className="shrink-0 border-t border-slate-100 px-4 py-3">
+        <div className="shrink-0 border-t border-[#cce6f8] px-3 py-1.5">
           <ListPagination
             page={current}
             pageSize={pageSize}
@@ -163,6 +166,6 @@ export function TechEvalWorklist() {
           />
         </div>
       )}
-    </Card>
+    </div>
   )
 }

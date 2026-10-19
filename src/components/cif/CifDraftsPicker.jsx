@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Briefcase, Building2, CalendarClock, ChevronLeft, ChevronRight, FileText, Hash, Plus, Search,
 } from 'lucide-react'
-import Card from '../ui/Card'
 import { useTenders } from '../../context/TenderContext'
 import {
   draftProgressStage,
@@ -60,10 +59,13 @@ export default function CifDraftsPicker() {
   }
 
   return (
-    <div className="w-full olng-slide-up">
-      <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+    // The page IS the layout's parent container, like every worklist: it bleeds
+    // to the container's edges and fills it — heading on top, rows scrolling,
+    // footer pinned below.
+    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col olng-slide-up">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3 p-5 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-[#cce6f8] dark:border-slate-800">
           <div className="min-w-0 flex-1 basis-72">
             <div className="flex items-center gap-3">
               <span
@@ -100,7 +102,7 @@ export default function CifDraftsPicker() {
         </div>
 
         {/* List */}
-        <div className="p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
           {drafts.length === 0 && isSearching ? (
             <EmptyState icon={Search} title="No drafts match your search">
               Try a different cost code, title or department.
@@ -158,7 +160,7 @@ export default function CifDraftsPicker() {
         </div>
 
         {/* Footer: rows per page + pagination + New CIF */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-5 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#cce6f8] dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 dark:text-slate-400">Rows per page</span>
@@ -210,7 +212,7 @@ export default function CifDraftsPicker() {
             New CIF
           </button>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }

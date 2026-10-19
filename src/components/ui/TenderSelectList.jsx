@@ -12,31 +12,9 @@ import {
   RefreshCw,
   UserPlus
 } from 'lucide-react'
-import Card from './Card'
-import Badge from './Badge'
+import ListPagination from '../shell/ListPagination'
 import { tenderRef } from '../../utils/tenderRef'
 
-const statusVariant = {
-  tech_eval:   'tech_eval',
-  comm_eval:   'comm_eval',
-  scm_gate1:   'scm_gate',
-  scm_gate2:   'scm_gate',
-  scm_gate3:   'scm_gate',
-  upload:      'upload',
-  award:       'award',
-  prequal_stage1:      'prequal_stage1',
-  prequal_stage2:      'prequal_stage2',
-  prequal_stage3:      'prequal_stage3',
-  prequal_stage4:      'prequal_stage4',
-  prequal_final_review: 'prequal_final_review',
-  prequal_rejected:    'prequal_rejected',
-  legal_review:        'legal_review',
-  contract_execution:  'contract_execution',
-  active:              'active',
-  contract_closure:    'contract_closure',
-  closed:              'closed',
-  parallel_eval:       'tech_eval',
-}
 
 const formatDeadline = (value) => {
   if (!value) return 'N/A'
@@ -94,177 +72,131 @@ export default function TenderSelectList({
     return filtered.slice(start, start + pageSize)
   }, [filtered, safePage, pageSize])
 
-  const IconComp = icon || <ClipboardList size={18} className="text-[var(--color-primary)] shrink-0" />
+  const IconComp = icon || <ClipboardList size={18} className="shrink-0" />
 
   return (
-    <div className="space-y-4">
-      {/* ── Main Worklist Card ── */}
-      <Card className="p-5 sm:p-6 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-        {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-[var(--color-primary)] flex items-center justify-center shrink-0 mt-0.5">
-              {IconComp}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">
-                  {title}
-                </h2>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {description}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 self-end sm:self-center">
-            {/* Search Box */}
-            <div className="relative min-w-[200px] sm:min-w-[240px]">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search tenders..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:bg-white dark:focus:bg-slate-800"
-              />
-            </div>
-            {/* Count Pill */}
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 whitespace-nowrap">
-              {filtered.length} {filtered.length === 1 ? 'tender' : 'tenders'}
-            </span>
+    // The page IS the layout's parent container (main app's FixedListCard):
+    // it bleeds to the container's edges (cancelling its p-5) and fills it —
+    // heading on top, rows scrolling in the middle, pagination pinned below.
+    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
+      {/* ── Heading: icon, title, description · search and count ── */}
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 px-4 pt-4 pb-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf] dark:bg-sky-950/60">
+            {IconComp}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-[#1b4c6f] dark:text-slate-100">{title}</h2>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="relative w-56 sm:w-64">
+            <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search by tender title"
+              aria-label="Search by tender title"
+              className="h-9 w-full rounded-lg border border-[#cce6f8] bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+          <span className="shrink-0 rounded-full bg-[#ecf4fc] px-2.5 py-1 text-xs text-slate-500 tabular-nums dark:bg-slate-800 dark:text-slate-300">
+            {filtered.length} {filtered.length === 1 ? 'tender' : 'tenders'}
+          </span>
+        </div>
+      </div>
 
-        {/* Content Area */}
-        <div className="pt-4">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 mb-3">
-                <FileText size={22} />
-              </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {search.trim() ? 'No matching tenders found' : emptyText}
-              </p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-sm">
-                {search.trim() ? 'Try adjusting your search criteria' : 'Awarded tenders ready for contract drafting will appear here automatically.'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {pagedItems.map(tender => (
-                <div
-                  key={tender.id}
-                  onClick={() => navigate(`${basePath}/${tender.id}`)}
-                  className="group block w-full p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/40 hover:bg-slate-50/80 dark:hover:bg-slate-800 hover:border-blue-300/60 dark:hover:border-blue-500/40 hover:shadow-sm transition-all cursor-pointer text-left"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      {/* Top row: Title and Badges */}
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 group-hover:text-[var(--color-primary)] transition-colors truncate">
-                          {tender.title}
-                        </h3>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 uppercase">
-                          {tender.stage || 'AWARD'}
+      {/* ── Rows ── */}
+      <div role="region" aria-label={`${title} worklist`} tabIndex={0}
+        className="min-h-0 flex-1 overflow-y-auto border-t border-[#cce6f8] px-3 py-2.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0089cf] dark:border-slate-800">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[#cce6f8] p-6 text-center sm:p-10 dark:border-slate-800">
+            <span className="flex w-10 h-10 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf] dark:bg-sky-950/60">
+              <FileText size={18} />
+            </span>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              {search.trim() ? 'No matching tenders found' : emptyText}
+            </p>
+            {search.trim() && <p className="text-xs text-slate-500">Try a different search.</p>}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {pagedItems.map(tender => (
+              <button
+                key={tender.id}
+                type="button"
+                onClick={() => navigate(`${basePath}/${tender.id}`)}
+                className="group block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0089cf]/30"
+              >
+                <div className="overflow-hidden rounded-xl border border-[#cce6f8] bg-white px-3.5 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#0089cf]/40 hover:bg-[#0089cf]/[0.06] dark:border-slate-800 dark:bg-slate-800/40">
+                  <div className="flex items-center justify-between gap-3 sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <h3 className="max-w-full truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{tender.title}</h3>
+                        <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 dark:border-sky-800/60 dark:bg-sky-900/30 dark:text-sky-300">
+                          {tender.stage || 'Award'}
                         </span>
                         {tender.evalProgress === 'in_progress' && (
-                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-2 py-0.5 rounded-full">
-                            In Progress
-                          </span>
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">In Progress</span>
                         )}
                         {isUnassigned?.(tender) && (
-                          <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 ring-1 ring-violet-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">
                             <UserPlus size={9} /> Unassigned
                           </span>
                         )}
                         {tender.correctionRequests?.some(r => r.resolved) && (
-                          <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 ring-1 ring-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-300">
                             <RefreshCw size={9} /> Docs Re-submitted
                           </span>
                         )}
                       </div>
-
-                      {/* Meta items */}
-                      <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap text-xs text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1 font-mono">
-                          <Hash size={12} className="text-slate-400 shrink-0" />
-                          Cost Code: <strong className="font-semibold text-slate-700 dark:text-slate-300">{tender.costCode || tenderRef(tender) || 'N/A'}</strong>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="flex min-w-0 items-center gap-1">
+                          <Hash size={12} className="shrink-0" aria-hidden="true" />
+                          Cost Code: {tender.costCode || tenderRef(tender) || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} className="text-slate-400 shrink-0" />
+                        <span className="flex min-w-0 items-center gap-1">
+                          <Calendar size={12} className="shrink-0" aria-hidden="true" />
                           Deadline: {formatDeadline(tender.deadline)}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Building2 size={12} className="text-slate-400 shrink-0" />
+                        <span className="flex min-w-0 items-center gap-1">
+                          <Building2 size={12} className="shrink-0" aria-hidden="true" />
                           {tender.department || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Users size={12} className="text-slate-400 shrink-0" />
+                        <span className="flex min-w-0 items-center gap-1">
+                          <Users size={12} className="shrink-0" aria-hidden="true" />
                           {tender.bidders ?? 0} {(tender.bidders ?? 0) === 1 ? 'bidder' : 'bidders'}
                         </span>
                       </div>
                     </div>
-
-                    {/* Right side: Budget & Chevron */}
-                    <div className="flex items-center gap-4 shrink-0 pl-2">
+                    <div className="flex shrink-0 items-center gap-3">
                       <div className="text-right">
-                        <p className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Budget</p>
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                          {tender.budget || '—'}
-                        </p>
+                        <p className="text-[11px] text-slate-500">Budget</p>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{tender.budget || '—'}</p>
                       </div>
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-[var(--color-primary)] group-hover:bg-blue-50 dark:group-hover:bg-slate-700 transition-all">
-                        <ChevronRight size={16} />
-                      </div>
+                      <ChevronRight size={16} className="shrink-0 text-slate-400 transition-colors group-hover:text-[#0089cf]" aria-hidden="true" />
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer: Pagination */}
-        {filtered.length > pageSize && (
-          <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
-              <span>Rows per page</span>
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
-                className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>
-                Page {safePage} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Previous
               </button>
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Next
-              </button>
-            </div>
+            ))}
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* ── Pagination ── */}
+      {filtered.length > 0 && (
+        <div className="shrink-0 border-t border-[#cce6f8] px-3 py-1.5 dark:border-slate-800">
+          <ListPagination
+            page={safePage}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={size => { setPageSize(size); setPage(1) }}
+          />
+        </div>
+      )}
     </div>
   )
 }
-

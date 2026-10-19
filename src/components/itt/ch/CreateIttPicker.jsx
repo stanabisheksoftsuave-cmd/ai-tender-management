@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Building2, CalendarClock, ChevronLeft, ChevronRight, Hash, Inbox, Plus, Search, ShieldAlert, X } from 'lucide-react'
-import Card from '../../ui/Card'
 
 /*
  * Create ITT — the Contract Holder's tender picker (MAIN's TenderPicker):
@@ -120,8 +119,11 @@ export default function CreateIttPicker({
   }
 
   return (
-    <Card className="olng-slide-up overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-      <div className="px-5 pt-5 pb-1">
+    // The page IS the layout's parent container, like every worklist: it bleeds
+    // to the container's edges and fills it — heading on top, rows scrolling,
+    // footer pinned below.
+    <div className="olng-slide-up -m-5 flex h-[calc(100%+2.5rem)] flex-col">
+      <div className="shrink-0 px-4 pt-4 pb-1">
         <div className="flex items-start gap-3">
           <span
             className="flex size-10 shrink-0 items-center justify-center rounded-xl text-[#0089cf]"
@@ -198,7 +200,7 @@ export default function CreateIttPicker({
         )}
       </div>
 
-      <div className="px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
         {!hasAny ? (
           <PickerEmptyState icon={<ShieldAlert size={18} aria-hidden="true" />} title="No tenders ready for ITT creation">
             A tender must complete the <strong>PSF Strategy</strong> (Procurement Submission Form) step before its ITT can be created.
@@ -219,7 +221,7 @@ export default function CreateIttPicker({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-5 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#cce6f8] dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 dark:text-slate-400">Rows per page</span>
@@ -274,7 +276,7 @@ export default function CreateIttPicker({
           </button>
         ) : null}
       </div>
-    </Card>
+    </div>
   )
 }
 

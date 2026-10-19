@@ -34,11 +34,12 @@ export default function FinancialAssessmentWorklist({ tenders }) {
   const pageItems = assignments.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
-    // Fills the layout's parent container, so the footer stays pinned at the
-    // bottom and only the rows scroll.
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-[#cce6f8] bg-white">
+    // The page IS the layout's parent container, like every worklist: it bleeds
+    // to the container's edges and fills it — heading on top, rows scrolling,
+    // pagination pinned below.
+    <div className="-m-5 flex h-[calc(100%+2.5rem)] flex-col">
       {/* ── Header ── */}
-      <div className="flex shrink-0 items-start justify-between gap-4 px-3 pt-3 pb-2.5">
+      <div className="flex shrink-0 items-start justify-between gap-4 px-4 pt-4 pb-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f3fb] text-[#0089cf]">
             <Wallet size={18} aria-hidden="true" />

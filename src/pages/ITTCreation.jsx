@@ -779,7 +779,8 @@ export default function ITTCreation() {
 
   if (showDraftPicker) {
     return (
-      <div className="space-y-3">
+      // h-full so the picker can fill the layout's parent container.
+      <div className="h-full">
         <CreateIttPicker
           tenders={draftTenders}
           title={isIttReviewer ? 'ITT Review and Approve' : 'Create ITT'}
