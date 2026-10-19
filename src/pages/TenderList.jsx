@@ -156,6 +156,15 @@ const statusLabelsAr = {
   closed:             'مغلق ومؤرشف',
 }
 
+// Column widths — shared by the header table and the rows table.
+const TENDER_COLUMNS = (
+  <colgroup>
+    <col style={{ width: '13%' }} /><col style={{ width: '24%' }} /><col style={{ width: '13%' }} />
+    <col style={{ width: '8%' }} /><col style={{ width: '14%' }} /><col style={{ width: '20%' }} />
+    <col style={{ width: '8%' }} />
+  </colgroup>
+)
+
 export default function TenderList() {
   const navigate = useNavigate()
   const { user, users } = useAuth()
@@ -438,19 +447,31 @@ export default function TenderList() {
 
       {/* Table Card */}
       <Card className="flex min-h-[20rem] flex-1 flex-col overflow-hidden rounded-xl border border-[#cce6f8] dark:border-slate-800 bg-white dark:bg-slate-900">
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[56rem] table-fixed">
-            <thead className="sticky top-0 z-[1] bg-slate-50 dark:bg-slate-800/90 border-b border-[#cce6f8] dark:border-slate-700">
+        {/* Header and rows are two tables sharing one colgroup, so the rows'
+            scrollbar starts under the header instead of running beside it;
+            the header reserves the same scrollbar gutter to keep columns
+            aligned. The outer box scrolls both sideways together. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-x-auto">
+        <div className="flex min-h-0 min-w-[56rem] flex-1 flex-col">
+        <div className="shrink-0 overflow-y-hidden bg-slate-50 dark:bg-slate-800/90 border-b border-[#cce6f8] dark:border-slate-700 [scrollbar-gutter:stable]">
+          <table className="w-full table-fixed">
+            {TENDER_COLUMNS}
+            <thead>
               <tr>
-                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.id')}</th>
-                <th className="w-[24%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.title')}</th>
-                <th className="w-[13%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.deadline')}</th>
-                <th className="w-[8%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.bidders')}</th>
-                <th className="w-[14%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.budget')}</th>
-                <th className="w-[20%] text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.stage')}</th>
-                <th className="w-[8%] px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.actions')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.id')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.title')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.deadline')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.bidders')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.budget')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.stage')}</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('list.actions')}</th>
               </tr>
             </thead>
+          </table>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <table className="w-full table-fixed">
+            {TENDER_COLUMNS}
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {rows.length === 0 && (
                 <tr>
@@ -604,6 +625,8 @@ export default function TenderList() {
               ))}
             </tbody>
           </table>
+        </div>
+        </div>
         </div>
 
         {/* Pagination Footer */}

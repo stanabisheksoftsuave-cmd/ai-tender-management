@@ -21,6 +21,14 @@ import {
   stageDisplayLabel,
 } from './chFlow'
 
+// Recent tenders column widths — shared by the header table and the rows table.
+const RECENT_COLUMNS = (
+  <colgroup>
+    <col style={{ width: '14%' }} /><col style={{ width: '28%' }} /><col style={{ width: '14%' }} />
+    <col style={{ width: '9%' }} /><col style={{ width: '15%' }} /><col style={{ width: '20%' }} />
+  </colgroup>
+)
+
 export default function BusinessAdminDashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -276,30 +284,40 @@ export default function BusinessAdminDashboard() {
           </Link>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-[1]">
+        {/* Header and rows are two tables sharing one set of column widths, so
+            the rows' scrollbar starts under the header instead of running
+            beside it. The header reserves the same scrollbar gutter, keeping
+            every column lined up. */}
+        <div className="shrink-0 overflow-y-hidden [scrollbar-gutter:stable]">
+          <table className="w-full table-fixed text-left border-collapse">
+            {RECENT_COLUMNS}
+            <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[14%]">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Cost code
                 </th>
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[28%]">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Title
                 </th>
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[14%]">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Deadline
                 </th>
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[9%] text-center">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center">
                   Bidders
                 </th>
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[15%]">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Budget
                 </th>
-                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-[20%]">
+                <th className="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Stage
                 </th>
               </tr>
             </thead>
+          </table>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <table className="w-full table-fixed text-left border-collapse">
+            {RECENT_COLUMNS}
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {recentTenders.length === 0 ? (
                 <tr>

@@ -41,6 +41,14 @@ function downloadCsv(rows) {
   URL.revokeObjectURL(url)
 }
 
+// Column widths — shared by the header table and the rows table.
+const AUDIT_COLUMNS = (
+  <colgroup>
+    <col style={{ width: '16%' }} /><col style={{ width: '22%' }} /><col style={{ width: '16%' }} />
+    <col style={{ width: '24%' }} /><col style={{ width: '22%' }} />
+  </colgroup>
+)
+
 const FIELD_LABEL = 'mb-1.5 block text-sm font-semibold text-slate-800'
 
 export default function AuditLog() {
@@ -216,19 +224,27 @@ export default function AuditLog() {
       </div>
 
       {/* ── Table ── */}
-      <div className="min-h-0 flex-1 overflow-auto border-t border-[#cce6f8]">
-        <table className="w-full min-w-[56rem] table-fixed">
-          <colgroup>
-            <col style={{ width: '16%' }} /><col style={{ width: '22%' }} /><col style={{ width: '16%' }} />
-            <col style={{ width: '24%' }} /><col style={{ width: '22%' }} />
-          </colgroup>
-          <thead className="sticky top-0 z-[1] bg-slate-50">
+      {/* Header and rows are two tables sharing one colgroup, so the rows'
+            scrollbar starts under the header instead of running beside it;
+            the header reserves the same scrollbar gutter to keep columns
+            aligned. The outer box scrolls both sideways together. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-x-auto border-t border-[#cce6f8]">
+      <div className="flex min-h-0 min-w-[56rem] flex-1 flex-col">
+      <div className="shrink-0 overflow-y-hidden bg-slate-50 [scrollbar-gutter:stable]">
+        <table className="w-full table-fixed">
+          {AUDIT_COLUMNS}
+          <thead className="bg-slate-50">
             <tr className="border-b border-[#cce6f8]">
               {['Timestamp', 'User', 'Role', 'Action', 'Tender'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">{h}</th>
               ))}
             </tr>
           </thead>
+        </table>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+        <table className="w-full table-fixed">
+          {AUDIT_COLUMNS}
           <tbody>
             {pageRows.length === 0 ? (
               <tr>
@@ -255,6 +271,8 @@ export default function AuditLog() {
             ))}
           </tbody>
         </table>
+      </div>
+      </div>
       </div>
 
       {/* ── Custom export range dialog ── */}
